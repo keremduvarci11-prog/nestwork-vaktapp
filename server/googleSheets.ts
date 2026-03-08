@@ -110,25 +110,45 @@ export async function appendVaktToSheet(vaktData: {
     const sheetId = await getOrCreateSpreadsheet();
     const sheets = await getUncachableGoogleSheetClient();
 
-    const now = new Date().toLocaleString("nb-NO", { timeZone: "Europe/Oslo" });
+    const now = new Date();
+    const godkjentTid = [
+      String(now.getDate()).padStart(2, "0"),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      now.getFullYear(),
+    ].join(".") + " " + [
+      String(now.getHours()).padStart(2, "0"),
+      String(now.getMinutes()).padStart(2, "0"),
+    ].join(":");
+
+    let formattedDato = vaktData.dato;
+    if (vaktData.dato && vaktData.dato.includes("-")) {
+      const [y, m, d] = vaktData.dato.split("-");
+      formattedDato = `${d}.${m}.${y}`;
+    }
+
+    const formatTime = (t: string) => {
+      if (!t) return "";
+      const parts = t.split(":");
+      return parts.slice(0, 2).map(p => p.padStart(2, "0")).join(":");
+    };
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
       range: "Vakter!A:J",
-      valueInputOption: "USER_ENTERED",
+      valueInputOption: "RAW",
       requestBody: {
         values: [
           [
-            vaktData.dato,
+            formattedDato,
             vaktData.barnehageNavn,
             vaktData.region,
             vaktData.ansattNavn,
             vaktData.vikarkode,
-            vaktData.startTid,
-            vaktData.sluttTid,
+            formatTime(vaktData.startTid),
+            formatTime(vaktData.sluttTid),
             vaktData.timer,
             vaktData.status,
-            now,
+            godkjentTid,
           ],
         ],
       },
