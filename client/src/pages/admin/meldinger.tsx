@@ -47,15 +47,15 @@ function SamtaleView({
     },
   });
 
-  const markRead = useMutation({
-    mutationFn: () => apiRequest("PATCH", `/api/meldinger/${melding.id}/read`),
+  const markSeen = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/meldinger/${melding.id}/seen-admin`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/meldinger"] });
     },
   });
 
-  if (!melding.read) {
-    markRead.mutate();
+  if (!markSeen.isSuccess && !markSeen.isPending) {
+    markSeen.mutate();
   }
 
   const handleSend = () => {

@@ -28,6 +28,17 @@ function SamtaleView({
     queryKey: ["/api/meldinger", melding.id, "samtale"],
   });
 
+  const markSeen = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/meldinger/${melding.id}/seen-user`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meldinger/user"] });
+    },
+  });
+
+  if (!markSeen.isSuccess && !markSeen.isPending) {
+    markSeen.mutate();
+  }
+
   const sendReply = useMutation({
     mutationFn: (message: string) =>
       apiRequest("POST", `/api/meldinger/${melding.id}/samtale`, {

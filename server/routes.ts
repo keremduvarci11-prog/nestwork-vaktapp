@@ -221,6 +221,16 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.patch("/api/meldinger/:id/seen-user", requireAuth, async (req, res) => {
+    await storage.markSeenByUser(req.params.id);
+    res.json({ success: true });
+  });
+
+  app.patch("/api/meldinger/:id/seen-admin", requireAdmin, async (req, res) => {
+    await storage.markSeenByAdmin(req.params.id);
+    res.json({ success: true });
+  });
+
   app.patch("/api/meldinger/:id/close", requireAdmin, async (req, res) => {
     const updated = await storage.closeMelding(req.params.id);
     if (!updated) return res.status(404).json({ message: "Melding ikke funnet" });
@@ -244,6 +254,35 @@ export async function registerRoutes(
       message,
     });
     res.json(created);
+  });
+
+  app.get("/api/meldinger/unread-count/admin", requireAdmin, async (_req, res) => {
+    const all = await storage.getMeldinger();
+    let count = 0;
+    for (const m of all) {
+      if (m.closed) continue;
+      const samtale = await storage.getSamtaleMeldinger(m.id);
+      const lastAdminSeen = m.lastSeenByAdmin || new Date(0);
+      const hasNewFromUser = !m.read || samtale.some(
+        (s) => s.fromUserId !== "admin" && s.createdAt && new Date(s.createdAt) > lastAdminSeen
+      );
+      if (hasNewFromUser) count++;
+    }
+    res.json({ count });
+  });
+
+  app.get("/api/meldinger/unread-count/user/:userId", requireAuth, async (req, res) => {
+    const userMeldinger = await storage.getMeldingerByUser(req.params.userId);
+    let count = 0;
+    for (const m of userMeldinger) {
+      const samtale = await storage.getSamtaleMeldinger(m.id);
+      const lastUserSeen = m.lastSeenByUser || m.createdAt || new Date(0);
+      const hasNewFromAdmin = samtale.some(
+        (s) => s.fromUserId === "admin" && s.createdAt && new Date(s.createdAt) > new Date(lastUserSeen)
+      );
+      if (hasNewFromAdmin) count++;
+    }
+    res.json({ count });
   });
 
   app.get("/api/favoritter/:userId", requireAuth, async (req, res) => {

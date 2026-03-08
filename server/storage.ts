@@ -38,6 +38,8 @@ export interface IStorage {
   markMeldingRead(id: string): Promise<void>;
   replyToMelding(id: string, reply: string): Promise<Melding | undefined>;
   closeMelding(id: string): Promise<Melding | undefined>;
+  markSeenByUser(id: string): Promise<void>;
+  markSeenByAdmin(id: string): Promise<void>;
 
   getSamtaleMeldinger(meldingId: string): Promise<SamtaleMelding[]>;
   createSamtaleMelding(m: InsertSamtaleMelding): Promise<SamtaleMelding>;
@@ -162,6 +164,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(meldinger.id, id))
       .returning();
     return updated;
+  }
+
+  async markSeenByUser(id: string): Promise<void> {
+    await db.update(meldinger).set({ lastSeenByUser: new Date() }).where(eq(meldinger.id, id));
+  }
+
+  async markSeenByAdmin(id: string): Promise<void> {
+    await db.update(meldinger).set({ lastSeenByAdmin: new Date(), read: true }).where(eq(meldinger.id, id));
   }
 
   async getSamtaleMeldinger(meldingId: string): Promise<SamtaleMelding[]> {

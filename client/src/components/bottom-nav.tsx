@@ -2,12 +2,11 @@ import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Home, Calendar, DollarSign, User, MessageSquare, LayoutDashboard, CheckSquare, Plus, Mail } from "lucide-react";
-import type { Melding, SamtaleMelding } from "@shared/schema";
 
 const employeeItems = [
   { path: "/", label: "Hjem", icon: Home },
   { path: "/mine-vakter", label: "Vakter", icon: Calendar },
-  { path: "/meldinger", label: "Meldinger", icon: MessageSquare, badge: "employee" },
+  { path: "/meldinger", label: "Meldinger", icon: MessageSquare, badge: "employee" as const },
   { path: "/inntjening", label: "Lønn", icon: DollarSign },
   { path: "/profil", label: "Profil", icon: User },
 ];
@@ -16,7 +15,7 @@ const adminItems = [
   { path: "/admin", label: "Oversikt", icon: LayoutDashboard },
   { path: "/admin/ny-vakt", label: "Ny vakt", icon: Plus },
   { path: "/admin/godkjenn", label: "Godkjenn", icon: CheckSquare },
-  { path: "/admin/meldinger", label: "Meldinger", icon: Mail, badge: "admin" },
+  { path: "/admin/meldinger", label: "Meldinger", icon: Mail, badge: "admin" as const },
   { path: "/profil", label: "Profil", icon: User },
 ];
 
@@ -25,28 +24,21 @@ export function BottomNav({ role }: { role: string }) {
   const { user } = useAuth();
   const items = role === "admin" ? adminItems : employeeItems;
 
-  const { data: adminMeldinger } = useQuery<Melding[]>({
-    queryKey: ["/api/meldinger"],
+  const { data: adminCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/meldinger/unread-count/admin"],
     enabled: role === "admin",
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
-  const { data: userMeldinger } = useQuery<Melding[]>({
-    queryKey: ["/api/meldinger/user", user?.id],
+  const { data: userCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/meldinger/unread-count/user", user?.id],
     enabled: role === "ansatt" && !!user?.id,
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
-
-  const adminUnread = adminMeldinger?.filter((m) => !m.read).length || 0;
-
-  const employeeUnread = userMeldinger?.filter((m) => {
-    if (!m.reply && !m.repliedAt) return false;
-    return true;
-  }).length || 0;
 
   const getBadgeCount = (badge?: string) => {
-    if (badge === "admin") return adminUnread;
-    if (badge === "employee") return employeeUnread;
+    if (badge === "admin") return adminCount?.count || 0;
+    if (badge === "employee") return userCount?.count || 0;
     return 0;
   };
 
