@@ -10,16 +10,21 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  address: text("address"),
   role: text("role").notNull().default("ansatt"),
   region: text("region").notNull(),
   stilling: text("stilling").notNull(),
   timelonn: decimal("timelonn", { precision: 10, scale: 2 }).notNull(),
   profileImage: text("profile_image"),
   available: boolean("available").default(true),
+  availableWeekend: boolean("available_weekend").default(false),
+  status: text("user_status").default("Aktiv"),
+  externalId: integer("external_id"),
 });
 
 export const barnehager = pgTable("barnehager", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  externalId: text("external_id"),
   name: text("name").notNull(),
   address: text("address").notNull(),
   region: text("region").notNull(),
@@ -27,6 +32,13 @@ export const barnehager = pgTable("barnehager", {
   contactPhone: text("contact_phone"),
   contactEmail: text("contact_email"),
   tariff: text("tariff"),
+  tariffAssistent: decimal("tariff_assistent", { precision: 10, scale: 2 }),
+  tariffLaerer: decimal("tariff_laerer", { precision: 10, scale: 2 }),
+  orgnr: text("orgnr"),
+  parkering: text("parkering"),
+  nokkelkode: text("nokkelkode"),
+  rutiner: text("rutiner"),
+  aktiv: boolean("aktiv").default(true),
 });
 
 export const vakter = pgTable("vakter", {
