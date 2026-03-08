@@ -213,6 +213,14 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  app.patch("/api/meldinger/:id/reply", requireAdmin, async (req, res) => {
+    const { reply } = req.body;
+    if (!reply?.trim()) return res.status(400).json({ message: "Svar kan ikke vere tomt" });
+    const updated = await storage.replyToMelding(req.params.id, reply);
+    if (!updated) return res.status(404).json({ message: "Melding ikke funnet" });
+    res.json(updated);
+  });
+
   app.get("/api/favoritter/:userId", requireAuth, async (req, res) => {
     const f = await storage.getFavoritter(req.params.userId);
     res.json(f);

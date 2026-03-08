@@ -34,6 +34,7 @@ export interface IStorage {
   getMeldingerByUser(userId: string): Promise<Melding[]>;
   createMelding(m: InsertMelding): Promise<Melding>;
   markMeldingRead(id: string): Promise<void>;
+  replyToMelding(id: string, reply: string): Promise<Melding | undefined>;
 
   getFavoritter(userId: string): Promise<Favoritt[]>;
   addFavoritt(f: InsertFavoritt): Promise<Favoritt>;
@@ -134,6 +135,14 @@ export class DatabaseStorage implements IStorage {
 
   async markMeldingRead(id: string): Promise<void> {
     await db.update(meldinger).set({ read: true }).where(eq(meldinger.id, id));
+  }
+
+  async replyToMelding(id: string, reply: string): Promise<Melding | undefined> {
+    const [updated] = await db.update(meldinger)
+      .set({ reply, repliedAt: new Date(), read: true })
+      .where(eq(meldinger.id, id))
+      .returning();
+    return updated;
   }
 
   async getFavoritter(userId: string): Promise<Favoritt[]> {

@@ -4,7 +4,7 @@ import { Home, Calendar, History, DollarSign, User, MessageSquare, ClipboardList
 const employeeItems = [
   { path: "/", label: "Hjem", icon: Home },
   { path: "/mine-vakter", label: "Vakter", icon: Calendar },
-  { path: "/historikk", label: "Historikk", icon: History },
+  { path: "/meldinger", label: "Meldinger", icon: MessageSquare },
   { path: "/inntjening", label: "Lønn", icon: DollarSign },
   { path: "/profil", label: "Profil", icon: User },
 ];

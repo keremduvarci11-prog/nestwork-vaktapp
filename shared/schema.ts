@@ -62,6 +62,8 @@ export const meldinger = pgTable("meldinger", {
   subject: text("subject").notNull(),
   message: text("message").notNull(),
   read: boolean("read").default(false),
+  reply: text("reply"),
+  repliedAt: timestamp("replied_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

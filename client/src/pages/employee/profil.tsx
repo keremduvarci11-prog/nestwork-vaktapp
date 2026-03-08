@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Briefcase, Mail, Phone, LogOut, MessageSquare, ClipboardList, ChevronRight } from "lucide-react";
+import { MapPin, Briefcase, Mail, Phone, LogOut, History, ClipboardList, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Profil() {
@@ -95,13 +95,13 @@ export default function Profil() {
 
       {user?.role !== "admin" && (
         <div className="space-y-2">
-          <Link href="/meldinger">
+          <Link href="/historikk">
             <Card className="hover-elevate cursor-pointer">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Meldinger</span>
+                    <History className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Historikk</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 </div>
