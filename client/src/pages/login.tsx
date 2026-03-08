@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import nestworkLogo from "@assets/nestwork_logo.png";
+import { NestworkLogo } from "@/components/nestwork-logo";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -30,7 +30,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-3">
-          <img src={nestworkLogo} alt="Nestwork" className="w-16 h-16 object-contain mx-auto" />
+          <NestworkLogo size={64} className="mx-auto" />
           <h1 className="text-2xl font-bold tracking-tight">Nestwork</h1>
           <p className="text-muted-foreground text-sm">Vaktapp for barnehageansatte</p>
         </div>
