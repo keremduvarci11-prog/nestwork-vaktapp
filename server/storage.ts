@@ -30,6 +30,7 @@ export interface IStorage {
   getVakt(id: string): Promise<Vakt | undefined>;
   createVakt(v: InsertVakt): Promise<Vakt>;
   updateVakt(id: string, data: Partial<InsertVakt>): Promise<Vakt | undefined>;
+  deleteVakt(id: string): Promise<boolean>;
 
   getMeldinger(): Promise<Melding[]>;
   getMeldingerByUser(userId: string): Promise<Melding[]>;
@@ -126,6 +127,11 @@ export class DatabaseStorage implements IStorage {
   async updateVakt(id: string, data: Partial<InsertVakt>): Promise<Vakt | undefined> {
     const [updated] = await db.update(vakter).set(data).where(eq(vakter.id, id)).returning();
     return updated;
+  }
+
+  async deleteVakt(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(vakter).where(eq(vakter.id, id)).returning();
+    return !!deleted;
   }
 
   async getMeldinger(): Promise<Melding[]> {

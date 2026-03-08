@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Calendar, Clock, TrendingUp } from "lucide-react";
+import { Users, Calendar, Clock, TrendingUp, List } from "lucide-react";
+import { Link } from "wouter";
 import type { Vakt, Barnehage, User } from "@shared/schema";
 
 export default function AdminDashboard() {
@@ -95,6 +97,13 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          <Link href="/admin/alle-vakter">
+            <Button variant="outline" className="w-full" data-testid="button-alle-vakter">
+              <List className="w-4 h-4 mr-2" />
+              Administrer alle vakter
+            </Button>
+          </Link>
 
           {activeVakter.length > 0 && (
             <div>

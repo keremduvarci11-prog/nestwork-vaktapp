@@ -191,6 +191,12 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.delete("/api/vakter/:id", requireAdmin, async (req, res) => {
+    const deleted = await storage.deleteVakt(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Vakt ikke funnet" });
+    res.json({ success: true });
+  });
+
   app.get("/api/meldinger", requireAdmin, async (_req, res) => {
     const all = await storage.getMeldinger();
     res.json(all);
