@@ -17,6 +17,8 @@ export const users = pgTable("users", {
   stilling: text("stilling").notNull(),
   timelonn: decimal("timelonn", { precision: 10, scale: 2 }).notNull(),
   profileImage: text("profile_image"),
+  cvFile: text("cv_file"),
+  politiattestFile: text("politiattest_file"),
   available: boolean("available").default(true),
   availableWeekend: boolean("available_weekend").default(false),
   status: text("user_status").default("Aktiv"),

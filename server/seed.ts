@@ -121,12 +121,12 @@ export async function seedDatabase() {
   const ansatte = allUsers.filter(u => u.role === "ansatt");
 
   const onboardingItems = [
-    "Politiattest levert",
-    "CV lastet opp",
-    "Bankinfo registrert",
+    "Bytt passord",
+    "Last opp profilbilde",
+    "Last opp CV",
+    "Last opp politiattest",
+    "Registrer bankinfo",
     "Signert kontrakt",
-    "HMS-kurs gjennomført",
-    "Profilbilde lastet opp",
   ];
 
   for (const ansatt of ansatte) {

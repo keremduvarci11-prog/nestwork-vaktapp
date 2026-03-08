@@ -9,16 +9,16 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - **Database**: PostgreSQL with Drizzle ORM
 - **Routing**: Wouter (client-side), Express (server-side)
 - **Auth**: bcrypt password hashing (supports legacy plain-text for migration)
-- **File uploads**: multer for profile images (stored in /uploads/profiles)
+- **File uploads**: multer for profile images (/uploads/profiles) and documents (/uploads/documents)
 - **Google Sheets**: Auto-appends approved shifts via integration
 
 ## Key Data Models
-- **Users**: Employees and admins with region, position, hourly rate, kontonummer, profileImage
+- **Users**: Employees and admins with region, position, hourly rate, kontonummer, profileImage, cvFile, politiattestFile
 - **Barnehager**: Kindergartens with contact info and tariff
 - **Vakter**: Shifts with status flow: ledig -> venter -> godkjent/avslatt
 - **Meldinger**: Conversations between employees and admin (with samtale_meldinger thread messages)
 - **Favoritter**: Employee favorite kindergartens
-- **Onboarding**: Checklist items for new employees
+- **Onboarding**: Checklist items for new employees (password change, profile pic, CV, politiattest, bankinfo, contract)
 
 ## User Roles
 1. **Ansatt (Employee)**: View/claim shifts in their region, track earnings, messaging, onboarding, settings (change password/email/phone/kontonummer/profile picture)
@@ -35,6 +35,8 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - `PATCH /api/vakter/:id` - Update shift details (admin)
 - `/api/users/:id/change-password` - POST change password
 - `/api/users/:id/profile-image` - POST upload profile picture
+- `/api/users/:id/upload-cv` - POST upload CV document
+- `/api/users/:id/upload-politiattest` - POST upload police certificate
 - `/api/meldinger/unread-count/admin` - GET unread message count for admin
 - `/api/meldinger/unread-count/user/:userId` - GET unread message count for employee
 

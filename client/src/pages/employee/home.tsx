@@ -5,13 +5,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Clock, Calendar, Building2, AlertCircle } from "lucide-react";
-import type { Vakt, Barnehage } from "@shared/schema";
+import { useLocation } from "wouter";
+import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList } from "lucide-react";
+import type { Vakt, Barnehage, Onboarding } from "@shared/schema";
 
 
 export default function EmployeeHome() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data: vakter, isLoading: vLoading } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter", `?region=${user?.region}`],
@@ -33,9 +35,17 @@ export default function EmployeeHome() {
     },
   });
 
+  const { data: onboardingItems } = useQuery<Onboarding[]>({
+    queryKey: ["/api/onboarding", user?.id],
+  });
+
   const bhMap = new Map(barnehager?.map((b) => [b.id, b]) || []);
   const today = new Date().toISOString().split("T")[0];
   const ledigeVakter = vakter?.filter((v) => v.status === "ledig" && v.dato >= today) || [];
+
+  const onboardingDone = onboardingItems?.filter((i) => i.completed).length || 0;
+  const onboardingTotal = onboardingItems?.length || 0;
+  const hasUnfinishedOnboarding = onboardingTotal > 0 && onboardingDone < onboardingTotal;
 
   const formatDate = (d: string) => {
     const date = new Date(d + "T00:00:00");
@@ -51,6 +61,33 @@ export default function EmployeeHome() {
           {user?.region} - {ledigeVakter.length} ledige vakter
         </p>
       </div>
+
+      {hasUnfinishedOnboarding && (
+        <Card className="border-primary/30 bg-primary/5" data-testid="card-onboarding-banner">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <ClipboardList className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Fullfør oppsettet ditt</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Du har {onboardingTotal - onboardingDone} steg igjen. Bytt passord, last opp CV og politiattest, og legg inn profilbilde.
+                </p>
+                <Button
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => navigate("/onboarding")}
+                  data-testid="button-goto-onboarding"
+                >
+                  Kom i gang
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {vLoading ? (
         <div className="space-y-3">

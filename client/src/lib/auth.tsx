@@ -15,6 +15,8 @@ type User = {
   stilling: string;
   timelonn: string;
   profileImage: string | null;
+  cvFile: string | null;
+  politiattestFile: string | null;
   available: boolean | null;
 };
 

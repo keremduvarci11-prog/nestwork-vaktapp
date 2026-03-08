@@ -14,6 +14,27 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const docsDir = path.join(process.cwd(), "uploads", "documents");
+if (!fs.existsSync(docsDir)) {
+  fs.mkdirSync(docsDir, { recursive: true });
+}
+
+const docUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, docsDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".webp"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  },
+});
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadDir),
@@ -79,7 +100,15 @@ export async function registerRoutes(
   );
 
   const express = await import("express");
-  app.use("/uploads", express.default.static(path.join(process.cwd(), "uploads")));
+  app.use("/uploads/profiles", express.default.static(path.join(process.cwd(), "uploads", "profiles")));
+
+  app.get("/uploads/documents/:filename", requireAuth, (req, res) => {
+    const filePath = path.join(process.cwd(), "uploads", "documents", req.params.filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "Fil ikke funnet" });
+    }
+    res.sendFile(filePath);
+  });
 
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
@@ -155,6 +184,34 @@ export async function registerRoutes(
     }
     const imageUrl = `/uploads/profiles/${req.file.filename}`;
     const updated = await storage.updateUser(req.params.id, { profileImage: imageUrl });
+    if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
+    const { password: _, ...safeUser } = updated;
+    res.json(safeUser);
+  });
+
+  app.post("/api/users/:id/upload-cv", requireAuth, docUpload.single("file"), async (req, res) => {
+    if (req.session.userId !== req.params.id) {
+      return res.status(403).json({ message: "Ingen tilgang" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "Ingen fil valgt" });
+    }
+    const fileUrl = `/uploads/documents/${req.file.filename}`;
+    const updated = await storage.updateUser(req.params.id, { cvFile: fileUrl });
+    if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
+    const { password: _, ...safeUser } = updated;
+    res.json(safeUser);
+  });
+
+  app.post("/api/users/:id/upload-politiattest", requireAuth, docUpload.single("file"), async (req, res) => {
+    if (req.session.userId !== req.params.id) {
+      return res.status(403).json({ message: "Ingen tilgang" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "Ingen fil valgt" });
+    }
+    const fileUrl = `/uploads/documents/${req.file.filename}`;
+    const updated = await storage.updateUser(req.params.id, { politiattestFile: fileUrl });
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
     res.json(safeUser);
