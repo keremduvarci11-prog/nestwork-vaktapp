@@ -64,6 +64,15 @@ export const meldinger = pgTable("meldinger", {
   read: boolean("read").default(false),
   reply: text("reply"),
   repliedAt: timestamp("replied_at"),
+  closed: boolean("closed").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const samtaleMeldinger = pgTable("samtale_meldinger", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  meldingId: varchar("melding_id").notNull(),
+  fromUserId: varchar("from_user_id").notNull(),
+  message: text("message").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -85,6 +94,7 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertBarnehageSchema = createInsertSchema(barnehager).omit({ id: true });
 export const insertVaktSchema = createInsertSchema(vakter).omit({ id: true, createdAt: true });
 export const insertMeldingSchema = createInsertSchema(meldinger).omit({ id: true, createdAt: true });
+export const insertSamtaleMeldingSchema = createInsertSchema(samtaleMeldinger).omit({ id: true, createdAt: true });
 export const insertFavorittSchema = createInsertSchema(favoritter).omit({ id: true });
 export const insertOnboardingSchema = createInsertSchema(onboarding).omit({ id: true });
 
@@ -96,6 +106,8 @@ export type InsertVakt = z.infer<typeof insertVaktSchema>;
 export type Vakt = typeof vakter.$inferSelect;
 export type InsertMelding = z.infer<typeof insertMeldingSchema>;
 export type Melding = typeof meldinger.$inferSelect;
+export type InsertSamtaleMelding = z.infer<typeof insertSamtaleMeldingSchema>;
+export type SamtaleMelding = typeof samtaleMeldinger.$inferSelect;
 export type InsertFavoritt = z.infer<typeof insertFavorittSchema>;
 export type Favoritt = typeof favoritter.$inferSelect;
 export type InsertOnboarding = z.infer<typeof insertOnboardingSchema>;

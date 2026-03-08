@@ -221,6 +221,31 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.patch("/api/meldinger/:id/close", requireAdmin, async (req, res) => {
+    const updated = await storage.closeMelding(req.params.id);
+    if (!updated) return res.status(404).json({ message: "Melding ikke funnet" });
+    res.json(updated);
+  });
+
+  app.get("/api/meldinger/:id/samtale", requireAuth, async (req, res) => {
+    const msgs = await storage.getSamtaleMeldinger(req.params.id);
+    res.json(msgs);
+  });
+
+  app.post("/api/meldinger/:id/samtale", requireAuth, async (req, res) => {
+    const melding = await storage.getMelding(req.params.id);
+    if (!melding) return res.status(404).json({ message: "Samtale ikke funnet" });
+    if (melding.closed) return res.status(400).json({ message: "Samtalen er avsluttet" });
+    const { message, fromUserId } = req.body;
+    if (!message?.trim()) return res.status(400).json({ message: "Melding kan ikke vere tom" });
+    const created = await storage.createSamtaleMelding({
+      meldingId: req.params.id,
+      fromUserId,
+      message,
+    });
+    res.json(created);
+  });
+
   app.get("/api/favoritter/:userId", requireAuth, async (req, res) => {
     const f = await storage.getFavoritter(req.params.userId);
     res.json(f);

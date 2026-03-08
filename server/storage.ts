@@ -1,11 +1,12 @@
 import { db } from "./db";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import {
-  users, barnehager, vakter, meldinger, favoritter, onboarding,
+  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding,
   type User, type InsertUser,
   type Barnehage, type InsertBarnehage,
   type Vakt, type InsertVakt,
   type Melding, type InsertMelding,
+  type SamtaleMelding, type InsertSamtaleMelding,
   type Favoritt, type InsertFavoritt,
   type Onboarding, type InsertOnboarding,
 } from "@shared/schema";
@@ -32,9 +33,14 @@ export interface IStorage {
 
   getMeldinger(): Promise<Melding[]>;
   getMeldingerByUser(userId: string): Promise<Melding[]>;
+  getMelding(id: string): Promise<Melding | undefined>;
   createMelding(m: InsertMelding): Promise<Melding>;
   markMeldingRead(id: string): Promise<void>;
   replyToMelding(id: string, reply: string): Promise<Melding | undefined>;
+  closeMelding(id: string): Promise<Melding | undefined>;
+
+  getSamtaleMeldinger(meldingId: string): Promise<SamtaleMelding[]>;
+  createSamtaleMelding(m: InsertSamtaleMelding): Promise<SamtaleMelding>;
 
   getFavoritter(userId: string): Promise<Favoritt[]>;
   addFavoritt(f: InsertFavoritt): Promise<Favoritt>;
@@ -137,12 +143,36 @@ export class DatabaseStorage implements IStorage {
     await db.update(meldinger).set({ read: true }).where(eq(meldinger.id, id));
   }
 
+  async getMelding(id: string): Promise<Melding | undefined> {
+    const [m] = await db.select().from(meldinger).where(eq(meldinger.id, id));
+    return m;
+  }
+
   async replyToMelding(id: string, reply: string): Promise<Melding | undefined> {
     const [updated] = await db.update(meldinger)
       .set({ reply, repliedAt: new Date(), read: true })
       .where(eq(meldinger.id, id))
       .returning();
     return updated;
+  }
+
+  async closeMelding(id: string): Promise<Melding | undefined> {
+    const [updated] = await db.update(meldinger)
+      .set({ closed: true })
+      .where(eq(meldinger.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getSamtaleMeldinger(meldingId: string): Promise<SamtaleMelding[]> {
+    return db.select().from(samtaleMeldinger)
+      .where(eq(samtaleMeldinger.meldingId, meldingId))
+      .orderBy(samtaleMeldinger.createdAt);
+  }
+
+  async createSamtaleMelding(m: InsertSamtaleMelding): Promise<SamtaleMelding> {
+    const [created] = await db.insert(samtaleMeldinger).values(m).returning();
+    return created;
   }
 
   async getFavoritter(userId: string): Promise<Favoritt[]> {
