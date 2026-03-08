@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, TreePine } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import nestworkLogo from "@assets/nestwork_logo.png";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -29,9 +30,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
-            <TreePine className="w-8 h-8 text-primary" />
-          </div>
+          <img src={nestworkLogo} alt="Nestwork" className="w-16 h-16 object-contain mx-auto" />
           <h1 className="text-2xl font-bold tracking-tight">Nestwork</h1>
           <p className="text-muted-foreground text-sm">Vaktapp for barnehageansatte</p>
         </div>

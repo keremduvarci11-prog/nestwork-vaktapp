@@ -18,7 +18,8 @@ import NyVakt from "@/pages/admin/ny-vakt";
 import GodkjennVakter from "@/pages/admin/godkjenn";
 import AdminMeldinger from "@/pages/admin/meldinger";
 import NotFound from "@/pages/not-found";
-import { Loader2, TreePine } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import nestworkLogo from "@assets/nestwork_logo.png";
 
 function AppContent() {
   const { user, isLoading } = useAuth();
@@ -26,9 +27,7 @@ function AppContent() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10">
-          <TreePine className="w-7 h-7 text-primary" />
-        </div>
+        <img src={nestworkLogo} alt="Nestwork" className="w-14 h-14 object-contain" />
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
@@ -45,9 +44,7 @@ function AppContent() {
       <header className="sticky top-0 bg-background/95 backdrop-blur border-b z-40">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-              <TreePine className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img src={nestworkLogo} alt="Nestwork" className="w-8 h-8 object-contain" />
             <span className="font-bold text-sm">Nestwork</span>
           </div>
           {isAdmin && (
