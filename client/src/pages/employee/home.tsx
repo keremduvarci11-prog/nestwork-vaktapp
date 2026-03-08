@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList } from "lucide-react";
+import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2 } from "lucide-react";
 import type { Vakt, Barnehage, Onboarding } from "@shared/schema";
 
 
@@ -23,6 +23,10 @@ export default function EmployeeHome() {
     queryKey: ["/api/barnehager"],
   });
 
+  const { data: mineVakter } = useQuery<Vakt[]>({
+    queryKey: ["/api/vakter/mine", user?.id],
+  });
+
   const taVaktMutation = useMutation({
     mutationFn: (vaktId: string) =>
       apiRequest("POST", `/api/vakter/${vaktId}/ta`, { ansattId: user?.id }),
@@ -35,6 +39,17 @@ export default function EmployeeHome() {
     },
   });
 
+  const godtaVaktMutation = useMutation({
+    mutationFn: (vaktId: string) => apiRequest("POST", `/api/vakter/${vaktId}/godta`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
+      toast({ title: "Vakt godtatt!", description: "Vakten er nå bekreftet." });
+    },
+    onError: () => {
+      toast({ title: "Feil", description: "Kunne ikke godta vakten", variant: "destructive" });
+    },
+  });
+
   const { data: onboardingItems } = useQuery<Onboarding[]>({
     queryKey: ["/api/onboarding", user?.id],
   });
@@ -42,6 +57,7 @@ export default function EmployeeHome() {
   const bhMap = new Map(barnehager?.map((b) => [b.id, b]) || []);
   const today = new Date().toISOString().split("T")[0];
   const ledigeVakter = vakter?.filter((v) => v.status === "ledig" && v.dato >= today) || [];
+  const tildelte = mineVakter?.filter((v) => v.status === "tildelt" && v.dato >= today) || [];
 
   const onboardingDone = onboardingItems?.filter((i) => i.completed).length || 0;
   const onboardingTotal = onboardingItems?.length || 0;

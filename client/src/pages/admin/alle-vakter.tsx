@@ -8,12 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle } from "lucide-react";
+import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   ledig: { label: "Ledig", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  tildelt: { label: "Tildelt", className: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
   venter: { label: "Venter", className: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
   godkjent: { label: "Godkjent", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
 };
@@ -131,6 +132,7 @@ function EditVaktForm({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ledig">Ledig</SelectItem>
+              <SelectItem value="tildelt">Tildelt</SelectItem>
               <SelectItem value="venter">Venter</SelectItem>
               <SelectItem value="godkjent">Godkjent</SelectItem>
             </SelectContent>
@@ -181,6 +183,7 @@ export default function AlleVakter() {
   const [, navigate] = useLocation();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [tildelingId, setTildelingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("alle");
 
   const { data: vakter, isLoading } = useQuery<Vakt[]>({
@@ -202,6 +205,19 @@ export default function AlleVakter() {
     },
     onError: () => {
       toast({ title: "Feil", description: "Kunne ikke slette vakt", variant: "destructive" });
+    },
+  });
+
+  const tildelVakt = useMutation({
+    mutationFn: ({ vaktId, ansattId }: { vaktId: string; ansattId: string }) =>
+      apiRequest("POST", `/api/vakter/${vaktId}/tildel`, { ansattId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
+      toast({ title: "Vakt tildelt", description: "Den ansatte kan nå godta vakten." });
+      setTildelingId(null);
+    },
+    onError: () => {
+      toast({ title: "Feil", description: "Kunne ikke tildele vakt", variant: "destructive" });
     },
   });
 
@@ -231,7 +247,7 @@ export default function AlleVakter() {
       </div>
 
       <div className="flex gap-2">
-        {["alle", "ledig", "venter", "godkjent"].map((f) => (
+        {["alle", "ledig", "tildelt", "venter", "godkjent"].map((f) => (
           <Button
             key={f}
             variant={filter === f ? "default" : "outline"}
@@ -348,6 +364,38 @@ export default function AlleVakter() {
                       <span>{vakt.region}</span>
                     </div>
                   </div>
+
+                  {vakt.status === "ledig" && (
+                    tildelingId === vakt.id ? (
+                      <div className="mt-3 pt-3 border-t space-y-2">
+                        <label className="text-xs font-medium">Velg ansatt å tildele</label>
+                        <Select onValueChange={(ansattId) => tildelVakt.mutate({ vaktId: vakt.id, ansattId })}>
+                          <SelectTrigger data-testid={`select-tildel-${vakt.id}`}>
+                            <SelectValue placeholder="Velg ansatt..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(users || []).filter((u) => u.role === "ansatt").map((a) => (
+                              <SelectItem key={a.id} value={a.id}>{a.name} ({a.region})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button variant="ghost" size="sm" onClick={() => setTildelingId(null)} data-testid={`button-cancel-tildel-${vakt.id}`}>
+                          Avbryt
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-3"
+                        onClick={() => setTildelingId(vakt.id)}
+                        data-testid={`button-tildel-${vakt.id}`}
+                      >
+                        <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+                        Tildel til ansatt
+                      </Button>
+                    )
+                  )}
                 </CardContent>
               </Card>
             );

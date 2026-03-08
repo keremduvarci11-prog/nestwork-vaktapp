@@ -285,6 +285,50 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.post("/api/vakter/:id/tildel", requireAdmin, async (req, res) => {
+    const { ansattId } = req.body;
+    if (!ansattId) {
+      return res.status(400).json({ message: "Mangler ansattId" });
+    }
+    const updated = await storage.updateVakt(req.params.id, {
+      status: "tildelt",
+      ansattId,
+    });
+    if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+    res.json(updated);
+  });
+
+  app.post("/api/vakter/:id/godta", requireAuth, async (req, res) => {
+    const vakt = await storage.getVakt(req.params.id);
+    if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
+    if (vakt.status !== "tildelt" || vakt.ansattId !== req.session.userId) {
+      return res.status(403).json({ message: "Denne vakten er ikke tildelt deg" });
+    }
+    const updated = await storage.updateVakt(req.params.id, { status: "godkjent" });
+    if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+
+    try {
+      const ansatt = await storage.getUser(req.session.userId!);
+      const bh = await storage.getBarnehage(updated.barnehageId);
+      if (ansatt && bh) {
+        await appendVaktToSheet({
+          dato: updated.dato,
+          barnehage: bh.name,
+          startTid: updated.startTid,
+          sluttTid: updated.sluttTid,
+          ansattNavn: ansatt.name,
+          vikarkode: updated.vikarkode,
+          region: updated.region,
+          status: "godkjent",
+        });
+      }
+    } catch (err) {
+      console.error("Google Sheets error:", err);
+    }
+
+    res.json(updated);
+  });
+
   app.post("/api/vakter/:id/godkjenn", requireAdmin, async (req, res) => {
     const updated = await storage.updateVakt(req.params.id, { status: "godkjent" });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
