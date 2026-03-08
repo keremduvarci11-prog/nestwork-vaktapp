@@ -16,10 +16,13 @@ export default function AdminDashboard() {
   });
 
   const today = new Date().toISOString().split("T")[0];
-  const thisWeekStart = new Date();
-  thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay() + 1);
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const thisWeekStart = new Date(now);
+  thisWeekStart.setDate(now.getDate() + mondayOffset);
   const thisWeekEnd = new Date(thisWeekStart);
-  thisWeekEnd.setDate(thisWeekEnd.getDate() + 6);
+  thisWeekEnd.setDate(thisWeekStart.getDate() + 6);
   const weekStart = thisWeekStart.toISOString().split("T")[0];
   const weekEnd = thisWeekEnd.toISOString().split("T")[0];
 
@@ -88,7 +91,7 @@ export default function AdminDashboard() {
                   <TrendingUp className="w-4 h-4 text-green-500" />
                   <p className="text-xs text-muted-foreground">Uketimer</p>
                 </div>
-                <p className="text-2xl font-bold">{weekHours.toFixed(0)}t</p>
+                <p className="text-2xl font-bold">{weekHours % 1 === 0 ? weekHours : weekHours.toFixed(1)}t</p>
               </CardContent>
             </Card>
           </div>
