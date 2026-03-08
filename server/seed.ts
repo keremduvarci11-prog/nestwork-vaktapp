@@ -105,16 +105,16 @@ export async function seedDatabase() {
   }
 
   await db.insert(barnehager).values([
-    { externalId: "A001", name: "Skorvane Fus Barnehage", address: "", region: "Os", contactPerson: "Kristin Tellefsen", tariffAssistent: "207", tariffLaerer: "250", orgnr: "927 311 097", aktiv: true },
-    { externalId: "A002", name: "Hjellemarka Fus Barnehage", address: "", region: "Os", contactPerson: "Birte Strømsø", tariffAssistent: "207", tariffLaerer: "250", orgnr: "927 308 754", aktiv: true },
-    { externalId: "A003", name: "Rakkungan Barnehagedrift AS", address: "", region: "Kristiansand", contactPerson: "Monica Tanche Bergh Ahlstrøm", orgnr: "996 501 884", aktiv: true },
-    { externalId: "A004", name: "Rakkerungan Gårdbarnehage AS", address: "", region: "Kristiansand", contactPerson: "Monica Tanche Bergh Ahlstrøm", orgnr: "930 696 552", aktiv: true },
-    { externalId: "A005", name: "Jegersberg Barnehage", address: "", region: "Kristiansand", contactPerson: "Monica Tanche Bergh Ahlstrøm", orgnr: "998 282 225", aktiv: true },
-    { externalId: "A006", name: "Søre Neset Fus Barnehage", address: "", region: "Os", contactPerson: "Edle Nøkleby", tariffAssistent: "207", tariffLaerer: "250", orgnr: "922 043 639", aktiv: true },
-    { externalId: "A007", name: "Håkonshella Fus Barnehage", address: "", region: "Bergen", contactPerson: "Gro Seberg", tariffAssistent: "207", tariffLaerer: "250", orgnr: "922 042 993", aktiv: true },
-    { externalId: "A008", name: "Prestagardskogen Fus Barnehage", address: "", region: "Stord", contactPerson: "Anne Kristin Aaseth / Lillian", tariffAssistent: "207", tariffLaerer: "250", orgnr: "916 072 848", aktiv: true },
-    { externalId: "A009", name: "Tyse Fus Barnehage", address: "", region: "Stord", contactPerson: "Anne Kristin Aaseth / Lillian", tariffAssistent: "207", tariffLaerer: "250", orgnr: "927 311 232", aktiv: true },
-    { externalId: "A010", name: "Jettegryto Barnehage", address: "", region: "Stord", contactPerson: "Line Ragnhildstveit", orgnr: "994 735 284", aktiv: true },
+    { externalId: "A001", name: "Skorvane Fus Barnehage", address: "Skeismyra 14, 5217 Hagavik", region: "Os", contactPerson: "Kristin Tellefsen", contactPhone: "902 19 798", tariffAssistent: "207", tariffLaerer: "250", orgnr: "927 311 097", aktiv: true },
+    { externalId: "A002", name: "Hjellemarka Fus Barnehage", address: "Storestraumen 275, 5212 Søfteland", region: "Os", contactPerson: "Birte Strømsø", contactPhone: "954 24 405", tariffAssistent: "207", tariffLaerer: "250", orgnr: "927 308 754", aktiv: true },
+    { externalId: "A003", name: "Rakkungan Barnehagedrift AS", address: "Kirsebærveien 10A, 4635 Kristiansand", region: "Kristiansand", contactPerson: "Monica Tanche Bergh Ahlstrøm", contactPhone: "971 31 108", orgnr: "996 501 884", aktiv: true },
+    { externalId: "A004", name: "Rakkerungan Gårdbarnehage AS", address: "Støleveien 21, 4639 Kristiansand", region: "Kristiansand", contactPerson: "Monica Tanche Bergh Ahlstrøm", contactPhone: "971 31 108", orgnr: "930 696 552", aktiv: true },
+    { externalId: "A005", name: "Jegersberg Barnehage", address: "Gillsveien 45, 4633 Kristiansand", region: "Kristiansand", contactPerson: "Monica Tanche Bergh Ahlstrøm", contactPhone: "971 31 108", orgnr: "998 282 225", aktiv: true },
+    { externalId: "A006", name: "Søre Neset Fus Barnehage", address: "Reset 32, 5200 Os", region: "Os", contactPerson: "Edle Nøkleby", contactPhone: "415 88 670", tariffAssistent: "207", tariffLaerer: "250", orgnr: "922 043 639", aktiv: true },
+    { externalId: "A007", name: "Håkonshella Fus Barnehage", address: "Håkonshellaveien 125, 5174 Bergen", region: "Bergen", contactPerson: "Gro Seberg", contactPhone: "483 99 222", tariffAssistent: "207", tariffLaerer: "250", orgnr: "922 042 993", aktiv: true },
+    { externalId: "A008", name: "Prestagardskogen Fus Barnehage", address: "Vestlivegen 40, 5414 Stord", region: "Stord", contactPerson: "Anne Kristin Aaseth / Lillian", contactPhone: "416 81 108 / 486 08 162", tariffAssistent: "207", tariffLaerer: "250", orgnr: "916 072 848", aktiv: true },
+    { externalId: "A009", name: "Tyse Fus Barnehage", address: "Tysemarkjo 47, 5414 Stord", region: "Stord", contactPerson: "Anne Kristin Aaseth / Lillian", contactPhone: "417 81 108 / 486 08 162", tariffAssistent: "207", tariffLaerer: "250", orgnr: "927 311 232", aktiv: true },
+    { externalId: "A010", name: "Jettegryto Barnehage", address: "Brakabygda 49, 5640 Eikelandsosen", region: "Stord", contactPerson: "Line Ragnhildstveit", contactPhone: "482 65 55", orgnr: "994 735 284", aktiv: true },
   ]);
 
   const allUsers = await db.select().from(users);
