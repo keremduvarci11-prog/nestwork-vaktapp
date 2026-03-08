@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage } from "./storage";
 import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema } from "@shared/schema";
+import { appendVaktToSheet, getSpreadsheetUrl } from "./googleSheets";
 
 declare module "express-session" {
   interface SessionData {
@@ -155,6 +156,32 @@ export async function registerRoutes(
   app.post("/api/vakter/:id/godkjenn", requireAdmin, async (req, res) => {
     const updated = await storage.updateVakt(req.params.id, { status: "godkjent" });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+
+    try {
+      const ansatt = updated.ansattId ? await storage.getUser(updated.ansattId) : null;
+      const barnehage = updated.barnehageId ? await storage.getBarnehage(updated.barnehageId) : null;
+      let timer = 0;
+      if (updated.startTid && updated.sluttTid) {
+        const [sh, sm] = updated.startTid.split(":").map(Number);
+        const [eh, em] = updated.sluttTid.split(":").map(Number);
+        timer = (eh * 60 + em - sh * 60 - sm) / 60;
+      }
+
+      await appendVaktToSheet({
+        dato: updated.dato || "",
+        barnehageNavn: barnehage?.name || updated.barnehageId || "",
+        region: updated.region || "",
+        ansattNavn: ansatt?.name || "",
+        vikarkode: updated.vikarkode || "",
+        startTid: updated.startTid || "",
+        sluttTid: updated.sluttTid || "",
+        timer: Math.round(timer * 100) / 100,
+        status: "godkjent",
+      });
+    } catch (err) {
+      console.error("[Google Sheets] Error:", err);
+    }
+
     res.json(updated);
   });
 
@@ -216,6 +243,11 @@ export async function registerRoutes(
     const updated = await storage.toggleOnboarding(req.params.id, completed);
     if (!updated) return res.status(404).json({ message: "Ikke funnet" });
     res.json(updated);
+  });
+
+  app.get("/api/sheets-url", requireAdmin, async (_req, res) => {
+    const url = await getSpreadsheetUrl();
+    res.json({ url });
   });
 
   return httpServer;
