@@ -53,7 +53,6 @@ export default function Historikk() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="font-semibold text-sm">{bh?.name || "Ukjent"}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{vakt.vikarkode}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1.5">

@@ -3,25 +3,11 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { MapPin, Clock, Calendar, Building2, AlertCircle } from "lucide-react";
 import type { Vakt, Barnehage } from "@shared/schema";
 
-const vikarkodeLabels: Record<string, string> = {
-  KTV: "Korttidsvikar",
-  LTV: "Langtidsvikar",
-  "LTV-NAV": "NAV-tiltak",
-  RES: "Reserve",
-};
-
-const vikarkodeColors: Record<string, string> = {
-  KTV: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  LTV: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  "LTV-NAV": "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-  RES: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
-};
 
 export default function EmployeeHome() {
   const { user } = useAuth();
@@ -91,13 +77,7 @@ export default function EmployeeHome() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-semibold text-sm truncate">{bh?.name || "Ukjent"}</h3>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${vikarkodeColors[vakt.vikarkode] || vikarkodeColors.RES}`}>
-                          {vakt.vikarkode}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{vikarkodeLabels[vakt.vikarkode]}</p>
+                      <h3 className="font-semibold text-sm truncate mb-1">{bh?.name || "Ukjent"}</h3>
                     </div>
                   </div>
 
