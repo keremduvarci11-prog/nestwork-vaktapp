@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, MailOpen, AlertCircle, Send, Lock, ArrowLeft, User } from "lucide-react";
+import { Mail, MailOpen, AlertCircle, Send, Lock, ArrowLeft, User, Trash2, RotateCcw } from "lucide-react";
 import type { Melding, User as UserType, SamtaleMelding } from "@shared/schema";
 
 function SamtaleView({
@@ -47,6 +47,24 @@ function SamtaleView({
     },
   });
 
+  const reopenSamtale = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/meldinger/${melding.id}/reopen`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meldinger"] });
+      toast({ title: "Samtale gjenåpnet" });
+      onBack();
+    },
+  });
+
+  const deleteSamtale = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/meldinger/${melding.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meldinger"] });
+      toast({ title: "Samtale slettet" });
+      onBack();
+    },
+  });
+
   const markSeen = useMutation({
     mutationFn: () => apiRequest("PATCH", `/api/meldinger/${melding.id}/seen-admin`),
     onSuccess: () => {
@@ -73,18 +91,42 @@ function SamtaleView({
           <h2 className="text-sm font-bold truncate">{melding.subject}</h2>
           <p className="text-xs text-muted-foreground">{sender?.name} - {sender?.region}</p>
         </div>
-        {!melding.closed && (
+        <div className="flex gap-1">
+          {melding.closed ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => reopenSamtale.mutate()}
+              data-testid="button-reopen-samtale"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+              Gjenåpne
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => closeSamtale.mutate()}
+              data-testid="button-close-samtale"
+              className="text-destructive border-destructive/30"
+            >
+              <Lock className="w-3.5 h-3.5 mr-1.5" />
+              Avslutt
+            </Button>
+          )}
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            onClick={() => closeSamtale.mutate()}
-            data-testid="button-close-samtale"
-            className="text-destructive border-destructive/30"
+            onClick={() => {
+              if (confirm("Vil du slette denne samtalen permanent?")) {
+                deleteSamtale.mutate();
+              }
+            }}
+            data-testid="button-delete-samtale"
           >
-            <Lock className="w-3.5 h-3.5 mr-1.5" />
-            Avslutt
+            <Trash2 className="w-3.5 h-3.5 text-red-500" />
           </Button>
-        )}
+        </div>
       </div>
 
       <div className="space-y-2">

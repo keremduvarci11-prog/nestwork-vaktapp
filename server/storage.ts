@@ -39,6 +39,9 @@ export interface IStorage {
   markMeldingRead(id: string): Promise<void>;
   replyToMelding(id: string, reply: string): Promise<Melding | undefined>;
   closeMelding(id: string): Promise<Melding | undefined>;
+  reopenMelding(id: string): Promise<Melding | undefined>;
+  deleteMelding(id: string): Promise<boolean>;
+  hideMeldingForUser(id: string): Promise<void>;
   markSeenByUser(id: string): Promise<void>;
   markSeenByAdmin(id: string): Promise<void>;
 
@@ -170,6 +173,24 @@ export class DatabaseStorage implements IStorage {
       .where(eq(meldinger.id, id))
       .returning();
     return updated;
+  }
+
+  async reopenMelding(id: string): Promise<Melding | undefined> {
+    const [updated] = await db.update(meldinger)
+      .set({ closed: false })
+      .where(eq(meldinger.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteMelding(id: string): Promise<boolean> {
+    await db.delete(samtaleMeldinger).where(eq(samtaleMeldinger.meldingId, id));
+    const [deleted] = await db.delete(meldinger).where(eq(meldinger.id, id)).returning();
+    return !!deleted;
+  }
+
+  async hideMeldingForUser(id: string): Promise<void> {
+    await db.update(meldinger).set({ hiddenByUser: true }).where(eq(meldinger.id, id));
   }
 
   async markSeenByUser(id: string): Promise<void> {

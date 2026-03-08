@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Send, MessageSquare, AlertCircle, Lock, ArrowLeft, Plus } from "lucide-react";
+import { Send, MessageSquare, AlertCircle, Lock, ArrowLeft, Plus, Trash2 } from "lucide-react";
 import type { Melding, SamtaleMelding } from "@shared/schema";
 
 function SamtaleView({
@@ -150,8 +150,18 @@ export default function Meldinger() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
 
-  const { data: meldinger, isLoading } = useQuery<Melding[]>({
+  const { data: rawMeldinger, isLoading } = useQuery<Melding[]>({
     queryKey: ["/api/meldinger/user", user?.id],
+  });
+
+  const meldinger = rawMeldinger?.filter((m) => !m.hiddenByUser) || [];
+
+  const hideMelding = useMutation({
+    mutationFn: (id: string) => apiRequest("PATCH", `/api/meldinger/${id}/hide-user`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meldinger/user"] });
+      toast({ title: "Samtale slettet" });
+    },
   });
 
   const sendMelding = useMutation({
@@ -260,7 +270,7 @@ export default function Meldinger() {
           <div className="space-y-3">
             {[1, 2].map((i) => <Skeleton key={i} className="h-20 w-full rounded-md" />)}
           </div>
-        ) : !meldinger?.length ? (
+        ) : !meldinger.length ? (
           <Card>
             <CardContent className="py-8 text-center">
               <AlertCircle className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
@@ -284,11 +294,10 @@ export default function Meldinger() {
               <Card
                 key={m.id}
                 className={`cursor-pointer hover-elevate ${m.closed ? "opacity-60" : ""}`}
-                onClick={() => setOpenMeldingId(m.id)}
                 data-testid={`card-samtale-${m.id}`}
               >
                 <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-2" onClick={() => setOpenMeldingId(m.id)}>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{m.subject}</p>
                       <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{m.message}</p>
@@ -305,11 +314,25 @@ export default function Meldinger() {
                       )}
                     </div>
                   </div>
-                  {m.createdAt && (
-                    <p className="text-xs text-muted-foreground mt-1.5">
-                      {new Date(m.createdAt).toLocaleDateString("nb-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between mt-1.5">
+                    {m.createdAt && (
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(m.createdAt).toLocaleDateString("nb-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm("Vil du slette denne samtalen?")) {
+                          hideMelding.mutate(m.id);
+                        }
+                      }}
+                      className="text-muted-foreground hover:text-red-500 p-1"
+                      data-testid={`button-hide-samtale-${m.id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </CardContent>
               </Card>
             ))}

@@ -66,6 +66,7 @@ export const meldinger = pgTable("meldinger", {
   reply: text("reply"),
   repliedAt: timestamp("replied_at"),
   closed: boolean("closed").default(false),
+  hiddenByUser: boolean("hidden_by_user").default(false),
   lastSeenByUser: timestamp("last_seen_by_user"),
   lastSeenByAdmin: timestamp("last_seen_by_admin"),
   createdAt: timestamp("created_at").defaultNow(),

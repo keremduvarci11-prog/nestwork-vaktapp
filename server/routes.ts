@@ -318,6 +318,23 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.patch("/api/meldinger/:id/reopen", requireAdmin, async (req, res) => {
+    const updated = await storage.reopenMelding(req.params.id);
+    if (!updated) return res.status(404).json({ message: "Melding ikke funnet" });
+    res.json(updated);
+  });
+
+  app.delete("/api/meldinger/:id", requireAdmin, async (req, res) => {
+    const deleted = await storage.deleteMelding(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Melding ikke funnet" });
+    res.json({ success: true });
+  });
+
+  app.patch("/api/meldinger/:id/hide-user", requireAuth, async (req, res) => {
+    await storage.hideMeldingForUser(req.params.id);
+    res.json({ success: true });
+  });
+
   app.get("/api/meldinger/:id/samtale", requireAuth, async (req, res) => {
     const msgs = await storage.getSamtaleMeldinger(req.params.id);
     res.json(msgs);
