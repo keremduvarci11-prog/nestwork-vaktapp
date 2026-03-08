@@ -1,9 +1,45 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema } from "@shared/schema";
 import { appendVaktToSheet, getSpreadsheetUrl } from "./googleSheets";
+
+const uploadDir = path.join(process.cwd(), "uploads", "profiles");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = [".jpg", ".jpeg", ".png", ".webp"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  },
+});
+
+async function comparePassword(plain: string, hashed: string): Promise<boolean> {
+  if (hashed.startsWith("$2")) {
+    return bcrypt.compare(plain, hashed);
+  }
+  return plain === hashed;
+}
+
+async function hashPassword(plain: string): Promise<string> {
+  return bcrypt.hash(plain, 10);
+}
 
 declare module "express-session" {
   interface SessionData {
@@ -42,13 +78,16 @@ export async function registerRoutes(
     })
   );
 
+  const express = await import("express");
+  app.use("/uploads", express.default.static(path.join(process.cwd(), "uploads")));
+
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
     let user = await storage.getUserByUsername(username);
     if (!user) {
       user = await storage.getUserByEmail(username);
     }
-    if (!user || user.password !== password) {
+    if (!user || !(await comparePassword(password, user.password))) {
       return res.status(401).json({ message: "Feil brukernavn/e-post eller passord" });
     }
     req.session.userId = user.id;
@@ -79,7 +118,43 @@ export async function registerRoutes(
   });
 
   app.patch("/api/users/:id", requireAuth, async (req, res) => {
-    const updated = await storage.updateUser(req.params.id, req.body);
+    const { password: pw, ...safeData } = req.body;
+    const updated = await storage.updateUser(req.params.id, safeData);
+    if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
+    const { password: _, ...safeUser } = updated;
+    res.json(safeUser);
+  });
+
+  app.post("/api/users/:id/change-password", requireAuth, async (req, res) => {
+    if (req.session.userId !== req.params.id) {
+      return res.status(403).json({ message: "Ingen tilgang" });
+    }
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Mangler passord" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Passord må være minst 6 tegn" });
+    }
+    const user = await storage.getUser(req.params.id);
+    if (!user) return res.status(404).json({ message: "Bruker ikke funnet" });
+    if (!(await comparePassword(currentPassword, user.password))) {
+      return res.status(401).json({ message: "Feil nåværende passord" });
+    }
+    const hashed = await hashPassword(newPassword);
+    await storage.updateUser(req.params.id, { password: hashed });
+    res.json({ success: true });
+  });
+
+  app.post("/api/users/:id/profile-image", requireAuth, upload.single("image"), async (req, res) => {
+    if (req.session.userId !== req.params.id) {
+      return res.status(403).json({ message: "Ingen tilgang" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "Ingen fil valgt" });
+    }
+    const imageUrl = `/uploads/profiles/${req.file.filename}`;
+    const updated = await storage.updateUser(req.params.id, { profileImage: imageUrl });
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
     res.json(safeUser);

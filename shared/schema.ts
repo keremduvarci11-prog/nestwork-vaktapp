@@ -11,6 +11,7 @@ export const users = pgTable("users", {
   email: text("email"),
   phone: text("phone"),
   address: text("address"),
+  kontonummer: text("kontonummer"),
   role: text("role").notNull().default("ansatt"),
   region: text("region").notNull(),
   stilling: text("stilling").notNull(),

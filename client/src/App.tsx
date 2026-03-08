@@ -18,6 +18,7 @@ import NyVakt from "@/pages/admin/ny-vakt";
 import GodkjennVakter from "@/pages/admin/godkjenn";
 import AdminMeldinger from "@/pages/admin/meldinger";
 import AlleVakter from "@/pages/admin/alle-vakter";
+import Innstillinger from "@/pages/employee/innstillinger";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 import { NestworkLogo } from "@/components/nestwork-logo";
@@ -65,6 +66,7 @@ function AppContent() {
               <Route path="/admin/meldinger" component={AdminMeldinger} />
               <Route path="/admin/alle-vakter" component={AlleVakter} />
               <Route path="/profil" component={Profil} />
+              <Route path="/innstillinger" component={Innstillinger} />
             </>
           ) : (
             <>
@@ -73,6 +75,7 @@ function AppContent() {
               <Route path="/historikk" component={Historikk} />
               <Route path="/inntjening" component={Inntjening} />
               <Route path="/profil" component={Profil} />
+              <Route path="/innstillinger" component={Innstillinger} />
               <Route path="/meldinger" component={Meldinger} />
               <Route path="/onboarding" component={OnboardingPage} />
             </>

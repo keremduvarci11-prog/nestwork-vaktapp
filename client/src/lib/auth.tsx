@@ -8,6 +8,8 @@ type User = {
   name: string;
   email: string | null;
   phone: string | null;
+  address: string | null;
+  kontonummer: string | null;
   role: string;
   region: string;
   stilling: string;
