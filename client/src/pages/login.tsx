@@ -42,13 +42,13 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="username">Brukernavn</label>
+                <label className="text-sm font-medium" htmlFor="username">E-post eller brukernavn</label>
                 <Input
                   id="username"
                   data-testid="input-username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Skriv inn brukernavn"
+                  placeholder="din.epost@gmail.com"
                   required
                 />
               </div>
@@ -69,9 +69,8 @@ export default function LoginPage() {
               </Button>
             </form>
             <div className="mt-6 p-3 rounded-md bg-muted">
-              <p className="text-xs text-muted-foreground mb-2">Demo-innlogging:</p>
+              <p className="text-xs text-muted-foreground mb-2">Logg inn med din e-postadresse og passord.</p>
               <div className="space-y-1 text-xs text-muted-foreground">
-                <p><span className="font-medium">Ansatt:</span> anna / ansatt123</p>
                 <p><span className="font-medium">Admin:</span> admin / admin123</p>
               </div>
             </div>

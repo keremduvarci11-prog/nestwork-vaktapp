@@ -43,9 +43,12 @@ export async function registerRoutes(
 
   app.post("/api/auth/login", async (req, res) => {
     const { username, password } = req.body;
-    const user = await storage.getUserByUsername(username);
+    let user = await storage.getUserByUsername(username);
+    if (!user) {
+      user = await storage.getUserByEmail(username);
+    }
     if (!user || user.password !== password) {
-      return res.status(401).json({ message: "Feil brukernavn eller passord" });
+      return res.status(401).json({ message: "Feil brukernavn/e-post eller passord" });
     }
     req.session.userId = user.id;
     const { password: _, ...safeUser } = user;
