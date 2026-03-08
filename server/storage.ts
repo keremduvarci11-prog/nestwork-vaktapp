@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import {
   users, barnehager, vakter, meldinger, favoritter, onboarding,
   type User, type InsertUser,
@@ -24,6 +24,7 @@ export interface IStorage {
 
   getVakter(): Promise<Vakt[]>;
   getVakterByRegion(region: string): Promise<Vakt[]>;
+  getVakterByRegions(regions: string[]): Promise<Vakt[]>;
   getVakterByAnsatt(ansattId: string): Promise<Vakt[]>;
   getVakt(id: string): Promise<Vakt | undefined>;
   createVakt(v: InsertVakt): Promise<Vakt>;
@@ -93,6 +94,10 @@ export class DatabaseStorage implements IStorage {
 
   async getVakterByRegion(region: string): Promise<Vakt[]> {
     return db.select().from(vakter).where(eq(vakter.region, region)).orderBy(desc(vakter.dato));
+  }
+
+  async getVakterByRegions(regions: string[]): Promise<Vakt[]> {
+    return db.select().from(vakter).where(inArray(vakter.region, regions)).orderBy(desc(vakter.dato));
   }
 
   async getVakterByAnsatt(ansattId: string): Promise<Vakt[]> {

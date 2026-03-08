@@ -102,10 +102,16 @@ export async function registerRoutes(
     res.json(created);
   });
 
+  const regionGroups: Record<string, string[]> = {
+    "Bergen": ["Bergen", "Os"],
+    "Os": ["Os"],
+  };
+
   app.get("/api/vakter", requireAuth, async (req, res) => {
     const region = req.query.region as string;
     if (region) {
-      const v = await storage.getVakterByRegion(region);
+      const regions = regionGroups[region] || [region];
+      const v = await storage.getVakterByRegions(regions);
       return res.json(v);
     }
     const all = await storage.getVakter();
