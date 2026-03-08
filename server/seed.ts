@@ -18,7 +18,7 @@ export async function seedDatabase() {
     password: "admin123",
     name: "Nestwork Admin",
     email: "post@nestwork.no",
-    phone: "",
+    phone: "465 30 651",
     role: "admin",
     region: "Alle",
     stilling: "Daglig leder",
