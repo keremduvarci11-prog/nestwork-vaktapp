@@ -15,20 +15,22 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 ## Key Data Models
 - **Users**: Employees and admins with region, position, hourly rate, kontonummer, profileImage, cvFile, politiattestFile
 - **Barnehager**: Kindergartens with contact info and tariff
-- **Vakter**: Shifts with status flow: ledig -> venter -> godkjent/avslatt
+- **Vakter**: Shifts with status flow: ledig -> venter -> godkjent/avslatt, or ledig -> tildelt -> godkjent (admin direct assignment)
 - **Meldinger**: Conversations between employees and admin (with samtale_meldinger thread messages)
 - **Favoritter**: Employee favorite kindergartens
 - **Onboarding**: Checklist items for new employees (password change, profile pic, CV, politiattest, bankinfo, contract)
 
 ## User Roles
 1. **Ansatt (Employee)**: View/claim shifts in their region, track earnings, messaging, onboarding, settings (change password/email/phone/kontonummer/profile picture)
-2. **Admin**: Create/edit/delete shifts, approve/reject requests, dashboard overview, messaging, manage all vakter
+2. **Admin**: Create/edit/delete shifts, approve/reject requests, assign shifts directly to employees (tildel), dashboard overview, messaging, manage all vakter
 
 ## Important Routes
 - `/api/auth/login` - POST login (supports email or username)
 - `/api/auth/me` - GET current user
 - `/api/vakter` - GET all shifts (with ?region= filter)
-- `/api/vakter/:id/ta` - POST claim a shift
+- `/api/vakter/:id/ta` - POST claim a shift (uses session userId)
+- `/api/vakter/:id/tildel` - POST admin assigns shift to employee
+- `/api/vakter/:id/godta` - POST employee accepts assigned shift
 - `/api/vakter/:id/godkjenn` - POST approve shift
 - `/api/vakter/:id/avslaa` - POST reject shift
 - `DELETE /api/vakter/:id` - DELETE a shift (admin)
@@ -50,11 +52,15 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 
 ## Key Features
 - Bergen region sees both Bergen + Os shifts (regionGroups mapping)
+- Admin can assign shifts directly to employees ("tildelt" status); employee sees and accepts ("Godta vakt")
 - Multi-turn conversation messaging with unread badges
-- Admin can close conversations
+- Admin can close/reopen/delete conversations; employees can hide conversations
 - Password change with bcrypt hashing
-- Profile picture upload
+- Profile picture upload (clickable avatar on profil page, camera icon overlay)
+- Admin avatar shows Nestwork logo; employees show initials or uploaded photo
+- CV and politiattest document upload (auth-protected)
 - Google Sheets integration for approved shifts
+- Inntjening shows NOK currency (not dollar sign)
 
 ## Demo Credentials
 - All employees start with password: nestwork2026

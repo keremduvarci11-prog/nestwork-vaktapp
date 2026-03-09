@@ -252,6 +252,12 @@ export async function registerRoutes(
   });
 
   app.get("/api/vakter/mine/:ansattId", requireAuth, async (req, res) => {
+    if (req.session.userId !== req.params.ansattId) {
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ message: "Ingen tilgang" });
+      }
+    }
     const v = await storage.getVakterByAnsatt(req.params.ansattId);
     res.json(v);
   });
@@ -276,10 +282,9 @@ export async function registerRoutes(
   });
 
   app.post("/api/vakter/:id/ta", requireAuth, async (req, res) => {
-    const { ansattId } = req.body;
     const updated = await storage.updateVakt(req.params.id, {
       status: "venter",
-      ansattId,
+      ansattId: req.session.userId!,
     });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
@@ -310,18 +315,23 @@ export async function registerRoutes(
     try {
       const ansatt = await storage.getUser(req.session.userId!);
       const bh = await storage.getBarnehage(updated.barnehageId);
-      if (ansatt && bh) {
-        await appendVaktToSheet({
-          dato: updated.dato,
-          barnehage: bh.name,
-          startTid: updated.startTid,
-          sluttTid: updated.sluttTid,
-          ansattNavn: ansatt.name,
-          vikarkode: updated.vikarkode,
-          region: updated.region,
-          status: "godkjent",
-        });
+      let timer = 0;
+      if (updated.startTid && updated.sluttTid) {
+        const [sh, sm] = updated.startTid.split(":").map(Number);
+        const [eh, em] = updated.sluttTid.split(":").map(Number);
+        timer = (eh * 60 + em - sh * 60 - sm) / 60;
       }
+      await appendVaktToSheet({
+        dato: updated.dato || "",
+        barnehageNavn: bh?.name || updated.barnehageId || "",
+        region: updated.region || "",
+        ansattNavn: ansatt?.name || "",
+        vikarkode: updated.vikarkode || "",
+        startTid: updated.startTid || "",
+        sluttTid: updated.sluttTid || "",
+        timer: Math.round(timer * 100) / 100,
+        status: "godkjent",
+      });
     } catch (err) {
       console.error("Google Sheets error:", err);
     }

@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useAuth } from "@/lib/auth";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -6,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Briefcase, Mail, Phone, LogOut, History, ClipboardList, ChevronRight, Settings, CreditCard } from "lucide-react";
+import { MapPin, Briefcase, Mail, Phone, LogOut, History, ClipboardList, ChevronRight, Settings, CreditCard, Camera } from "lucide-react";
 import { Link } from "wouter";
+import logoSrc from "@assets/nestwork_logo_transparent_1773012243381.png";
 
 export default function Profil() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleAvailability = useMutation({
     mutationFn: () =>
@@ -22,7 +25,34 @@ export default function Profil() {
     },
   });
 
+  const uploadImage = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch(`/api/users/${user?.id}/profile-image`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Opplasting feilet");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Profilbilde oppdatert" });
+      window.location.reload();
+    },
+    onError: () => {
+      toast({ title: "Feil", description: "Kunne ikke laste opp bilde", variant: "destructive" });
+    },
+  });
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadImage.mutate(file);
+  };
+
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase() || "?";
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="space-y-6">
@@ -33,19 +63,50 @@ export default function Profil() {
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-4 mb-6">
-            <Avatar className="w-16 h-16">
-              {user?.profileImage ? (
-                <AvatarImage src={user.profileImage} alt={user.name} />
-              ) : null}
-              <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar
+                className={`w-16 h-16 ${!isAdmin ? "cursor-pointer" : ""}`}
+                onClick={() => !isAdmin && fileInputRef.current?.click()}
+                data-testid="avatar-profile"
+              >
+                {isAdmin ? (
+                  <AvatarImage src={logoSrc} alt="Nestwork" className="object-contain p-1" />
+                ) : user?.profileImage ? (
+                  <AvatarImage src={user.profileImage} alt={user.name} />
+                ) : null}
+                <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              {!isAdmin && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-1 shadow-md"
+                  data-testid="button-upload-avatar"
+                >
+                  <Camera className="w-3 h-3" />
+                </button>
+              )}
+            </div>
             <div>
               <h2 className="text-lg font-bold" data-testid="text-user-name">{user?.name}</h2>
               <p className="text-sm text-muted-foreground">{user?.stilling}</p>
+              {!isAdmin && !user?.profileImage && (
+                <p className="text-xs text-primary mt-0.5">Trykk for å laste opp bilde</p>
+              )}
+              {uploadImage.isPending && (
+                <p className="text-xs text-primary mt-0.5">Laster opp...</p>
+              )}
             </div>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleImageSelect}
+            data-testid="input-avatar-upload"
+          />
 
           <div className="space-y-4">
             <div className="flex items-center gap-3">

@@ -29,7 +29,7 @@ export default function EmployeeHome() {
 
   const taVaktMutation = useMutation({
     mutationFn: (vaktId: string) =>
-      apiRequest("POST", `/api/vakter/${vaktId}/ta`, { ansattId: user?.id }),
+      apiRequest("POST", `/api/vakter/${vaktId}/ta`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
       toast({ title: "Vakt registrert!", description: "Venter på godkjenning fra admin." });
@@ -103,6 +103,53 @@ export default function EmployeeHome() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {tildelte.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wide">
+            Vakter tildelt deg
+          </p>
+          {tildelte.map((vakt) => {
+            const bh = bhMap.get(vakt.barnehageId);
+            return (
+              <Card key={vakt.id} className="border-purple-200 dark:border-purple-800" data-testid={`card-tildelt-${vakt.id}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <h3 className="font-semibold text-sm">{bh?.name || "Ukjent"}</h3>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      <UserCheck className="w-3 h-3" />
+                      Tildelt deg
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{formatDate(vakt.dato)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
+                      <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate">{bh?.address}</span>
+                    </div>
+                  </div>
+                  <Button
+                    data-testid={`button-godta-vakt-${vakt.id}`}
+                    className="w-full"
+                    onClick={() => godtaVaktMutation.mutate(vakt.id)}
+                    disabled={godtaVaktMutation.isPending}
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                    Godta vakt
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
       {vLoading ? (

@@ -28,9 +28,10 @@ export default function AdminDashboard() {
   const weekStart = thisWeekStart.toISOString().split("T")[0];
   const weekEnd = thisWeekEnd.toISOString().split("T")[0];
 
-  const activeVakter = vakter?.filter((v) => v.dato >= today && (v.status === "godkjent" || v.status === "venter")) || [];
+  const activeVakter = vakter?.filter((v) => v.dato >= today && (v.status === "godkjent" || v.status === "venter" || v.status === "tildelt")) || [];
   const ledigeVakter = vakter?.filter((v) => v.dato >= today && v.status === "ledig") || [];
   const venterVakter = vakter?.filter((v) => v.status === "venter") || [];
+  const tildelteVakter = vakter?.filter((v) => v.dato >= today && v.status === "tildelt") || [];
   const weekVakter = vakter?.filter((v) => v.dato >= weekStart && v.dato <= weekEnd && v.status === "godkjent") || [];
 
   const calcHours = (start: string, end: string) => {
