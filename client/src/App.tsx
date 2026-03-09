@@ -1,6 +1,6 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -13,6 +13,7 @@ import Inntjening from "@/pages/employee/inntjening";
 import Profil from "@/pages/employee/profil";
 import Meldinger from "@/pages/employee/meldinger";
 import OnboardingPage from "@/pages/employee/onboarding";
+import Varsler from "@/pages/employee/varsler";
 import AdminDashboard from "@/pages/admin/dashboard";
 import NyVakt from "@/pages/admin/ny-vakt";
 import GodkjennVakter from "@/pages/admin/godkjenn";
@@ -20,8 +21,11 @@ import AdminMeldinger from "@/pages/admin/meldinger";
 import AlleVakter from "@/pages/admin/alle-vakter";
 import Innstillinger from "@/pages/employee/innstillinger";
 import NotFound from "@/pages/not-found";
-import { Loader2 } from "lucide-react";
+import { Loader2, Bell } from "lucide-react";
 import { NestworkLogo } from "@/components/nestwork-logo";
+import { useLocation, Link } from "wouter";
+import { useEffect } from "react";
+import { subscribeToPush } from "@/lib/push";
 
 function AppContent() {
   const { user, isLoading } = useAuth();
@@ -40,6 +44,18 @@ function AppContent() {
   }
 
   const isAdmin = user.role === "admin";
+  const [location] = useLocation();
+
+  const { data: unreadVarsler } = useQuery<{ count: number }>({
+    queryKey: ["/api/varsler/unread-count"],
+    refetchInterval: 15000,
+  });
+
+  useEffect(() => {
+    subscribeToPush();
+  }, []);
+
+  const varselCount = unreadVarsler?.count || 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -49,9 +65,27 @@ function AppContent() {
             <NestworkLogo size={32} />
             <span className="font-bold text-sm">Nestwork</span>
           </div>
-          {isAdmin && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Admin</span>
-          )}
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Admin</span>
+            )}
+            <Link href="/varsler">
+              <button
+                className={`relative p-2 rounded-md transition-colors ${location === "/varsler" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                data-testid="button-varsler"
+              >
+                <Bell className="w-5 h-5" />
+                {varselCount > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1"
+                    data-testid="badge-varsler"
+                  >
+                    {varselCount > 99 ? "99+" : varselCount}
+                  </span>
+                )}
+              </button>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -65,6 +99,7 @@ function AppContent() {
               <Route path="/admin/godkjenn" component={GodkjennVakter} />
               <Route path="/admin/meldinger" component={AdminMeldinger} />
               <Route path="/admin/alle-vakter" component={AlleVakter} />
+              <Route path="/varsler" component={Varsler} />
               <Route path="/profil" component={Profil} />
               <Route path="/innstillinger" component={Innstillinger} />
             </>
@@ -77,6 +112,7 @@ function AppContent() {
               <Route path="/profil" component={Profil} />
               <Route path="/innstillinger" component={Innstillinger} />
               <Route path="/meldinger" component={Meldinger} />
+              <Route path="/varsler" component={Varsler} />
               <Route path="/onboarding" component={OnboardingPage} />
             </>
           )}

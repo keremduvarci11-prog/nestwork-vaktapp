@@ -5,8 +5,16 @@ export async function subscribeToPush() {
 
   try {
     const registration = await navigator.serviceWorker.register("/sw.js");
-    const res = await fetch("/api/push/vapid-key");
-    const { key } = await res.json();
+    let res: Response;
+    try {
+      res = await fetch("/api/push/vapid-key");
+      if (!res.ok) return;
+    } catch { return; }
+    let data: any;
+    try {
+      data = await res.json();
+    } catch { return; }
+    const key = data?.key;
     if (!key) return;
 
     const existing = await registration.pushManager.getSubscription();

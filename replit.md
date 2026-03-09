@@ -63,6 +63,10 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - Inntjening shows NOK currency (not dollar sign)
 - 30-minute pause toggle on shifts (trekkPause) deducts from paid hours everywhere
 - Admin can search/select employee directly when creating new shift (auto-assigns as tildelt)
+- Push notifications (Web Push API with VAPID keys + service worker)
+- In-app notification system (varsler table) with bell icon in header showing unread count
+- Cron jobs: 2hr ledig-vakt reminder, 1hr tildelt-purring, 20:00 evening reminder for next-day shifts
+- Notification triggers: new vakt (region), tildeling (employee), admin message (employee)
 
 ## Demo Credentials
 - All employees start with password: nestwork2026

@@ -610,6 +610,16 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  app.get("/sw.js", (_req, res) => {
+    const swPath = path.join(process.cwd(), "client", "public", "sw.js");
+    if (fs.existsSync(swPath)) {
+      res.setHeader("Content-Type", "application/javascript");
+      res.sendFile(swPath);
+    } else {
+      res.status(404).send("");
+    }
+  });
+
   app.get("/api/push/vapid-key", (_req, res) => {
     res.json({ key: process.env.VAPID_PUBLIC_KEY || "" });
   });
