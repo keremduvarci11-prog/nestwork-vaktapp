@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, TrendingUp } from "lucide-react";
+import { Clock, TrendingUp, CheckCircle } from "lucide-react";
 import type { Vakt } from "@shared/schema";
 
 export default function Inntjening() {
@@ -13,14 +13,15 @@ export default function Inntjening() {
   });
 
   const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
   const timelonn = parseFloat(user?.timelonn || "0");
 
   const monthVakter = vakter?.filter((v) => {
     const d = new Date(v.dato + "T00:00:00");
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear && v.status === "godkjent";
-  }) || [];
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear && v.status === "godkjent" && v.dato <= todayStr;
+  })?.sort((a, b) => a.dato.localeCompare(b.dato)) || [];
 
   const calcHours = (start: string, end: string, trekkPause?: boolean | null) => {
     const [sh, sm] = start.split(":").map(Number);
@@ -33,13 +34,13 @@ export default function Inntjening() {
   const totalHours = monthVakter.reduce((sum, v) => sum + calcHours(v.startTid, v.sluttTid, v.trekkPause), 0);
   const totalEarnings = totalHours * timelonn;
 
-  const monthName = today.toLocaleDateString("nb-NO", { month: "long", year: "numeric" });
+  const todayFormatted = today.toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold">Inntjening</h1>
-        <p className="text-sm text-muted-foreground mt-1 capitalize">{monthName}</p>
+        <p className="text-sm text-muted-foreground mt-1" data-testid="text-today-date">{todayFormatted}</p>
       </div>
 
       {isLoading ? (
@@ -71,7 +72,7 @@ export default function Inntjening() {
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Timer</p>
+                      <p className="text-xs text-muted-foreground">Timer jobbet</p>
                       <p className="text-lg font-bold">{totalHours.toFixed(1)}</p>
                     </div>
                   </div>
@@ -93,16 +94,22 @@ export default function Inntjening() {
 
           {monthVakter.length > 0 && (
             <div>
-              <h2 className="text-sm font-semibold mb-3">Vakter denne måneden</h2>
+              <h2 className="text-sm font-semibold mb-3">Fullforte vakter denne maneden</h2>
               <div className="space-y-2">
                 {monthVakter.map((v) => {
                   const hours = calcHours(v.startTid, v.sluttTid, v.trekkPause);
                   const date = new Date(v.dato + "T00:00:00");
                   return (
-                    <div key={v.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                      <div>
-                        <p className="text-sm font-medium">{date.toLocaleDateString("nb-NO", { day: "numeric", month: "short" })}</p>
-                        <p className="text-xs text-muted-foreground">{v.startTid?.slice(0, 5)} - {v.sluttTid?.slice(0, 5)}</p>
+                    <div key={v.id} className="flex items-center justify-between py-2 border-b last:border-0" data-testid={`row-vakt-${v.id}`}>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">{date.toLocaleDateString("nb-NO", { day: "numeric", month: "short" })}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {v.startTid?.slice(0, 5)} - {v.sluttTid?.slice(0, 5)}
+                            {v.trekkPause ? " (30m pause)" : ""}
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium">{(hours * timelonn).toLocaleString("nb-NO")} kr</p>
@@ -113,6 +120,14 @@ export default function Inntjening() {
                 })}
               </div>
             </div>
+          )}
+
+          {monthVakter.length === 0 && (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="text-sm text-muted-foreground">Ingen fullforte vakter denne maneden enna</p>
+              </CardContent>
+            </Card>
           )}
         </>
       )}
