@@ -41,3 +41,9 @@ waitForPort = 5000
 
 [agent]
 integrations = ["google-sheet:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BL9fPkiBRDupcmbKU0WuCjsL9dCovyN24otYD5kYX97-GEorD7Vu8I87EMGp-rNbsdnXiLxqd3z_Wqvq9Flviy0"
+VAPID_PRIVATE_KEY = "IYQz82U9cltTBxkvqv0aM0XZFNN1oCZ3lugZ0b8egvE"

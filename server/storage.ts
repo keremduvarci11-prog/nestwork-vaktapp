@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import {
-  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding,
+  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions,
   type User, type InsertUser,
   type Barnehage, type InsertBarnehage,
   type Vakt, type InsertVakt,
@@ -9,6 +9,8 @@ import {
   type SamtaleMelding, type InsertSamtaleMelding,
   type Favoritt, type InsertFavoritt,
   type Onboarding, type InsertOnboarding,
+  type Varsel, type InsertVarsel,
+  type PushSubscription, type InsertPushSubscription,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -55,6 +57,18 @@ export interface IStorage {
   getOnboarding(userId: string): Promise<Onboarding[]>;
   createOnboarding(o: InsertOnboarding): Promise<Onboarding>;
   toggleOnboarding(id: string, completed: boolean): Promise<Onboarding | undefined>;
+
+  getVarsler(userId: string): Promise<Varsel[]>;
+  createVarsel(v: InsertVarsel): Promise<Varsel>;
+  markVarselRead(id: string): Promise<void>;
+  markAllVarslerRead(userId: string): Promise<void>;
+  getUnreadVarselCount(userId: string): Promise<number>;
+
+  getPushSubscriptions(userId: string): Promise<PushSubscription[]>;
+  savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription>;
+  deletePushSubscription(endpoint: string): Promise<void>;
+  getUsersByRegion(region: string): Promise<User[]>;
+  getUsersByRegions(regions: string[]): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -240,6 +254,50 @@ export class DatabaseStorage implements IStorage {
       .where(eq(onboarding.id, id))
       .returning();
     return updated;
+  }
+
+  async getVarsler(userId: string): Promise<Varsel[]> {
+    return db.select().from(varsler).where(eq(varsler.userId, userId)).orderBy(desc(varsler.createdAt));
+  }
+
+  async createVarsel(v: InsertVarsel): Promise<Varsel> {
+    const [created] = await db.insert(varsler).values(v).returning();
+    return created;
+  }
+
+  async markVarselRead(id: string): Promise<void> {
+    await db.update(varsler).set({ read: true }).where(eq(varsler.id, id));
+  }
+
+  async markAllVarslerRead(userId: string): Promise<void> {
+    await db.update(varsler).set({ read: true }).where(eq(varsler.userId, userId));
+  }
+
+  async getUnreadVarselCount(userId: string): Promise<number> {
+    const all = await db.select().from(varsler).where(and(eq(varsler.userId, userId), eq(varsler.read, false)));
+    return all.length;
+  }
+
+  async getPushSubscriptions(userId: string): Promise<PushSubscription[]> {
+    return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+  }
+
+  async savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription> {
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
+    const [created] = await db.insert(pushSubscriptions).values(sub).returning();
+    return created;
+  }
+
+  async deletePushSubscription(endpoint: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  }
+
+  async getUsersByRegion(region: string): Promise<User[]> {
+    return db.select().from(users).where(and(eq(users.region, region), eq(users.role, "ansatt")));
+  }
+
+  async getUsersByRegions(regions: string[]): Promise<User[]> {
+    return db.select().from(users).where(and(inArray(users.region, regions), eq(users.role, "ansatt")));
   }
 }
 

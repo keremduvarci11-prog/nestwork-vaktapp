@@ -97,6 +97,26 @@ export const onboarding = pgTable("onboarding", {
   completedAt: timestamp("completed_at"),
 });
 
+export const varsler = pgTable("varsler", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull().default("info"),
+  read: boolean("read").default(false),
+  link: text("link"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertBarnehageSchema = createInsertSchema(barnehager).omit({ id: true });
 export const insertVaktSchema = createInsertSchema(vakter).omit({ id: true, createdAt: true });
@@ -104,6 +124,8 @@ export const insertMeldingSchema = createInsertSchema(meldinger).omit({ id: true
 export const insertSamtaleMeldingSchema = createInsertSchema(samtaleMeldinger).omit({ id: true, createdAt: true });
 export const insertFavorittSchema = createInsertSchema(favoritter).omit({ id: true });
 export const insertOnboardingSchema = createInsertSchema(onboarding).omit({ id: true });
+export const insertVarselSchema = createInsertSchema(varsler).omit({ id: true, createdAt: true });
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -119,3 +141,7 @@ export type InsertFavoritt = z.infer<typeof insertFavorittSchema>;
 export type Favoritt = typeof favoritter.$inferSelect;
 export type InsertOnboarding = z.infer<typeof insertOnboardingSchema>;
 export type Onboarding = typeof onboarding.$inferSelect;
+export type InsertVarsel = z.infer<typeof insertVarselSchema>;
+export type Varsel = typeof varsler.$inferSelect;
+export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;

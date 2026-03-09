@@ -8,6 +8,7 @@ import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema } from "@shared/schema";
 import { appendVaktToSheet, getSpreadsheetUrl } from "./googleSheets";
+import { notifyRegion, notifyUser } from "./notifications";
 
 const uploadDir = path.join(process.cwd(), "uploads", "profiles");
 if (!fs.existsSync(uploadDir)) {
@@ -272,6 +273,30 @@ export async function registerRoutes(
     const parsed = insertVaktSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const created = await storage.createVakt(parsed.data);
+
+    try {
+      const bh = await storage.getBarnehage(created.barnehageId);
+      if (created.status === "tildelt" && created.ansattId) {
+        await notifyUser(
+          created.ansattId,
+          "Du har fatt en ny vakt",
+          `Nestwork Admin har tildelt deg en vakt ${created.dato} hos ${bh?.name || "ukjent"}. Husk a godkjenne.`,
+          "tildeling",
+          "/mine-vakter"
+        );
+      } else {
+        await notifyRegion(
+          created.region,
+          "Ny vakt tilgjengelig",
+          `Ny vakt ${created.dato} hos ${bh?.name || "ukjent"} (${created.startTid?.slice(0, 5)} - ${created.sluttTid?.slice(0, 5)})`,
+          "vakt",
+          "/"
+        );
+      }
+    } catch (err) {
+      console.error("[Notify] Feil ved varsling:", err);
+    }
+
     res.json(created);
   });
 
@@ -300,6 +325,20 @@ export async function registerRoutes(
       ansattId,
     });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+
+    try {
+      const bh = await storage.getBarnehage(updated.barnehageId);
+      await notifyUser(
+        ansattId,
+        "Du har fatt en ny vakt",
+        `Nestwork Admin har tildelt deg en vakt ${updated.dato} hos ${bh?.name || "ukjent"}. Husk a godkjenne.`,
+        "tildeling",
+        "/mine-vakter"
+      );
+    } catch (err) {
+      console.error("[Notify] Feil ved tildeling-varsling:", err);
+    }
+
     res.json(updated);
   });
 
@@ -466,6 +505,22 @@ export async function registerRoutes(
       fromUserId,
       message,
     });
+
+    try {
+      const sender = await storage.getUser(fromUserId);
+      if (sender?.role === "admin") {
+        await notifyUser(
+          melding.fromUserId,
+          "Ny melding fra Nestwork Admin",
+          "Du har fatt en ny melding fra Nestwork Admin.",
+          "melding",
+          "/meldinger"
+        );
+      }
+    } catch (err) {
+      console.error("[Notify] Feil ved melding-varsling:", err);
+    }
+
     res.json(created);
   });
 
@@ -533,6 +588,52 @@ export async function registerRoutes(
   app.get("/api/sheets-url", requireAdmin, async (_req, res) => {
     const url = await getSpreadsheetUrl();
     res.json({ url });
+  });
+
+  app.get("/api/varsler", requireAuth, async (req, res) => {
+    const v = await storage.getVarsler(req.session.userId!);
+    res.json(v);
+  });
+
+  app.get("/api/varsler/unread-count", requireAuth, async (req, res) => {
+    const count = await storage.getUnreadVarselCount(req.session.userId!);
+    res.json({ count });
+  });
+
+  app.patch("/api/varsler/:id/read", requireAuth, async (req, res) => {
+    await storage.markVarselRead(req.params.id);
+    res.json({ success: true });
+  });
+
+  app.patch("/api/varsler/read-all", requireAuth, async (req, res) => {
+    await storage.markAllVarslerRead(req.session.userId!);
+    res.json({ success: true });
+  });
+
+  app.get("/api/push/vapid-key", (_req, res) => {
+    res.json({ key: process.env.VAPID_PUBLIC_KEY || "" });
+  });
+
+  app.post("/api/push/subscribe", requireAuth, async (req, res) => {
+    const { endpoint, keys } = req.body;
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ message: "Ugyldig subscription" });
+    }
+    await storage.savePushSubscription({
+      userId: req.session.userId!,
+      endpoint,
+      p256dh: keys.p256dh,
+      auth: keys.auth,
+    });
+    res.json({ success: true });
+  });
+
+  app.post("/api/push/unsubscribe", requireAuth, async (req, res) => {
+    const { endpoint } = req.body;
+    if (endpoint) {
+      await storage.deletePushSubscription(endpoint);
+    }
+    res.json({ success: true });
   });
 
   return httpServer;
