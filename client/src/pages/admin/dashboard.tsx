@@ -34,13 +34,15 @@ export default function AdminDashboard() {
   const tildelteVakter = vakter?.filter((v) => v.dato >= today && v.status === "tildelt") || [];
   const weekVakter = vakter?.filter((v) => v.dato >= weekStart && v.dato <= weekEnd && v.status === "godkjent") || [];
 
-  const calcHours = (start: string, end: string) => {
+  const calcHours = (start: string, end: string, trekkPause?: boolean | null) => {
     const [sh, sm] = start.split(":").map(Number);
     const [eh, em] = end.split(":").map(Number);
-    return (eh * 60 + em - sh * 60 - sm) / 60;
+    let hours = (eh * 60 + em - sh * 60 - sm) / 60;
+    if (trekkPause) hours -= 0.5;
+    return Math.max(0, hours);
   };
 
-  const weekHours = weekVakter.reduce((sum, v) => sum + calcHours(v.startTid, v.sluttTid), 0);
+  const weekHours = weekVakter.reduce((sum, v) => sum + calcHours(v.startTid, v.sluttTid, v.trekkPause), 0);
 
   const bhMap = new Map(barnehager?.map((b) => [b.id, b]) || []);
   const userMap = new Map(users?.map((u) => [u.id, u]) || []);
