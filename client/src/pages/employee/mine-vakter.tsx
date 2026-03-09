@@ -96,7 +96,7 @@ export default function MineVakter() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}</span>
+                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{vakt.trekkPause ? " (30m pause)" : ""}</span>
                     </div>
                     <div className="flex items-center gap-1.5 col-span-2">
                       <Building2 className="w-3.5 h-3.5" />
@@ -143,7 +143,7 @@ export default function MineVakter() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}</span>
+                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{vakt.trekkPause ? " (30m pause)" : ""}</span>
                     </div>
                     <div className="flex items-center gap-1.5 col-span-2">
                       <Building2 className="w-3.5 h-3.5" />

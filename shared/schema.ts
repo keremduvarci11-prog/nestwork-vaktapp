@@ -55,6 +55,7 @@ export const vakter = pgTable("vakter", {
   ansattId: varchar("ansatt_id"),
   region: text("region").notNull(),
   beskrivelse: text("beskrivelse"),
+  trekkPause: boolean("trekk_pause").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

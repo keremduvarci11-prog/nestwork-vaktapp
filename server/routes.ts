@@ -275,7 +275,7 @@ export async function registerRoutes(
     res.json(created);
   });
 
-  app.patch("/api/vakter/:id", requireAuth, async (req, res) => {
+  app.patch("/api/vakter/:id", requireAdmin, async (req, res) => {
     const updated = await storage.updateVakt(req.params.id, req.body);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
@@ -320,6 +320,8 @@ export async function registerRoutes(
         const [sh, sm] = updated.startTid.split(":").map(Number);
         const [eh, em] = updated.sluttTid.split(":").map(Number);
         timer = (eh * 60 + em - sh * 60 - sm) / 60;
+        if (updated.trekkPause) timer -= 0.5;
+        timer = Math.max(0, timer);
       }
       await appendVaktToSheet({
         dato: updated.dato || "",
@@ -351,6 +353,8 @@ export async function registerRoutes(
         const [sh, sm] = updated.startTid.split(":").map(Number);
         const [eh, em] = updated.sluttTid.split(":").map(Number);
         timer = (eh * 60 + em - sh * 60 - sm) / 60;
+        if (updated.trekkPause) timer -= 0.5;
+        timer = Math.max(0, timer);
       }
 
       await appendVaktToSheet({

@@ -22,13 +22,15 @@ export default function Inntjening() {
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear && v.status === "godkjent";
   }) || [];
 
-  const calcHours = (start: string, end: string) => {
+  const calcHours = (start: string, end: string, trekkPause?: boolean | null) => {
     const [sh, sm] = start.split(":").map(Number);
     const [eh, em] = end.split(":").map(Number);
-    return (eh * 60 + em - sh * 60 - sm) / 60;
+    let hours = (eh * 60 + em - sh * 60 - sm) / 60;
+    if (trekkPause) hours -= 0.5;
+    return Math.max(0, hours);
   };
 
-  const totalHours = monthVakter.reduce((sum, v) => sum + calcHours(v.startTid, v.sluttTid), 0);
+  const totalHours = monthVakter.reduce((sum, v) => sum + calcHours(v.startTid, v.sluttTid, v.trekkPause), 0);
   const totalEarnings = totalHours * timelonn;
 
   const monthName = today.toLocaleDateString("nb-NO", { month: "long", year: "numeric" });
@@ -94,7 +96,7 @@ export default function Inntjening() {
               <h2 className="text-sm font-semibold mb-3">Vakter denne måneden</h2>
               <div className="space-y-2">
                 {monthVakter.map((v) => {
-                  const hours = calcHours(v.startTid, v.sluttTid);
+                  const hours = calcHours(v.startTid, v.sluttTid, v.trekkPause);
                   const date = new Date(v.dato + "T00:00:00");
                   return (
                     <div key={v.id} className="flex items-center justify-between py-2 border-b last:border-0">

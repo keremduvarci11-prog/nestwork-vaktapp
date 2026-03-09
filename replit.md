@@ -15,7 +15,7 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 ## Key Data Models
 - **Users**: Employees and admins with region, position, hourly rate, kontonummer, profileImage, cvFile, politiattestFile
 - **Barnehager**: Kindergartens with contact info and tariff
-- **Vakter**: Shifts with status flow: ledig -> venter -> godkjent/avslatt, or ledig -> tildelt -> godkjent (admin direct assignment)
+- **Vakter**: Shifts with status flow: ledig -> venter -> godkjent/avslatt, or ledig -> tildelt -> godkjent (admin direct assignment). Has `trekkPause` boolean for 30-min lunch deduction.
 - **Meldinger**: Conversations between employees and admin (with samtale_meldinger thread messages)
 - **Favoritter**: Employee favorite kindergartens
 - **Onboarding**: Checklist items for new employees (password change, profile pic, CV, politiattest, bankinfo, contract)
@@ -59,8 +59,10 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - Profile picture upload (clickable avatar on profil page, camera icon overlay)
 - Admin avatar shows Nestwork logo; employees show initials or uploaded photo
 - CV and politiattest document upload (auth-protected)
-- Google Sheets integration for approved shifts
+- Google Sheets integration for approved shifts (with pause deduction in timer)
 - Inntjening shows NOK currency (not dollar sign)
+- 30-minute pause toggle on shifts (trekkPause) deducts from paid hours everywhere
+- Admin can search/select employee directly when creating new shift (auto-assigns as tildelt)
 
 ## Demo Credentials
 - All employees start with password: nestwork2026

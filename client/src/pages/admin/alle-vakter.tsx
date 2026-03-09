@@ -5,10 +5,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus } from "lucide-react";
+import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus, Coffee } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
 
@@ -41,6 +42,7 @@ function EditVaktForm({
   const [beskrivelse, setBeskrivelse] = useState(vakt.beskrivelse || "");
   const [status, setStatus] = useState(vakt.status);
   const [ansattId, setAnsattId] = useState(vakt.ansattId || "");
+  const [trekkPause, setTrekkPause] = useState(vakt.trekkPause || false);
 
   const selectedBh = barnehager.find((b) => b.id === barnehageId);
 
@@ -56,6 +58,7 @@ function EditVaktForm({
         status,
         region: selectedBh?.region || vakt.region,
         ansattId: ansattId || null,
+        trekkPause,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
@@ -152,6 +155,18 @@ function EditVaktForm({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="flex items-center justify-between p-2.5 rounded-md bg-muted/50 border">
+          <div className="flex items-center gap-2">
+            <Coffee className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-medium">Trekk 30 min pause</span>
+          </div>
+          <Switch
+            checked={trekkPause}
+            onCheckedChange={setTrekkPause}
+            data-testid="edit-switch-trekk-pause"
+          />
         </div>
 
         <div className="space-y-2">
