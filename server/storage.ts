@@ -257,7 +257,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getVarsler(userId: string): Promise<Varsel[]> {
-    return db.select().from(varsler).where(eq(varsler.userId, userId)).orderBy(desc(varsler.createdAt));
+    return db.select().from(varsler).where(and(eq(varsler.userId, userId), eq(varsler.read, false))).orderBy(desc(varsler.createdAt));
   }
 
   async createVarsel(v: InsertVarsel): Promise<Varsel> {
