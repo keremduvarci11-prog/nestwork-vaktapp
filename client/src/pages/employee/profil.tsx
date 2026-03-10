@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Briefcase, Mail, Phone, LogOut, History, ClipboardList, ChevronRight, Settings, CreditCard, Camera } from "lucide-react";
+import { MapPin, Briefcase, Mail, Phone, LogOut, History, ClipboardList, ChevronRight, Settings, CreditCard, Camera, Sun, Moon } from "lucide-react";
 import { Link } from "wouter";
 import logoSrc from "@assets/nestwork_logo_transparent_1773012243381.png";
+import { useTheme } from "@/components/theme-provider";
 
 export default function Profil() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleAvailability = useMutation({
@@ -56,8 +58,22 @@ export default function Profil() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Min profil</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (theme === "light") setTheme("dark");
+            else if (theme === "dark") setTheme("system");
+            else setTheme("light");
+          }}
+          data-testid="button-theme-toggle"
+          className="gap-2"
+        >
+          {theme === "dark" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+          {theme === "light" ? "Lys" : theme === "dark" ? "Mørk" : "Auto"}
+        </Button>
       </div>
 
       <Card>

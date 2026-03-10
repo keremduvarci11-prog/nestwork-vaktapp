@@ -7,14 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Camera, Save, Eye, EyeOff, Sun, Moon } from "lucide-react";
-import { useTheme } from "@/components/theme-provider";
+import { ArrowLeft, Camera, Save, Eye, EyeOff } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Innstillinger() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { theme, setTheme } = useTheme();
   const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -292,34 +290,6 @@ export default function Innstillinger() {
           >
             Bytt passord
           </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {theme === "dark" ? <Moon className="w-4 h-4 text-muted-foreground" /> : <Sun className="w-4 h-4 text-muted-foreground" />}
-              <div>
-                <p className="text-sm font-medium">Mørk modus</p>
-                <p className="text-xs text-muted-foreground">
-                  {theme === "dark" ? "Aktivert" : theme === "system" ? "Automatisk" : "Deaktivert"}
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (theme === "light") setTheme("dark");
-                else if (theme === "dark") setTheme("system");
-                else setTheme("light");
-              }}
-              data-testid="button-theme-toggle"
-            >
-              {theme === "light" ? "Av" : theme === "dark" ? "På" : "Auto"}
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>
