@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Camera, Save, Eye, EyeOff, Sun, Moon, Monitor } from "lucide-react";
+import { ArrowLeft, Camera, Save, Eye, EyeOff, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useLocation } from "wouter";
 
@@ -296,31 +296,30 @@ export default function Innstillinger() {
       </Card>
 
       <Card>
-        <CardContent className="p-4 space-y-3">
-          <p className="text-sm font-semibold">Utseende</p>
-
-          {([
-            { value: "light" as const, label: "Lys modus (standard)", Icon: Sun },
-            { value: "dark" as const, label: "Mørk modus", Icon: Moon },
-            { value: "system" as const, label: "Automatisk (følg systeminnstillinger)", Icon: Monitor },
-          ]).map(({ value, label, Icon }) => (
-            <button
-              key={value}
-              onClick={() => setTheme(value)}
-              className={`w-full flex items-center gap-3 p-3 rounded-md text-left transition-colors ${
-                theme === value
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground"
-              }`}
-              data-testid={`button-theme-${value}`}
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {theme === "dark" ? <Moon className="w-4 h-4 text-muted-foreground" /> : <Sun className="w-4 h-4 text-muted-foreground" />}
+              <div>
+                <p className="text-sm font-medium">Mørk modus</p>
+                <p className="text-xs text-muted-foreground">
+                  {theme === "dark" ? "Aktivert" : theme === "system" ? "Automatisk" : "Deaktivert"}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (theme === "light") setTheme("dark");
+                else if (theme === "dark") setTheme("system");
+                else setTheme("light");
+              }}
+              data-testid="button-theme-toggle"
             >
-              <Icon className="w-5 h-5 shrink-0" />
-              <span className="text-sm font-medium">{label}</span>
-              {theme === value && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-primary shrink-0" />
-              )}
-            </button>
-          ))}
+              {theme === "light" ? "Av" : theme === "dark" ? "På" : "Auto"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
