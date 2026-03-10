@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Camera, Save, Eye, EyeOff } from "lucide-react";
 import { useLocation } from "wouter";
+import { ImageCropper } from "@/components/image-cropper";
 
 export default function Innstillinger() {
   const { user } = useAuth();
@@ -69,10 +70,12 @@ export default function Innstillinger() {
     },
   });
 
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+
   const uploadImage = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async (blob: Blob) => {
       const formData = new FormData();
-      formData.append("image", file);
+      formData.append("image", blob, "profile.jpg");
       const res = await fetch(`/api/users/${user?.id}/profile-image`, {
         method: "POST",
         body: formData,
@@ -96,8 +99,16 @@ export default function Innstillinger() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      uploadImage.mutate(file);
+      const reader = new FileReader();
+      reader.onload = () => setCropImageSrc(reader.result as string);
+      reader.readAsDataURL(file);
     }
+    e.target.value = "";
+  };
+
+  const handleCropComplete = (blob: Blob) => {
+    setCropImageSrc(null);
+    uploadImage.mutate(blob);
   };
 
   const handlePasswordSubmit = () => {
@@ -292,6 +303,14 @@ export default function Innstillinger() {
           </Button>
         </CardContent>
       </Card>
+
+      {cropImageSrc && (
+        <ImageCropper
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCropComplete}
+          onCancel={() => setCropImageSrc(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import logoSrc from "@assets/nestwork_logo_transparent_1773012243381.png";
+import logoSrc from "@assets/nestwork_logo_centered.png";
 
 interface LogoProps {
   className?: string;
