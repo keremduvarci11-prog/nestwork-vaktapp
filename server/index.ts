@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase } from "./seed";
 import { startCronJobs } from "./cronJobs";
+import { syncProductionData } from "./syncProdData";
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,6 +64,7 @@ app.use((req, res, next) => {
 
 (async () => {
   await seedDatabase();
+  await syncProductionData();
   await registerRoutes(httpServer, app);
   startCronJobs();
 
