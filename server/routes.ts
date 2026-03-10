@@ -436,6 +436,10 @@ export async function registerRoutes(
   });
 
   app.get("/api/meldinger/user/:userId", requireAuth, async (req, res) => {
+    const currentUser = await storage.getUser(req.session.userId!);
+    if (req.session.userId !== req.params.userId && currentUser?.role !== "admin") {
+      return res.status(403).json({ message: "Ikke tilgang" });
+    }
     const m = await storage.getMeldingerByUser(req.params.userId);
     res.json(m);
   });
@@ -443,7 +447,15 @@ export async function registerRoutes(
   app.post("/api/meldinger", requireAuth, async (req, res) => {
     const parsed = insertMeldingSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-    const created = await storage.createMelding(parsed.data);
+    const data = parsed.data;
+    const currentUser = await storage.getUser(req.session.userId!);
+    if (currentUser?.role === "admin") {
+      data.fromUserId = "admin";
+    } else {
+      data.fromUserId = req.session.userId!;
+      data.toUserId = undefined;
+    }
+    const created = await storage.createMelding(data);
     res.json(created);
   });
 
@@ -502,24 +514,33 @@ export async function registerRoutes(
     const melding = await storage.getMelding(req.params.id);
     if (!melding) return res.status(404).json({ message: "Samtale ikke funnet" });
     if (melding.closed) return res.status(400).json({ message: "Samtalen er avsluttet" });
-    const { message, fromUserId } = req.body;
+    const currentUser = await storage.getUser(req.session.userId!);
+    const isAdmin = currentUser?.role === "admin";
+    const isParticipant = melding.fromUserId === req.session.userId || melding.toUserId === req.session.userId;
+    if (!isAdmin && !isParticipant) {
+      return res.status(403).json({ message: "Ikke tilgang" });
+    }
+    const { message } = req.body;
     if (!message?.trim()) return res.status(400).json({ message: "Melding kan ikke vere tom" });
+    const actualFromUserId = isAdmin ? "admin" : req.session.userId!;
     const created = await storage.createSamtaleMelding({
       meldingId: req.params.id,
-      fromUserId,
+      fromUserId: actualFromUserId,
       message,
     });
 
     try {
-      const sender = await storage.getUser(fromUserId);
-      if (sender?.role === "admin") {
-        await notifyUser(
-          melding.fromUserId,
-          "Ny melding fra Nestwork Admin",
-          "Du har fatt en ny melding fra Nestwork Admin.",
-          "melding",
-          "/meldinger"
-        );
+      if (isAdmin) {
+        const targetUserId = melding.fromUserId === "admin" ? melding.toUserId : melding.fromUserId;
+        if (targetUserId) {
+          await notifyUser(
+            targetUserId,
+            "Ny melding fra Nestwork Admin",
+            "Du har fatt en ny melding fra Nestwork Admin.",
+            "melding",
+            "/meldinger"
+          );
+        }
       }
     } catch (err) {
       console.error("[Notify] Feil ved melding-varsling:", err);
@@ -544,13 +565,23 @@ export async function registerRoutes(
   });
 
   app.get("/api/meldinger/unread-count/user/:userId", requireAuth, async (req, res) => {
+    const currentUser = await storage.getUser(req.session.userId!);
+    if (req.session.userId !== req.params.userId && currentUser?.role !== "admin") {
+      return res.status(403).json({ message: "Ikke tilgang" });
+    }
     const userMeldinger = await storage.getMeldingerByUser(req.params.userId);
     let count = 0;
     for (const m of userMeldinger) {
+      if (m.hiddenByUser) continue;
+      const lastUserSeen = m.lastSeenByUser ? new Date(m.lastSeenByUser) : null;
+      if (m.fromUserId === "admin" && !lastUserSeen) {
+        count++;
+        continue;
+      }
       const samtale = await storage.getSamtaleMeldinger(m.id);
-      const lastUserSeen = m.lastSeenByUser || m.createdAt || new Date(0);
+      const seenTime = lastUserSeen || (m.createdAt ? new Date(m.createdAt) : new Date(0));
       const hasNewFromAdmin = samtale.some(
-        (s) => s.fromUserId === "admin" && s.createdAt && new Date(s.createdAt) > new Date(lastUserSeen)
+        (s) => s.fromUserId === "admin" && s.createdAt && new Date(s.createdAt) > seenTime
       );
       if (hasNewFromAdmin) count++;
     }
@@ -605,10 +636,20 @@ export async function registerRoutes(
   });
 
   app.get("/api/onboarding/:userId", requireAuth, async (req, res) => {
-    if (req.session.userId !== req.params.userId && req.session.role !== "admin") {
+    const currentUser = await storage.getUser(req.session.userId!);
+    if (req.session.userId !== req.params.userId && currentUser?.role !== "admin") {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
-    const items = await storage.getOnboarding(req.params.userId);
+    let items = await storage.getOnboarding(req.params.userId);
+    const defaultItems = ["Bytt passord", "Last opp profilbilde", "Last opp CV", "Last opp politiattest", "Registrer bankinfo", "Signert kontrakt"];
+    const existingNames = new Set(items.map((i) => i.item));
+    const missing = defaultItems.filter((d) => !existingNames.has(d));
+    if (missing.length > 0) {
+      for (const item of missing) {
+        await storage.createOnboarding({ userId: req.params.userId, item, completed: false });
+      }
+      items = await storage.getOnboarding(req.params.userId);
+    }
     res.json(items);
   });
 

@@ -15,13 +15,16 @@ const ThemeContext = createContext<ThemeContextType>({
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== "undefined") {
-      return (localStorage.getItem("nestwork-theme") as Theme) || "light";
+      const saved = localStorage.getItem("nestwork-theme") as Theme | null;
+      if (saved === "dark" || saved === "system") return saved;
+      return "light";
     }
     return "light";
   });
 
   useEffect(() => {
     const root = document.documentElement;
+    root.classList.remove("dark");
 
     if (theme === "system") {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -33,7 +36,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return () => mq.removeEventListener("change", apply);
     }
 
-    root.classList.toggle("dark", theme === "dark");
+    if (theme === "dark") {
+      root.classList.add("dark");
+    }
   }, [theme]);
 
   useEffect(() => {

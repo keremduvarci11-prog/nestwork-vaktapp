@@ -54,6 +54,7 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - Bergen region sees both Bergen + Os shifts (regionGroups mapping)
 - Admin can assign shifts directly to employees ("tildelt" status); employee sees and accepts ("Godta vakt")
 - Multi-turn conversation messaging with unread badges
+- Admin can initiate new conversations with specific employees (Ny melding with employee search/select)
 - Admin can close/reopen/delete conversations; employees can hide conversations
 - Password change with bcrypt hashing
 - Profile picture upload (clickable avatar on profil page, camera icon overlay)
@@ -67,7 +68,9 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - In-app notification system (varsler table) with bell icon in header showing unread count
 - Cron jobs: 2hr ledig-vakt reminder, 1hr tildelt-purring, 20:00 evening reminder for next-day shifts
 - Notification triggers: new vakt (region), tildeling (employee), admin message (employee)
-- Dark mode with three options: Lys/Mørk/Automatisk (localStorage "nestwork-theme"), ThemeProvider wraps app
+- Dark mode with three options: Lys/Mørk/Automatisk (localStorage "nestwork-theme"), ThemeProvider wraps app, defaults to light
+- syncProdData.ts: auto-syncs production DB with real data + creates onboarding items on startup
+- Onboarding auto-backfill: missing items are created on first fetch per employee
 - Employee bottom nav: Onboarding tab (replaces Lønn) with circular progress ring
 - Admin "Ansattes onboarding" page: search employees, view progress, download documents
 

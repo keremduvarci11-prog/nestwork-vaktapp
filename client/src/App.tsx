@@ -93,7 +93,7 @@ function AppContent() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-4 pb-24">
+      <main className="max-w-lg mx-auto px-4 py-4 pb-28">
         <Switch>
           {isAdmin ? (
             <>

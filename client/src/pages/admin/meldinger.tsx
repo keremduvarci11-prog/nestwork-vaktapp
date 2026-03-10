@@ -4,9 +4,10 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, MailOpen, AlertCircle, Send, Lock, ArrowLeft, User, Trash2, RotateCcw } from "lucide-react";
+import { Mail, MailOpen, AlertCircle, Send, Lock, ArrowLeft, User, Trash2, RotateCcw, Plus, Search, ChevronDown } from "lucide-react";
 import type { Melding, User as UserType, SamtaleMelding } from "@shared/schema";
 
 function SamtaleView({
@@ -89,7 +90,7 @@ function SamtaleView({
         </Button>
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-bold truncate">{melding.subject}</h2>
-          <p className="text-xs text-muted-foreground">{sender?.name} - {sender?.region}</p>
+          <p className="text-xs text-muted-foreground">{sender ? `${sender.name} - ${sender.region}` : "Sendt av Nestwork"}</p>
         </div>
         <div className="flex gap-1">
           {melding.closed ? (
@@ -130,12 +131,14 @@ function SamtaleView({
       </div>
 
       <div className="space-y-2">
-        <div className="flex justify-start">
-          <div className="max-w-[85%] rounded-lg p-3 bg-muted">
-            <p className="text-xs font-medium text-muted-foreground mb-1">{sender?.name}</p>
+        <div className={`flex ${melding.fromUserId === "admin" ? "justify-end" : "justify-start"}`}>
+          <div className={`max-w-[85%] rounded-lg p-3 ${melding.fromUserId === "admin" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+            <p className={`text-xs font-medium mb-1 ${melding.fromUserId === "admin" ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+              {melding.fromUserId === "admin" ? "Nestwork" : sender?.name}
+            </p>
             <p className="text-sm">{melding.message}</p>
             {melding.createdAt && (
-              <p className="text-[10px] text-muted-foreground mt-1">
+              <p className={`text-[10px] mt-1 ${melding.fromUserId === "admin" ? "text-primary-foreground/50" : "text-muted-foreground"}`}>
                 {new Date(melding.createdAt).toLocaleDateString("nb-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
               </p>
             )}
@@ -201,8 +204,144 @@ function SamtaleView({
   );
 }
 
+function NyMeldingView({
+  users,
+  onBack,
+}: {
+  users: UserType[];
+  onBack: () => void;
+}) {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const ansatte = users.filter((u) => u.role === "ansatt");
+  const filtered = search
+    ? ansatte.filter((u) =>
+        u.name.toLowerCase().includes(search.toLowerCase()) ||
+        u.region.toLowerCase().includes(search.toLowerCase())
+      )
+    : ansatte;
+
+  const sendMelding = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/meldinger", {
+        fromUserId: "admin",
+        toUserId: selectedUser!.id,
+        subject,
+        message,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meldinger"] });
+      toast({ title: "Melding sendt" });
+      onBack();
+    },
+    onError: () => {
+      toast({ title: "Kunne ikke sende melding", variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack} data-testid="button-back-ny-melding">
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <h2 className="text-lg font-bold">Ny melding</h2>
+      </div>
+
+      <div className="space-y-3">
+        <div className="relative">
+          <label className="text-sm font-medium mb-1.5 block">Velg mottaker</label>
+          {selectedUser ? (
+            <div
+              className="flex items-center justify-between p-3 rounded-md border cursor-pointer"
+              onClick={() => { setSelectedUser(null); setShowDropdown(true); }}
+              data-testid="selected-user-display"
+            >
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{selectedUser.name}</span>
+                <span className="text-xs text-muted-foreground">{selectedUser.region}</span>
+              </div>
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                data-testid="input-search-ansatt"
+                placeholder="Søk etter ansatt..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setShowDropdown(true); }}
+                onFocus={() => setShowDropdown(true)}
+                className="pl-9"
+              />
+            </div>
+          )}
+          {showDropdown && !selectedUser && (
+            <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground text-center">Ingen ansatte funnet</div>
+              ) : (
+                filtered.map((u) => (
+                  <button
+                    key={u.id}
+                    data-testid={`select-ansatt-${u.id}`}
+                    className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted transition-colors"
+                    onClick={() => { setSelectedUser(u); setShowDropdown(false); setSearch(""); }}
+                  >
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">{u.name}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">{u.region}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Emne</label>
+          <Input
+            data-testid="input-ny-melding-subject"
+            placeholder="Skriv emne..."
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium mb-1.5 block">Melding</label>
+          <Textarea
+            data-testid="input-ny-melding-body"
+            placeholder="Skriv melding..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+          />
+        </div>
+
+        <Button
+          data-testid="button-send-ny-melding"
+          onClick={() => sendMelding.mutate()}
+          disabled={!selectedUser || !subject.trim() || !message.trim() || sendMelding.isPending}
+          className="w-full"
+        >
+          <Send className="w-4 h-4 mr-2" />
+          Send melding
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminMeldinger() {
   const [openMeldingId, setOpenMeldingId] = useState<string | null>(null);
+  const [showNyMelding, setShowNyMelding] = useState(false);
 
   const { data: meldinger, isLoading } = useQuery<Melding[]>({
     queryKey: ["/api/meldinger"],
@@ -216,11 +355,24 @@ export default function AdminMeldinger() {
   const unreadCount = meldinger?.filter((m) => !m.read).length || 0;
   const openMelding = meldinger?.find((m) => m.id === openMeldingId);
 
+  if (showNyMelding && users) {
+    return (
+      <NyMeldingView
+        users={users}
+        onBack={() => setShowNyMelding(false)}
+      />
+    );
+  }
+
   if (openMelding) {
+    const isAdminSent = openMelding.fromUserId === "admin";
+    const otherUser = isAdminSent
+      ? userMap.get(openMelding.toUserId || "")
+      : userMap.get(openMelding.fromUserId);
     return (
       <SamtaleView
         melding={openMelding}
-        sender={userMap.get(openMelding.fromUserId)}
+        sender={otherUser}
         onBack={() => setOpenMeldingId(null)}
       />
     );
@@ -228,9 +380,19 @@ export default function AdminMeldinger() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold" data-testid="text-admin-meldinger-title">Meldinger</h1>
-        <p className="text-sm text-muted-foreground mt-1">{unreadCount} uleste meldinger</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold" data-testid="text-admin-meldinger-title">Meldinger</h1>
+          <p className="text-sm text-muted-foreground mt-1">{unreadCount} uleste meldinger</p>
+        </div>
+        <Button
+          onClick={() => setShowNyMelding(true)}
+          data-testid="button-ny-melding-admin"
+          size="sm"
+        >
+          <Plus className="w-4 h-4 mr-1.5" />
+          Ny melding
+        </Button>
       </div>
 
       {isLoading ? (
@@ -247,7 +409,8 @@ export default function AdminMeldinger() {
       ) : (
         <div className="space-y-2">
           {meldinger.map((m) => {
-            const sender = userMap.get(m.fromUserId);
+            const isAdminSent = m.fromUserId === "admin";
+            const otherUser = isAdminSent ? userMap.get(m.toUserId || "") : userMap.get(m.fromUserId);
             return (
               <Card
                 key={m.id}
@@ -269,8 +432,11 @@ export default function AdminMeldinger() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-sm font-semibold">{sender?.name || "Ukjent"}</p>
-                          <p className="text-xs text-muted-foreground">{sender?.region}</p>
+                          <p className="text-sm font-semibold">
+                            {isAdminSent && <span className="text-xs text-muted-foreground mr-1">Til:</span>}
+                            {otherUser?.name || "Ukjent"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{otherUser?.region}</p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           {m.createdAt && (

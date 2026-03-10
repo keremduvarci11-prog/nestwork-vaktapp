@@ -109,8 +109,8 @@ export function BottomNav({ role }: { role: string }) {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t z-50 safe-area-bottom" data-testid="bottom-nav">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
+    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t z-50" data-testid="bottom-nav" style={{ paddingBottom: "env(safe-area-inset-bottom, 8px)" }}>
+      <div className="flex items-center justify-around h-14 max-w-lg mx-auto px-2 pb-1">
         {items.map((item) => {
           const isActive = item.path === "/"
             ? location === "/"

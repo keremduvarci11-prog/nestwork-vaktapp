@@ -79,8 +79,15 @@ export async function syncProductionData() {
 ('e03b1e77-b8eb-4a38-aff5-6be5a8cd404c', 'A001', 'Skorvane Fus Barnehage', 'Skeismyra 14, 5217 Hagavik', 'Os', 'Kristin Tellefsen', '902 19 798', NULL, NULL, '207.00', '250.00', '927 311 097', NULL, NULL, NULL, true),
 ('2d23e409-b144-46e8-b3ff-2cb0d61af5e6', 'A006', 'Søre Neset Fus Barnehage', 'Reset 32, 5200 Os', 'Os', 'Edle Nøkleby', '415 88 670', NULL, NULL, '207.00', '250.00', '922 043 639', NULL, NULL, NULL, true),
 ('e33e3b0d-6a02-48d6-9249-a6d3695b61c9', 'A009', 'Tyse Fus Barnehage', 'Tysemarkjo 47, 5414 Stord', 'Stord', 'Anne Kristin Aaseth / Lillian', '417 81 108 / 486 08 162', NULL, NULL, '207.00', '250.00', '927 311 232', NULL, NULL, NULL, true)`);
+    const ansatte = await client.query("SELECT id FROM users WHERE role = 'ansatt'");
+    const onboardingItems = ['Bytt passord', 'Last opp profilbilde', 'Last opp CV', 'Last opp politiattest', 'Registrer bankinfo', 'Signert kontrakt'];
+    for (const row of ansatte.rows) {
+      for (const item of onboardingItems) {
+        await client.query("INSERT INTO onboarding (user_id, item, completed) VALUES ($1, $2, false)", [row.id, item]);
+      }
+    }
     await client.query('COMMIT');
-    console.log('[Migration] Produksjonsdata synkronisert: ' + 49 + ' brukere, ' + 10 + ' barnehager');
+    console.log('[Migration] Produksjonsdata synkronisert: ' + 49 + ' brukere, ' + 10 + ' barnehager, ' + ansatte.rows.length * onboardingItems.length + ' onboarding items');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[Migration] Feil:', err);

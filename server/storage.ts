@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, or } from "drizzle-orm";
 import {
   users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions,
   type User, type InsertUser,
@@ -156,7 +156,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMeldingerByUser(userId: string): Promise<Melding[]> {
-    return db.select().from(meldinger).where(eq(meldinger.fromUserId, userId)).orderBy(desc(meldinger.createdAt));
+    return db.select().from(meldinger).where(or(eq(meldinger.fromUserId, userId), eq(meldinger.toUserId, userId))).orderBy(desc(meldinger.createdAt));
   }
 
   async createMelding(m: InsertMelding): Promise<Melding> {

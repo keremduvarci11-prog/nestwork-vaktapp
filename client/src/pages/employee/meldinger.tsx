@@ -72,11 +72,14 @@ function SamtaleView({
       </div>
 
       <div className="space-y-2">
-        <div className="flex justify-end">
-          <div className="max-w-[85%] rounded-lg p-3 bg-primary text-primary-foreground">
+        <div className={`flex ${melding.fromUserId === userId ? "justify-end" : "justify-start"}`}>
+          <div className={`max-w-[85%] rounded-lg p-3 ${melding.fromUserId === userId ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+            {melding.fromUserId !== userId && (
+              <p className="text-xs font-medium text-muted-foreground mb-1">Nestwork</p>
+            )}
             <p className="text-sm">{melding.message}</p>
             {melding.createdAt && (
-              <p className="text-[10px] text-primary-foreground/50 mt-1">
+              <p className={`text-[10px] mt-1 ${melding.fromUserId === userId ? "text-primary-foreground/50" : "text-muted-foreground"}`}>
                 {new Date(melding.createdAt).toLocaleDateString("nb-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
               </p>
             )}
