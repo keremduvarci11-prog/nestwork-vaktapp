@@ -4,7 +4,7 @@ import session from "express-session";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema } from "@shared/schema";
 import { appendVaktToSheet, getSpreadsheetUrl } from "./googleSheets";
