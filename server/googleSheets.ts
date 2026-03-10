@@ -36,7 +36,6 @@ async function getAccessToken() {
   return accessToken;
 }
 
-// WARNING: Never cache this client.
 export async function getUncachableGoogleSheetClient() {
   const accessToken = await getAccessToken();
 
@@ -49,6 +48,21 @@ export async function getUncachableGoogleSheetClient() {
 }
 
 let spreadsheetId: string | null = null;
+const existingSheets = new Set<string>();
+
+const HEADER_ROW = [
+  "Dato",
+  "Ansatt",
+  "Ansatt-ID",
+  "Vikarkode",
+  "Start",
+  "Slutt",
+  "Timer",
+  "Pause",
+  "Region",
+  "Status",
+  "Godkjent tidspunkt",
+];
 
 async function getOrCreateSpreadsheet(): Promise<string> {
   if (spreadsheetId) return spreadsheetId;
@@ -62,7 +76,7 @@ async function getOrCreateSpreadsheet(): Promise<string> {
       },
       sheets: [
         {
-          properties: { title: "Vakter" },
+          properties: { title: "Oversikt" },
           data: [
             {
               startRow: 0,
@@ -70,16 +84,12 @@ async function getOrCreateSpreadsheet(): Promise<string> {
               rowData: [
                 {
                   values: [
-                    { userEnteredValue: { stringValue: "Dato" } },
-                    { userEnteredValue: { stringValue: "Barnehage" } },
-                    { userEnteredValue: { stringValue: "Region" } },
-                    { userEnteredValue: { stringValue: "Ansatt" } },
-                    { userEnteredValue: { stringValue: "Vikarkode" } },
-                    { userEnteredValue: { stringValue: "Start" } },
-                    { userEnteredValue: { stringValue: "Slutt" } },
-                    { userEnteredValue: { stringValue: "Timer" } },
-                    { userEnteredValue: { stringValue: "Status" } },
-                    { userEnteredValue: { stringValue: "Godkjent tidspunkt" } },
+                    { userEnteredValue: { stringValue: "Dette regnearket oppdateres automatisk." } },
+                  ],
+                },
+                {
+                  values: [
+                    { userEnteredValue: { stringValue: "Hver barnehage har sin egen fane med godkjente vakter." } },
                   ],
                 },
               ],
@@ -91,8 +101,62 @@ async function getOrCreateSpreadsheet(): Promise<string> {
   });
 
   spreadsheetId = response.data.spreadsheetId!;
+  existingSheets.add("Oversikt");
   console.log(`[Google Sheets] Created spreadsheet: ${spreadsheetId}`);
   return spreadsheetId;
+}
+
+function sanitizeSheetName(name: string): string {
+  return name.replace(/[\\/*?:\[\]]/g, "").substring(0, 100);
+}
+
+async function ensureSheetExists(sheetName: string): Promise<void> {
+  const safeName = sanitizeSheetName(sheetName);
+  if (existingSheets.has(safeName)) return;
+
+  const sheetId = await getOrCreateSpreadsheet();
+  const sheets = await getUncachableGoogleSheetClient();
+
+  try {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+    const names = meta.data.sheets?.map(s => s.properties?.title) || [];
+    names.forEach(n => { if (n) existingSheets.add(n); });
+  } catch {}
+
+  if (existingSheets.has(safeName)) return;
+
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        requests: [
+          {
+            addSheet: {
+              properties: { title: safeName },
+            },
+          },
+        ],
+      },
+    });
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: `'${safeName}'!A:K`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [HEADER_ROW],
+      },
+    });
+
+    existingSheets.add(safeName);
+    console.log(`[Google Sheets] Created sheet for: ${safeName}`);
+  } catch (error: any) {
+    if (error?.message?.includes("already exists")) {
+      existingSheets.add(safeName);
+    } else {
+      throw error;
+    }
+  }
 }
 
 export async function appendVaktToSheet(vaktData: {
@@ -100,14 +164,19 @@ export async function appendVaktToSheet(vaktData: {
   barnehageNavn: string;
   region: string;
   ansattNavn: string;
+  ansattId?: number | null;
   vikarkode: string;
   startTid: string;
   sluttTid: string;
   timer: number;
+  trekkPause?: boolean;
   status: string;
 }) {
   try {
     const sheetId = await getOrCreateSpreadsheet();
+    const sheetName = sanitizeSheetName(vaktData.barnehageNavn);
+    await ensureSheetExists(sheetName);
+
     const sheets = await getUncachableGoogleSheetClient();
 
     const now = new Date();
@@ -134,19 +203,20 @@ export async function appendVaktToSheet(vaktData: {
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: "Vakter!A:J",
+      range: `'${sheetName}'!A:K`,
       valueInputOption: "RAW",
       requestBody: {
         values: [
           [
             formattedDato,
-            vaktData.barnehageNavn,
-            vaktData.region,
             vaktData.ansattNavn,
+            vaktData.ansattId || "",
             vaktData.vikarkode,
             formatTime(vaktData.startTid),
             formatTime(vaktData.sluttTid),
             vaktData.timer,
+            vaktData.trekkPause ? "Ja" : "Nei",
+            vaktData.region,
             vaktData.status,
             godkjentTid,
           ],
@@ -154,7 +224,7 @@ export async function appendVaktToSheet(vaktData: {
       },
     });
 
-    console.log(`[Google Sheets] Added vakt: ${vaktData.ansattNavn} @ ${vaktData.barnehageNavn}`);
+    console.log(`[Google Sheets] Added vakt to '${sheetName}': ${vaktData.ansattNavn}`);
   } catch (error) {
     console.error("[Google Sheets] Failed to append vakt:", error);
   }

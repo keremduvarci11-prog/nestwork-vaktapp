@@ -367,10 +367,12 @@ export async function registerRoutes(
         barnehageNavn: bh?.name || updated.barnehageId || "",
         region: updated.region || "",
         ansattNavn: ansatt?.name || "",
+        ansattId: ansatt?.externalId || null,
         vikarkode: updated.vikarkode || "",
         startTid: updated.startTid || "",
         sluttTid: updated.sluttTid || "",
         timer: Math.round(timer * 100) / 100,
+        trekkPause: updated.trekkPause || false,
         status: "godkjent",
       });
     } catch (err) {
@@ -401,10 +403,12 @@ export async function registerRoutes(
         barnehageNavn: barnehage?.name || updated.barnehageId || "",
         region: updated.region || "",
         ansattNavn: ansatt?.name || "",
+        ansattId: ansatt?.externalId || null,
         vikarkode: updated.vikarkode || "",
         startTid: updated.startTid || "",
         sluttTid: updated.sluttTid || "",
         timer: Math.round(timer * 100) / 100,
+        trekkPause: updated.trekkPause || false,
         status: "godkjent",
       });
     } catch (err) {
