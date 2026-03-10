@@ -91,6 +91,9 @@ export default function Profil() {
             <div>
               <h2 className="text-lg font-bold" data-testid="text-user-name">{user?.name}</h2>
               <p className="text-sm text-muted-foreground">{user?.stilling}</p>
+              {user?.externalId && (
+                <p className="text-xs text-muted-foreground" data-testid="text-employee-id">Ansatt-ID: {user.externalId}</p>
+              )}
               {!isAdmin && !user?.profileImage && (
                 <p className="text-xs text-primary mt-0.5">Trykk for å laste opp bilde</p>
               )}

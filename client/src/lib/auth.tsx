@@ -18,6 +18,7 @@ type User = {
   cvFile: string | null;
   politiattestFile: string | null;
   available: boolean | null;
+  externalId: number | null;
 };
 
 type AuthContextType = {
