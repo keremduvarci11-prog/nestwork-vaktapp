@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nestwork</string>
+    <string name="title_activity_main">Nestwork</string>
+    <string name="package_name">no.nestwork.vaktapp</string>
+    <string name="custom_url_scheme">no.nestwork.vaktapp</string>
+</resources>

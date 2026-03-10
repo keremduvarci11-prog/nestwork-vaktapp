@@ -71,6 +71,15 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - Employee bottom nav: Onboarding tab (replaces Lønn) with circular progress ring
 - Admin "Ansattes onboarding" page: search employees, view progress, download documents
 
+## Capacitor (Native Mobile)
+- Capacitor configured with `appId: no.nestwork.vaktapp`, `appName: Nestwork`
+- `webDir: dist/public` (Vite build output)
+- Server URL points to deployed Replit app (live backend)
+- iOS and Android platforms added (`ios/` and `android/` folders)
+- Plugins: SplashScreen (teal background), StatusBar, Keyboard
+- Workflow: `npm run build` → `npx cap sync` → open in Xcode/Android Studio
+- Profile image cropping: react-easy-crop for zoom/pan before upload
+
 ## Demo Credentials
 - All employees start with password: nestwork2026
 - Admin: admin / admin123
