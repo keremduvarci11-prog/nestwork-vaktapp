@@ -18,6 +18,7 @@ export default function Innstillinger() {
   const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [username, setUsername] = useState(user?.username || "");
   const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [address, setAddress] = useState(user?.address || "");
@@ -34,6 +35,7 @@ export default function Innstillinger() {
   const updateProfile = useMutation({
     mutationFn: () =>
       apiRequest("PATCH", `/api/users/${user?.id}`, {
+        username,
         email,
         phone,
         address,
@@ -168,6 +170,15 @@ export default function Innstillinger() {
       <Card>
         <CardContent className="p-4 space-y-4">
           <p className="text-sm font-semibold">Kontaktinformasjon</p>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium">Brukernavn</label>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              data-testid="input-username"
+            />
+          </div>
 
           <div className="space-y-2">
             <label className="text-xs font-medium">E-post</label>

@@ -67,12 +67,6 @@ export default function LoginPage() {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Logg inn"}
               </Button>
             </form>
-            <div className="mt-6 p-3 rounded-md bg-muted">
-              <p className="text-xs text-muted-foreground mb-2">Logg inn med din e-postadresse og passord.</p>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p><span className="font-medium">Admin:</span> admin / admin123</p>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
