@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
@@ -59,6 +60,12 @@ export default function Varsler() {
   };
 
   const unreadCount = varsler?.filter((v) => !v.read).length || 0;
+
+  useEffect(() => {
+    if (unreadCount > 0) {
+      markAllRead.mutate();
+    }
+  }, [varsler]);
 
   return (
     <div className="space-y-4">
