@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Camera, Save, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Camera, Save, Eye, EyeOff, Sun, Moon, Monitor } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
 import { useLocation } from "wouter";
 
 export default function Innstillinger() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -279,6 +281,35 @@ export default function Innstillinger() {
           >
             Bytt passord
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <p className="text-sm font-semibold">Utseende</p>
+
+          {([
+            { value: "light" as const, label: "Lys modus (standard)", Icon: Sun },
+            { value: "dark" as const, label: "Mørk modus", Icon: Moon },
+            { value: "system" as const, label: "Automatisk (følg systeminnstillinger)", Icon: Monitor },
+          ]).map(({ value, label, Icon }) => (
+            <button
+              key={value}
+              onClick={() => setTheme(value)}
+              className={`w-full flex items-center gap-3 p-3 rounded-md text-left transition-colors ${
+                theme === value
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground"
+              }`}
+              data-testid={`button-theme-${value}`}
+            >
+              <Icon className="w-5 h-5 shrink-0" />
+              <span className="text-sm font-medium">{label}</span>
+              {theme === value && (
+                <span className="ml-auto w-2 h-2 rounded-full bg-primary shrink-0" />
+              )}
+            </button>
+          ))}
         </CardContent>
       </Card>
     </div>

@@ -4,6 +4,7 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { ThemeProvider } from "@/components/theme-provider";
 import { BottomNav } from "@/components/bottom-nav";
 import LoginPage from "@/pages/login";
 import EmployeeHome from "@/pages/employee/home";
@@ -19,6 +20,7 @@ import NyVakt from "@/pages/admin/ny-vakt";
 import GodkjennVakter from "@/pages/admin/godkjenn";
 import AdminMeldinger from "@/pages/admin/meldinger";
 import AlleVakter from "@/pages/admin/alle-vakter";
+import AnsattesOnboarding from "@/pages/admin/ansattes-onboarding";
 import Innstillinger from "@/pages/employee/innstillinger";
 import NotFound from "@/pages/not-found";
 import { Loader2, Bell } from "lucide-react";
@@ -29,6 +31,19 @@ import { subscribeToPush } from "@/lib/push";
 
 function AppContent() {
   const { user, isLoading } = useAuth();
+  const [location] = useLocation();
+
+  const { data: unreadVarsler } = useQuery<{ count: number }>({
+    queryKey: ["/api/varsler/unread-count"],
+    enabled: !!user,
+    refetchInterval: 15000,
+  });
+
+  useEffect(() => {
+    if (user) {
+      subscribeToPush();
+    }
+  }, [user]);
 
   if (isLoading) {
     return (
@@ -44,17 +59,6 @@ function AppContent() {
   }
 
   const isAdmin = user.role === "admin";
-  const [location] = useLocation();
-
-  const { data: unreadVarsler } = useQuery<{ count: number }>({
-    queryKey: ["/api/varsler/unread-count"],
-    refetchInterval: 15000,
-  });
-
-  useEffect(() => {
-    subscribeToPush();
-  }, []);
-
   const varselCount = unreadVarsler?.count || 0;
 
   return (
@@ -99,6 +103,7 @@ function AppContent() {
               <Route path="/admin/godkjenn" component={GodkjennVakter} />
               <Route path="/admin/meldinger" component={AdminMeldinger} />
               <Route path="/admin/alle-vakter" component={AlleVakter} />
+              <Route path="/admin/ansattes-onboarding" component={AnsattesOnboarding} />
               <Route path="/varsler" component={Varsler} />
               <Route path="/profil" component={Profil} />
               <Route path="/innstillinger" component={Innstillinger} />
@@ -127,14 +132,16 @@ function AppContent() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <AppContent />
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <Toaster />
+            <AppContent />
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

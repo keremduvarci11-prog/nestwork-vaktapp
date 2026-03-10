@@ -568,7 +568,42 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  app.get("/api/admin/onboarding-overview", requireAdmin, async (_req, res) => {
+    const allUsers = await storage.getAllUsers();
+    const employees = allUsers.filter((u) => u.role !== "admin");
+    const overview = await Promise.all(
+      employees.map(async (u) => {
+        const items = await storage.getOnboarding(u.id);
+        const totalCount = items.length;
+        const completedCount = items.filter((i) => i.completed).length;
+        const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        const { password: _, ...safeUser } = u;
+        return {
+          userId: u.id,
+          name: u.name,
+          region: u.region,
+          profileImage: u.profileImage,
+          cvFile: u.cvFile,
+          politiattestFile: u.politiattestFile,
+          progress,
+          completedCount,
+          totalCount,
+          items: items.map((i) => ({
+            id: i.id,
+            item: i.item,
+            completed: i.completed,
+            completedAt: i.completedAt,
+          })),
+        };
+      })
+    );
+    res.json(overview);
+  });
+
   app.get("/api/onboarding/:userId", requireAuth, async (req, res) => {
+    if (req.session.userId !== req.params.userId && req.session.role !== "admin") {
+      return res.status(403).json({ message: "Ikke tilgang" });
+    }
     const items = await storage.getOnboarding(req.params.userId);
     res.json(items);
   });

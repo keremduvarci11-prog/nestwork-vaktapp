@@ -67,6 +67,9 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - In-app notification system (varsler table) with bell icon in header showing unread count
 - Cron jobs: 2hr ledig-vakt reminder, 1hr tildelt-purring, 20:00 evening reminder for next-day shifts
 - Notification triggers: new vakt (region), tildeling (employee), admin message (employee)
+- Dark mode with three options: Lys/Mørk/Automatisk (localStorage "nestwork-theme"), ThemeProvider wraps app
+- Employee bottom nav: Onboarding tab (replaces Lønn) with circular progress ring
+- Admin "Ansattes onboarding" page: search employees, view progress, download documents
 
 ## Demo Credentials
 - All employees start with password: nestwork2026
