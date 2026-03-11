@@ -456,6 +456,21 @@ export async function registerRoutes(
       data.toUserId = undefined;
     }
     const created = await storage.createMelding(data);
+
+    if (currentUser?.role === "admin" && data.toUserId) {
+      try {
+        await notifyUser(
+          data.toUserId,
+          "Nestwork Admin sendte deg en melding",
+          data.subject,
+          "melding",
+          "/meldinger"
+        );
+      } catch (err) {
+        console.error("[Notify] Feil ved ny-melding-varsling:", err);
+      }
+    }
+
     res.json(created);
   });
 

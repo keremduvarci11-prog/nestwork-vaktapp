@@ -1,29 +1,46 @@
 import { apiRequest } from "./queryClient";
 
 export async function subscribeToPush() {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    console.log("[Push] Service Worker or PushManager not supported");
+    return;
+  }
 
   try {
-    const registration = await navigator.serviceWorker.register("/sw.js");
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    await navigator.serviceWorker.ready;
+    console.log("[Push] Service Worker registered");
+
     let res: Response;
     try {
       res = await fetch("/api/push/vapid-key");
-      if (!res.ok) return;
-    } catch { return; }
+      if (!res.ok) {
+        console.log("[Push] VAPID key fetch failed:", res.status);
+        return;
+      }
+    } catch (e) {
+      console.log("[Push] VAPID key fetch error:", e);
+      return;
+    }
     let data: any;
     try {
       data = await res.json();
     } catch { return; }
     const key = data?.key;
-    if (!key) return;
+    if (!key) {
+      console.log("[Push] No VAPID key returned");
+      return;
+    }
 
     const existing = await registration.pushManager.getSubscription();
     if (existing) {
+      console.log("[Push] Re-sending existing subscription");
       await sendSubscription(existing);
       return;
     }
 
     const permission = await Notification.requestPermission();
+    console.log("[Push] Permission:", permission);
     if (permission !== "granted") return;
 
     const subscription = await registration.pushManager.subscribe({
@@ -31,6 +48,7 @@ export async function subscribeToPush() {
       applicationServerKey: urlBase64ToUint8Array(key),
     });
 
+    console.log("[Push] New subscription created");
     await sendSubscription(subscription);
   } catch (err) {
     console.error("[Push] Subscription error:", err);
@@ -39,10 +57,15 @@ export async function subscribeToPush() {
 
 async function sendSubscription(subscription: PushSubscription) {
   const json = subscription.toJSON();
-  await apiRequest("POST", "/api/push/subscribe", {
-    endpoint: json.endpoint,
-    keys: json.keys,
-  });
+  try {
+    await apiRequest("POST", "/api/push/subscribe", {
+      endpoint: json.endpoint,
+      keys: json.keys,
+    });
+    console.log("[Push] Subscription sent to server");
+  } catch (err) {
+    console.error("[Push] Failed to send subscription:", err);
+  }
 }
 
 function urlBase64ToUint8Array(base64String: string) {
