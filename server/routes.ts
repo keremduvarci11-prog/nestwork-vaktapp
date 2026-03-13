@@ -514,6 +514,17 @@ export async function registerRoutes(
       } catch (err) {
         console.error("[Notify] Feil ved ny-melding-varsling:", err);
       }
+    } else if (currentUser?.role !== "admin") {
+      try {
+        await notifyAdmins(
+          "Ny melding fra ansatt",
+          `${currentUser?.name || "En ansatt"}: ${data.subject}`,
+          "melding",
+          "/admin/meldinger"
+        );
+      } catch (err) {
+        console.error("[Notify] Feil ved admin-varsling (ny melding):", err);
+      }
     }
 
     res.json(created);
