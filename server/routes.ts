@@ -7,8 +7,8 @@ import fs from "fs";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema } from "@shared/schema";
-import { appendVaktToSheet, getSpreadsheetUrl } from "./googleSheets";
-import { notifyRegion, notifyUser } from "./notifications";
+import { appendVaktToSheet, removeVaktFromSheet, getSpreadsheetUrl } from "./googleSheets";
+import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 
 const uploadDir = path.join(process.cwd(), "uploads", "profiles");
 if (!fs.existsSync(uploadDir)) {
@@ -320,6 +320,21 @@ export async function registerRoutes(
     });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
+
+    (async () => {
+      try {
+        const ansatt = await storage.getUser(req.session.userId!);
+        const bh = await storage.getBarnehage(updated.barnehageId);
+        await notifyAdmins(
+          "Ny vaktforespørsel",
+          `${ansatt?.name || "En ansatt"} ønsker vakt ${updated.dato} hos ${bh?.name || "ukjent"}.`,
+          "vakt",
+          "/godkjenn"
+        );
+      } catch (err) {
+        console.error("[Notify] Feil ved admin-varsling (ta vakt):", err);
+      }
+    })();
   });
 
   app.post("/api/vakter/:id/tildel", requireAdmin, async (req, res) => {
@@ -385,8 +400,14 @@ export async function registerRoutes(
           trekkPause: updated.trekkPause || false,
           status: "godkjent",
         });
+        await notifyAdmins(
+          "Tildelt vakt godtatt",
+          `${ansatt?.name || "En ansatt"} har godtatt vakt ${updated.dato} hos ${bh?.name || "ukjent"}.`,
+          "vakt",
+          "/alle-vakter"
+        );
       } catch (err) {
-        console.error("Google Sheets error:", err);
+        console.error("Google Sheets/Notify error:", err);
       }
     })();
   });
@@ -435,9 +456,23 @@ export async function registerRoutes(
   });
 
   app.delete("/api/vakter/:id", requireAdmin, async (req, res) => {
+    const vakt = await storage.getVakt(req.params.id);
+    if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
     const deleted = await storage.deleteVakt(req.params.id);
     if (!deleted) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json({ success: true });
+
+    if (vakt.status === "godkjent" && vakt.barnehageId) {
+      (async () => {
+        try {
+          const bh = await storage.getBarnehage(vakt.barnehageId);
+          const ansatt = vakt.ansattId ? await storage.getUser(vakt.ansattId) : null;
+          await removeVaktFromSheet(bh?.name || vakt.barnehageId, vakt.dato || "", ansatt?.name || "");
+        } catch (err) {
+          console.error("[Google Sheets] Error removing deleted vakt:", err);
+        }
+      })();
+    }
   });
 
   app.get("/api/meldinger", requireAdmin, async (_req, res) => {
@@ -566,6 +601,13 @@ export async function registerRoutes(
             "/meldinger"
           );
         }
+      } else {
+        await notifyAdmins(
+          "Ny melding fra ansatt",
+          `${currentUser?.name || "En ansatt"} har sendt en melding.`,
+          "melding",
+          "/meldinger"
+        );
       }
     } catch (err) {
       console.error("[Notify] Feil ved melding-varsling:", err);

@@ -339,6 +339,66 @@ export async function appendVaktToSheet(vaktData: {
   }
 }
 
+export async function removeVaktFromSheet(barnehageNavn: string, dato: string, ansattNavn: string) {
+  try {
+    const saved = loadSpreadsheetId();
+    if (!saved) return;
+
+    const sheetName = sanitizeSheetName(barnehageNavn);
+    const sheets = await getUncachableGoogleSheetClient();
+
+    let formattedDato = dato;
+    if (dato && dato.includes("-")) {
+      const [y, m, d] = dato.split("-");
+      formattedDato = `${d}.${m}.${y}`;
+    }
+
+    const result = await sheets.spreadsheets.values.get({
+      spreadsheetId: saved,
+      range: `'${sheetName}'!A:L`,
+    });
+
+    const rows = result.data.values;
+    if (!rows || rows.length <= 1) return;
+
+    const rowsToDelete: number[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const rowDato = rows[i][0];
+      const rowAnsatt = rows[i][1];
+      if (rowDato === formattedDato && (!ansattNavn || rowAnsatt === ansattNavn)) {
+        rowsToDelete.push(i);
+      }
+    }
+
+    if (rowsToDelete.length === 0) return;
+
+    const numericSheetId = await getSheetId(sheetName);
+    if (numericSheetId === null) return;
+
+    const deleteRequests = rowsToDelete
+      .sort((a, b) => b - a)
+      .map(idx => ({
+        deleteDimension: {
+          range: {
+            sheetId: numericSheetId,
+            dimension: "ROWS",
+            startIndex: idx,
+            endIndex: idx + 1,
+          },
+        },
+      }));
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: saved,
+      requestBody: { requests: deleteRequests },
+    });
+
+    console.log(`[Google Sheets] Removed ${rowsToDelete.length} row(s) from '${sheetName}'`);
+  } catch (error) {
+    console.error("[Google Sheets] Failed to remove vakt:", error);
+  }
+}
+
 export async function getSpreadsheetUrl(): Promise<string | null> {
   try {
     const id = await getOrCreateSpreadsheet();

@@ -67,7 +67,8 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - Push notifications (Web Push API with VAPID keys + service worker)
 - In-app notification system (varsler table) with bell icon in header showing unread count
 - Cron jobs: 2hr ledig-vakt reminder, 1hr tildelt-purring, 20:00 evening reminder for next-day shifts
-- Notification triggers: new vakt (region), tildeling (employee), admin message (employee)
+- Notification triggers: new vakt (region), tildeling (employee), admin message (employee), employee takes shift (admin), employee accepts assigned shift (admin), employee sends message (admin)
+- Google Sheets auto-cleanup: deleting a godkjent vakt also removes it from the sheet
 - Dark mode with three options: Lys/Mørk/Automatisk (localStorage "nestwork-theme"), ThemeProvider wraps app, defaults to light
 - syncProdData.ts: auto-syncs production DB with real data + creates onboarding items on startup
 - Onboarding auto-backfill: missing items are created on first fetch per employee

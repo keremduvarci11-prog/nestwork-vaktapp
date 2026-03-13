@@ -70,3 +70,11 @@ export async function notifyRegion(region: string, title: string, message: strin
 export async function notifyUser(userId: string, title: string, message: string, type: string = "info", link?: string) {
   await sendNotification(userId, title, message, type, link);
 }
+
+export async function notifyAdmins(title: string, message: string, type: string = "info", link?: string) {
+  const allUsers = await storage.getAllUsers();
+  const admins = allUsers.filter(u => u.role === "admin");
+  for (const admin of admins) {
+    await sendNotification(admin.id, title, message, type, link);
+  }
+}
