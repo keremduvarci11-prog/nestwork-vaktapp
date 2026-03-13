@@ -26,10 +26,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement;
     root.classList.remove("dark");
 
+    const applyThemeColor = (isDark: boolean) => {
+      const meta = document.querySelector('meta[name="theme-color"]');
+      const statusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+      if (meta) meta.setAttribute("content", isDark ? "#1a1a1a" : "#1a5f5f");
+      if (statusBar) statusBar.setAttribute("content", isDark ? "black-translucent" : "default");
+    };
+
     if (theme === "system") {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
       const apply = () => {
         root.classList.toggle("dark", mq.matches);
+        applyThemeColor(mq.matches);
       };
       apply();
       mq.addEventListener("change", apply);
@@ -39,6 +47,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (theme === "dark") {
       root.classList.add("dark");
     }
+    applyThemeColor(theme === "dark");
   }, [theme]);
 
   useEffect(() => {

@@ -186,39 +186,45 @@ export default function AnsattesOnboarding() {
                         ))}
                       </div>
 
-                      {(emp.cvFile || emp.politiattestFile) && (
-                        <div className="mt-4 space-y-2">
+                      <div className="mt-4 space-y-2">
                           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                             Dokumenter
                           </p>
-                          {emp.cvFile && (
-                            <a
-                              href={emp.cvFile}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-sm text-primary hover:underline"
-                              data-testid={`link-cv-${emp.userId}`}
-                            >
-                              <FileText className="w-4 h-4" />
-                              <span>Last ned CV</span>
-                              <Download className="w-3 h-3" />
-                            </a>
-                          )}
-                          {emp.politiattestFile && (
-                            <a
-                              href={emp.politiattestFile}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-sm text-primary hover:underline"
-                              data-testid={`link-politiattest-${emp.userId}`}
-                            >
-                              <ShieldCheck className="w-4 h-4" />
-                              <span>Last ned politiattest</span>
-                              <Download className="w-3 h-3" />
-                            </a>
-                          )}
+                          <div className="flex items-center gap-2 text-sm">
+                            <FileText className="w-4 h-4 flex-shrink-0" />
+                            {emp.cvFile ? (
+                              <a
+                                href={emp.cvFile}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-primary hover:underline"
+                                data-testid={`link-cv-${emp.userId}`}
+                              >
+                                <span>Last ned CV</span>
+                                <Download className="w-3 h-3" />
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground" data-testid={`text-no-cv-${emp.userId}`}>CV ikke lastet opp</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                            {emp.politiattestFile ? (
+                              <a
+                                href={emp.politiattestFile}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-primary hover:underline"
+                                data-testid={`link-politiattest-${emp.userId}`}
+                              >
+                                <span>Last ned politiattest</span>
+                                <Download className="w-3 h-3" />
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground" data-testid={`text-no-politiattest-${emp.userId}`}>Politiattest ikke lastet opp</span>
+                            )}
+                          </div>
                         </div>
-                      )}
                     </div>
                   )}
                 </CardContent>
