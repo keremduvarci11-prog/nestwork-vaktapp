@@ -18,6 +18,7 @@ export default function EmployeeHome() {
 
   const { data: vakter, isLoading: vLoading } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter", `?region=${user?.region}`],
+    refetchInterval: 30000,
   });
 
   const { data: barnehager } = useQuery<Barnehage[]>({
@@ -26,6 +27,7 @@ export default function EmployeeHome() {
 
   const { data: mineVakter } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter/mine", user?.id],
+    refetchInterval: 30000,
   });
 
   const taVaktMutation = useMutation({

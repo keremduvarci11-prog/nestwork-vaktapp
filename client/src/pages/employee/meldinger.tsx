@@ -155,6 +155,7 @@ export default function Meldinger() {
 
   const { data: rawMeldinger, isLoading } = useQuery<Melding[]>({
     queryKey: ["/api/meldinger/user", user?.id],
+    refetchInterval: 30000,
   });
 
   const meldinger = rawMeldinger?.filter((m) => !m.hiddenByUser) || [];
