@@ -5,6 +5,12 @@ export async function syncProductionData() {
   try {
     const check = await client.query("SELECT email FROM users WHERE username = 'admin'");
     if (check.rows.length > 0 && check.rows[0].email === 'post@nestwork.no') {
+      await client.query(`
+        INSERT INTO barnehager (id, external_id, name, address, region, contact_person, contact_phone, contact_email, tariff, tariff_assistent, tariff_laerer, orgnr, parkering, nokkelkode, rutiner, aktiv) VALUES
+        ('a4ff645b-37a5-4bce-9648-c93fdbe30bfa', 'A012', 'Buggeland Barnehage', 'Buggelandbakken 145, 4324 Sandnes', 'Stavanger', 'Kjersti Fiskå', '476 45 717', NULL, NULL, NULL, NULL, '887 493 812', NULL, NULL, NULL, true),
+        ('99caabb6-6068-42e4-8aad-defadbb578f2', 'A013', 'Espira Kuventræ Barnehage', 'Industrivegen 99, 5210 Osøyro', 'Os', 'Ine-Henriette Lynum', '932 58 658', NULL, NULL, NULL, NULL, '989 838 563', NULL, NULL, NULL, true)
+        ON CONFLICT (id) DO NOTHING
+      `);
       return;
     }
     console.log('[Migration] Synkroniserer produksjonsdatabasen...');
