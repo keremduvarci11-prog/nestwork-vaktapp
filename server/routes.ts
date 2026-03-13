@@ -291,6 +291,39 @@ export async function registerRoutes(
     res.json(v);
   });
 
+  app.get("/api/vakter/:id/kalender", requireAuth, async (req, res) => {
+    const v = await storage.getVakt(req.params.id);
+    if (!v) return res.status(404).json({ message: "Vakt ikke funnet" });
+    const bh = await storage.getBarnehage(v.barnehageId);
+    const bhName = bh?.name || "Ukjent barnehage";
+    const bhAddress = bh?.address || "";
+    const fmtTime = (t: string) => t.replace(/:/g, "").slice(0, 4) + "00";
+    const dtStart = v.dato.replace(/-/g, "") + "T" + fmtTime(v.startTid || "07:00:00");
+    const dtEnd = v.dato.replace(/-/g, "") + "T" + fmtTime(v.sluttTid || "16:00:00");
+    const uid = v.id + "@nestwork";
+    const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Nestwork//Vaktapp//NO",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      `DTSTAMP:${now}`,
+      `DTSTART:${dtStart}`,
+      `DTEND:${dtEnd}`,
+      `SUMMARY:Vakt - ${bhName}`,
+      `LOCATION:${bhAddress}`,
+      `DESCRIPTION:Vakt hos ${bhName}\\n${bhAddress}`,
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="vakt-${v.dato}.ics"`);
+    res.send(ics);
+  });
+
   app.post("/api/vakter", requireAdmin, async (req, res) => {
     const parsed = insertVaktSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });

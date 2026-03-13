@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, Building2, CheckCircle2, Timer, AlertCircle, UserCheck } from "lucide-react";
+import { Calendar, Clock, Building2, CheckCircle2, Timer, AlertCircle, UserCheck, CalendarPlus } from "lucide-react";
 import type { Vakt, Barnehage } from "@shared/schema";
 
 const statusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle2 }> = {
@@ -25,6 +25,10 @@ export default function MineVakter() {
   const { data: barnehager } = useQuery<Barnehage[]>({
     queryKey: ["/api/barnehager"],
   });
+
+  const addToCalendar = (vaktId: string) => {
+    window.open(`/api/vakter/${vaktId}/kalender`, "_blank");
+  };
 
   const godtaVakt = useMutation({
     mutationFn: (vaktId: string) => apiRequest("POST", `/api/vakter/${vaktId}/godta`),
@@ -103,15 +107,26 @@ export default function MineVakter() {
                       <span className="truncate">{bh?.address}</span>
                     </div>
                   </div>
-                  <Button
-                    className="w-full mt-3"
-                    onClick={() => godtaVakt.mutate(vakt.id)}
-                    disabled={godtaVakt.isPending}
-                    data-testid={`button-godta-vakt-${vakt.id}`}
-                  >
-                    <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                    Godta vakt
-                  </Button>
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      className="flex-1"
+                      onClick={() => godtaVakt.mutate(vakt.id)}
+                      disabled={godtaVakt.isPending}
+                      data-testid={`button-godta-vakt-${vakt.id}`}
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                      Godta vakt
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => addToCalendar(vakt.id)}
+                      data-testid={`button-kalender-${vakt.id}`}
+                      title="Legg til i kalender"
+                    >
+                      <CalendarPlus className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -150,6 +165,18 @@ export default function MineVakter() {
                       <span className="truncate">{bh?.address}</span>
                     </div>
                   </div>
+                  {vakt.status === "godkjent" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-3"
+                      onClick={() => addToCalendar(vakt.id)}
+                      data-testid={`button-kalender-${vakt.id}`}
+                    >
+                      <CalendarPlus className="w-4 h-4 mr-1.5" />
+                      Legg til i kalender
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );
