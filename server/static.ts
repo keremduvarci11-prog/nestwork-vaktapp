@@ -16,12 +16,15 @@ export function serveStatic(app: Express) {
     setHeaders: (res, filePath) => {
       if (filePath.endsWith("sw.js")) {
         res.setHeader("Service-Worker-Allowed", "/");
-        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      } else if (filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       }
     },
   }));
 
   app.use("/{*path}", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

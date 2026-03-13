@@ -9,7 +9,6 @@ export async function syncProductionData() {
     }
     console.log('[Migration] Synkroniserer produksjonsdatabasen...');
     await client.query('BEGIN');
-    await client.query('DELETE FROM push_subscriptions');
     await client.query('DELETE FROM varsler');
     await client.query('DELETE FROM favoritter');
     await client.query('DELETE FROM samtale_meldinger');
