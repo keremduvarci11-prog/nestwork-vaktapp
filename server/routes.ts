@@ -100,11 +100,20 @@ export async function registerRoutes(
   });
 
   const PgStore = connectPgSimple(session);
+  const { pool: sessionPool } = await import("./db");
+  await sessionPool.query(`
+    CREATE TABLE IF NOT EXISTS "session" (
+      "sid" varchar NOT NULL PRIMARY KEY,
+      "sess" json NOT NULL,
+      "expire" timestamp(6) NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+  `);
   app.use(
     session({
       store: new PgStore({
-        conString: process.env.DATABASE_URL,
-        createTableIfMissing: true,
+        pool: sessionPool,
+        tableName: "session",
       }),
       secret: process.env.SESSION_SECRET || "nestwork-secret-key",
       resave: false,
