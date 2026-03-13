@@ -729,20 +729,25 @@ export async function registerRoutes(
   app.post("/api/push/subscribe", requireAuth, async (req, res) => {
     const { endpoint, keys } = req.body;
     if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      console.log(`[Push] Subscribe rejected: missing fields for user ${req.session.userId}`);
       return res.status(400).json({ message: "Ugyldig subscription" });
     }
+    console.log(`[Push] Saving subscription for user ${req.session.userId}, endpoint: ${endpoint.substring(0, 60)}...`);
     await storage.savePushSubscription({
       userId: req.session.userId!,
       endpoint,
       p256dh: keys.p256dh,
       auth: keys.auth,
     });
+    const allSubs = await storage.getPushSubscriptions(req.session.userId!);
+    console.log(`[Push] User ${req.session.userId} now has ${allSubs.length} subscription(s)`);
     res.json({ success: true });
   });
 
   app.post("/api/push/unsubscribe", requireAuth, async (req, res) => {
     const { endpoint } = req.body;
     if (endpoint) {
+      console.log(`[Push] Unsubscribe requested for endpoint: ${endpoint.substring(0, 60)}...`);
       await storage.deletePushSubscription(endpoint);
     }
     res.json({ success: true });
