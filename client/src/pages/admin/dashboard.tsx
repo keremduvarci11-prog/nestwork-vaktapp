@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Calendar, Clock, TrendingUp, List } from "lucide-react";
 import { Link } from "wouter";
 import type { Vakt, Barnehage, User } from "@shared/schema";
+import { PushPermissionBanner } from "@/components/push-banner";
 
 export default function AdminDashboard() {
   const { data: vakter, isLoading: vLoading } = useQuery<Vakt[]>({
@@ -51,6 +52,8 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      <PushPermissionBanner compact />
+
       <div>
         <h1 className="text-xl font-bold">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">Oversikt over bemanningen</p>
