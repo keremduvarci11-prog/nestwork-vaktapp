@@ -21,7 +21,6 @@ export default function Innstillinger() {
   const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [address, setAddress] = useState(user?.address || "");
-  const [kontonummer, setKontonummer] = useState(user?.kontonummer || "");
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -38,7 +37,6 @@ export default function Innstillinger() {
         email,
         phone,
         address,
-        kontonummer,
       }),
     onSuccess: () => {
       toast({ title: "Profil oppdatert" });
@@ -215,16 +213,6 @@ export default function Innstillinger() {
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               data-testid="input-address"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-medium">Kontonummer</label>
-            <Input
-              value={kontonummer}
-              onChange={(e) => setKontonummer(e.target.value)}
-              placeholder="1234 56 78901"
-              data-testid="input-kontonummer"
             />
           </div>
 

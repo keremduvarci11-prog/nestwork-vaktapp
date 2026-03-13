@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BottomNav } from "@/components/bottom-nav";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import LoginPage from "@/pages/login";
 import EmployeeHome from "@/pages/employee/home";
 import MineVakter from "@/pages/employee/mine-vakter";
@@ -104,6 +105,7 @@ function AppContent() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4 pb-28">
+        <PullToRefresh>
         <Switch>
           {isAdmin ? (
             <>
@@ -133,6 +135,7 @@ function AppContent() {
           )}
           <Route component={NotFound} />
         </Switch>
+        </PullToRefresh>
       </main>
 
       <BottomNav role={user.role} />

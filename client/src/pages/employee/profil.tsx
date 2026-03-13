@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Briefcase, Mail, Phone, LogOut, History, ClipboardList, ChevronRight, Settings, CreditCard, Camera, Sun, Moon } from "lucide-react";
+import { MapPin, Briefcase, Mail, Phone, LogOut, History, ClipboardList, ChevronRight, Settings, Camera, Sun, Moon } from "lucide-react";
 import { Link } from "wouter";
 import logoSrc from "@assets/nestwork_logo_centered.png";
 import { useTheme } from "@/components/theme-provider";
@@ -169,15 +169,6 @@ export default function Profil() {
                 <p className="text-sm font-medium">{user?.phone || "Ikke angitt"}</p>
               </div>
             </div>
-            {user?.kontonummer && (
-              <div className="flex items-center gap-3">
-                <CreditCard className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Kontonummer</p>
-                  <p className="text-sm font-medium">{user.kontonummer}</p>
-                </div>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
