@@ -35,6 +35,7 @@ export default function EmployeeHome() {
       apiRequest("POST", `/api/vakter/${vaktId}/ta`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vakter/mine"] });
       toast({ title: "Vakt registrert!", description: "Venter på godkjenning fra admin." });
     },
     onError: () => {
@@ -46,6 +47,7 @@ export default function EmployeeHome() {
     mutationFn: (vaktId: string) => apiRequest("POST", `/api/vakter/${vaktId}/godta`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vakter/mine"] });
       toast({ title: "Vakt godtatt!", description: "Vakten er nå bekreftet." });
     },
     onError: () => {

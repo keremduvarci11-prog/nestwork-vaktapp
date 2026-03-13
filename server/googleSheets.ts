@@ -1,4 +1,6 @@
 import { google } from 'googleapis';
+import * as fs from 'fs';
+import * as path from 'path';
 
 let connectionSettings: any;
 
@@ -47,8 +49,32 @@ export async function getUncachableGoogleSheetClient() {
   return google.sheets({ version: 'v4', auth: oauth2Client });
 }
 
+const SPREADSHEET_ID_FILE = path.join(process.cwd(), '.spreadsheet-id');
 let spreadsheetId: string | null = null;
 const existingSheets = new Set<string>();
+
+function loadSpreadsheetId(): string | null {
+  if (spreadsheetId) return spreadsheetId;
+  try {
+    if (fs.existsSync(SPREADSHEET_ID_FILE)) {
+      const id = fs.readFileSync(SPREADSHEET_ID_FILE, 'utf-8').trim();
+      if (id) {
+        spreadsheetId = id;
+        return id;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function saveSpreadsheetId(id: string) {
+  spreadsheetId = id;
+  try {
+    fs.writeFileSync(SPREADSHEET_ID_FILE, id, 'utf-8');
+  } catch (err) {
+    console.error('[Google Sheets] Could not save spreadsheet ID:', err);
+  }
+}
 
 const HEADER_ROW = [
   "Dato",
@@ -62,10 +88,32 @@ const HEADER_ROW = [
   "Region",
   "Status",
   "Godkjent tidspunkt",
+  "Sorteringsdato",
 ];
 
+async function verifySpreadsheetExists(id: string): Promise<boolean> {
+  try {
+    const sheets = await getUncachableGoogleSheetClient();
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+    const names = meta.data.sheets?.map(s => s.properties?.title) || [];
+    names.forEach(n => { if (n) existingSheets.add(n); });
+    return true;
+  } catch (err: any) {
+    if (err?.code === 404 || err?.status === 404 || err?.message?.includes("not found")) {
+      return false;
+    }
+    console.warn('[Google Sheets] Transient error verifying spreadsheet, assuming it exists:', err?.message);
+    return true;
+  }
+}
+
 async function getOrCreateSpreadsheet(): Promise<string> {
-  if (spreadsheetId) return spreadsheetId;
+  const saved = loadSpreadsheetId();
+  if (saved) {
+    const valid = await verifySpreadsheetExists(saved);
+    if (valid) return saved;
+    console.log('[Google Sheets] Saved spreadsheet not found, creating new one');
+  }
 
   const sheets = await getUncachableGoogleSheetClient();
   
@@ -100,14 +148,23 @@ async function getOrCreateSpreadsheet(): Promise<string> {
     },
   });
 
-  spreadsheetId = response.data.spreadsheetId!;
+  const newId = response.data.spreadsheetId!;
+  saveSpreadsheetId(newId);
   existingSheets.add("Oversikt");
-  console.log(`[Google Sheets] Created spreadsheet: ${spreadsheetId}`);
-  return spreadsheetId;
+  console.log(`[Google Sheets] Created spreadsheet: ${newId}`);
+  return newId;
 }
 
 function sanitizeSheetName(name: string): string {
   return name.replace(/[\\/*?:\[\]]/g, "").substring(0, 100);
+}
+
+async function getSheetId(sheetName: string): Promise<number | null> {
+  const sheetId = await getOrCreateSpreadsheet();
+  const sheets = await getUncachableGoogleSheetClient();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+  const sheet = meta.data.sheets?.find(s => s.properties?.title === sheetName);
+  return sheet?.properties?.sheetId ?? null;
 }
 
 async function ensureSheetExists(sheetName: string): Promise<void> {
@@ -159,6 +216,51 @@ async function ensureSheetExists(sheetName: string): Promise<void> {
   }
 }
 
+async function sortSheetByDate(sheetName: string): Promise<void> {
+  const safeName = sanitizeSheetName(sheetName);
+  const ssId = await getOrCreateSpreadsheet();
+  const numericSheetId = await getSheetId(safeName);
+  if (numericSheetId === null) return;
+
+  const sheets = await getUncachableGoogleSheetClient();
+
+  try {
+    const result = await sheets.spreadsheets.values.get({
+      spreadsheetId: ssId,
+      range: `'${safeName}'!A:L`,
+    });
+    const rowCount = result.data.values?.length || 1;
+    if (rowCount <= 2) return;
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: ssId,
+      requestBody: {
+        requests: [
+          {
+            sortRange: {
+              range: {
+                sheetId: numericSheetId,
+                startRowIndex: 1,
+                endRowIndex: rowCount,
+                startColumnIndex: 0,
+                endColumnIndex: 12,
+              },
+              sortSpecs: [
+                {
+                  dimensionIndex: 11,
+                  sortOrder: "ASCENDING",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+  } catch (err) {
+    console.error(`[Google Sheets] Sort failed for ${safeName}:`, err);
+  }
+}
+
 export async function appendVaktToSheet(vaktData: {
   dato: string;
   barnehageNavn: string;
@@ -201,9 +303,13 @@ export async function appendVaktToSheet(vaktData: {
       return parts.slice(0, 2).map(p => p.padStart(2, "0")).join(":");
     };
 
+    const sortableDato = vaktData.dato && vaktData.dato.includes("-")
+      ? vaktData.dato
+      : formattedDato.split(".").reverse().join("-");
+
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `'${sheetName}'!A:K`,
+      range: `'${sheetName}'!A:L`,
       valueInputOption: "RAW",
       requestBody: {
         values: [
@@ -219,10 +325,13 @@ export async function appendVaktToSheet(vaktData: {
             vaktData.region,
             vaktData.status,
             godkjentTid,
+            sortableDato,
           ],
         ],
       },
     });
+
+    await sortSheetByDate(sheetName);
 
     console.log(`[Google Sheets] Added vakt to '${sheetName}': ${vaktData.ansattNavn}`);
   } catch (error) {

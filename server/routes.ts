@@ -358,71 +358,74 @@ export async function registerRoutes(
     const updated = await storage.updateVakt(req.params.id, { status: "godkjent" });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
 
-    try {
-      const ansatt = await storage.getUser(req.session.userId!);
-      const bh = await storage.getBarnehage(updated.barnehageId);
-      let timer = 0;
-      if (updated.startTid && updated.sluttTid) {
-        const [sh, sm] = updated.startTid.split(":").map(Number);
-        const [eh, em] = updated.sluttTid.split(":").map(Number);
-        timer = (eh * 60 + em - sh * 60 - sm) / 60;
-        if (updated.trekkPause) timer -= 0.5;
-        timer = Math.max(0, timer);
-      }
-      await appendVaktToSheet({
-        dato: updated.dato || "",
-        barnehageNavn: bh?.name || updated.barnehageId || "",
-        region: updated.region || "",
-        ansattNavn: ansatt?.name || "",
-        ansattId: ansatt?.externalId || null,
-        vikarkode: updated.vikarkode || "",
-        startTid: updated.startTid || "",
-        sluttTid: updated.sluttTid || "",
-        timer: Math.round(timer * 100) / 100,
-        trekkPause: updated.trekkPause || false,
-        status: "godkjent",
-      });
-    } catch (err) {
-      console.error("Google Sheets error:", err);
-    }
-
     res.json(updated);
+
+    (async () => {
+      try {
+        const ansatt = await storage.getUser(req.session.userId!);
+        const bh = await storage.getBarnehage(updated.barnehageId);
+        let timer = 0;
+        if (updated.startTid && updated.sluttTid) {
+          const [sh, sm] = updated.startTid.split(":").map(Number);
+          const [eh, em] = updated.sluttTid.split(":").map(Number);
+          timer = (eh * 60 + em - sh * 60 - sm) / 60;
+          if (updated.trekkPause) timer -= 0.5;
+          timer = Math.max(0, timer);
+        }
+        await appendVaktToSheet({
+          dato: updated.dato || "",
+          barnehageNavn: bh?.name || updated.barnehageId || "",
+          region: updated.region || "",
+          ansattNavn: ansatt?.name || "",
+          ansattId: ansatt?.externalId || null,
+          vikarkode: updated.vikarkode || "",
+          startTid: updated.startTid || "",
+          sluttTid: updated.sluttTid || "",
+          timer: Math.round(timer * 100) / 100,
+          trekkPause: updated.trekkPause || false,
+          status: "godkjent",
+        });
+      } catch (err) {
+        console.error("Google Sheets error:", err);
+      }
+    })();
   });
 
   app.post("/api/vakter/:id/godkjenn", requireAdmin, async (req, res) => {
     const updated = await storage.updateVakt(req.params.id, { status: "godkjent" });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
 
-    try {
-      const ansatt = updated.ansattId ? await storage.getUser(updated.ansattId) : null;
-      const barnehage = updated.barnehageId ? await storage.getBarnehage(updated.barnehageId) : null;
-      let timer = 0;
-      if (updated.startTid && updated.sluttTid) {
-        const [sh, sm] = updated.startTid.split(":").map(Number);
-        const [eh, em] = updated.sluttTid.split(":").map(Number);
-        timer = (eh * 60 + em - sh * 60 - sm) / 60;
-        if (updated.trekkPause) timer -= 0.5;
-        timer = Math.max(0, timer);
-      }
-
-      await appendVaktToSheet({
-        dato: updated.dato || "",
-        barnehageNavn: barnehage?.name || updated.barnehageId || "",
-        region: updated.region || "",
-        ansattNavn: ansatt?.name || "",
-        ansattId: ansatt?.externalId || null,
-        vikarkode: updated.vikarkode || "",
-        startTid: updated.startTid || "",
-        sluttTid: updated.sluttTid || "",
-        timer: Math.round(timer * 100) / 100,
-        trekkPause: updated.trekkPause || false,
-        status: "godkjent",
-      });
-    } catch (err) {
-      console.error("[Google Sheets] Error:", err);
-    }
-
     res.json(updated);
+
+    (async () => {
+      try {
+        const ansatt = updated.ansattId ? await storage.getUser(updated.ansattId) : null;
+        const barnehage = updated.barnehageId ? await storage.getBarnehage(updated.barnehageId) : null;
+        let timer = 0;
+        if (updated.startTid && updated.sluttTid) {
+          const [sh, sm] = updated.startTid.split(":").map(Number);
+          const [eh, em] = updated.sluttTid.split(":").map(Number);
+          timer = (eh * 60 + em - sh * 60 - sm) / 60;
+          if (updated.trekkPause) timer -= 0.5;
+          timer = Math.max(0, timer);
+        }
+        await appendVaktToSheet({
+          dato: updated.dato || "",
+          barnehageNavn: barnehage?.name || updated.barnehageId || "",
+          region: updated.region || "",
+          ansattNavn: ansatt?.name || "",
+          ansattId: ansatt?.externalId || null,
+          vikarkode: updated.vikarkode || "",
+          startTid: updated.startTid || "",
+          sluttTid: updated.sluttTid || "",
+          timer: Math.round(timer * 100) / 100,
+          trekkPause: updated.trekkPause || false,
+          status: "godkjent",
+        });
+      } catch (err) {
+        console.error("[Google Sheets] Error:", err);
+      }
+    })();
   });
 
   app.post("/api/vakter/:id/avslaa", requireAdmin, async (req, res) => {

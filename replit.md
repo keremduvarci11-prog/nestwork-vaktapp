@@ -60,7 +60,7 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - Profile picture upload (clickable avatar on profil page, camera icon overlay)
 - Admin avatar shows Nestwork logo; employees show initials or uploaded photo
 - CV and politiattest document upload (auth-protected)
-- Google Sheets integration: each barnehage gets its own sheet tab with columns (Dato, Ansatt, Ansatt-ID, Vikarkode, Start, Slutt, Timer, Pause, Region, Status, Godkjent tidspunkt)
+- Google Sheets integration: ONE persistent spreadsheet with tabs per barnehage, sorted in ascending date order. Columns: Dato, Ansatt, Ansatt-ID, Vikarkode, Start, Slutt, Timer, Pause, Region, Status, Godkjent tidspunkt, Sorteringsdato. Spreadsheet ID persisted to .spreadsheet-id file.
 - Inntjening shows NOK currency (not dollar sign)
 - 30-minute pause toggle on shifts (trekkPause) deducts from paid hours everywhere
 - Admin can search/select employee directly when creating new shift (auto-assigns as tildelt)
