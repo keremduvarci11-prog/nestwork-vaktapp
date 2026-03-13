@@ -308,9 +308,51 @@ export async function registerRoutes(
   });
 
   app.patch("/api/vakter/:id", requireAdmin, async (req, res) => {
+    const before = await storage.getVakt(req.params.id);
     const updated = await storage.updateVakt(req.params.id, req.body);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
+
+    if (updated.ansattId && before?.status === "venter" && updated.status === "godkjent") {
+      (async () => {
+        try {
+          const bh = await storage.getBarnehage(updated.barnehageId);
+          await notifyUser(
+            updated.ansattId!,
+            "Vakten din er godkjent!",
+            `Din vakt ${updated.dato} hos ${bh?.name || "ukjent"} (${updated.startTid?.slice(0, 5)} - ${updated.sluttTid?.slice(0, 5)}) er bekreftet.`,
+            "vakt",
+            "/mine-vakter"
+          );
+
+          let timer = 0;
+          if (updated.startTid && updated.sluttTid) {
+            const [sh, sm] = updated.startTid.split(":").map(Number);
+            const [eh, em] = updated.sluttTid.split(":").map(Number);
+            timer = (eh * 60 + em - sh * 60 - sm) / 60;
+            if (updated.trekkPause) timer -= 0.5;
+            timer = Math.max(0, timer);
+          }
+          const ansatt = await storage.getUser(updated.ansattId!);
+          const barnehage = await storage.getBarnehage(updated.barnehageId);
+          await appendVaktToSheet({
+            dato: updated.dato || "",
+            barnehageNavn: barnehage?.name || updated.barnehageId || "",
+            region: updated.region || "",
+            ansattNavn: ansatt?.name || "",
+            ansattId: ansatt?.externalId || null,
+            vikarkode: updated.vikarkode || "",
+            startTid: updated.startTid || "",
+            sluttTid: updated.sluttTid || "",
+            timer: Math.round(timer * 100) / 100,
+            trekkPause: updated.trekkPause || false,
+            status: "godkjent",
+          });
+        } catch (err) {
+          console.error("[Notify/Sheets] Feil ved godkjenning-varsling:", err);
+        }
+      })();
+    }
   });
 
   app.post("/api/vakter/:id/ta", requireAuth, async (req, res) => {
@@ -329,7 +371,7 @@ export async function registerRoutes(
           "Ny vaktforespørsel",
           `${ansatt?.name || "En ansatt"} ønsker vakt ${updated.dato} hos ${bh?.name || "ukjent"}.`,
           "vakt",
-          "/godkjenn"
+          "/admin/godkjenn"
         );
       } catch (err) {
         console.error("[Notify] Feil ved admin-varsling (ta vakt):", err);
@@ -404,7 +446,7 @@ export async function registerRoutes(
           "Tildelt vakt godtatt",
           `${ansatt?.name || "En ansatt"} har godtatt vakt ${updated.dato} hos ${bh?.name || "ukjent"}.`,
           "vakt",
-          "/alle-vakter"
+          "/admin/alle-vakter"
         );
       } catch (err) {
         console.error("Google Sheets/Notify error:", err);
@@ -617,7 +659,7 @@ export async function registerRoutes(
           "Ny melding fra ansatt",
           `${currentUser?.name || "En ansatt"} har sendt en melding.`,
           "melding",
-          "/meldinger"
+          "/admin/meldinger"
         );
       }
     } catch (err) {
