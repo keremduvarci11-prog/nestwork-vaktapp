@@ -27,7 +27,7 @@ export default function MineVakter() {
   });
 
   const addToCalendar = (vaktId: string) => {
-    window.open(`/api/vakter/${vaktId}/kalender`, "_blank");
+    window.location.href = `/api/vakter/${vaktId}/kalender`;
   };
 
   const godtaVakt = useMutation({

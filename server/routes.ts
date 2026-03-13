@@ -320,7 +320,6 @@ export async function registerRoutes(
       "END:VCALENDAR",
     ].join("\r\n");
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="vakt-${v.dato}.ics"`);
     res.send(ics);
   });
 
