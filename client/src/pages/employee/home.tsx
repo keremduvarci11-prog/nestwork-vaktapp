@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2 } from "lucide-react";
+import { PushPermissionBanner } from "@/components/push-banner";
 import type { Vakt, Barnehage, Onboarding } from "@shared/schema";
 
 
@@ -77,6 +78,8 @@ export default function EmployeeHome() {
           {user?.region} - {ledigeVakter.length} ledige vakter
         </p>
       </div>
+
+      <PushPermissionBanner compact />
 
       {hasUnfinishedOnboarding && (
         <Card className="border-primary/30 bg-primary/5" data-testid="card-onboarding-banner">

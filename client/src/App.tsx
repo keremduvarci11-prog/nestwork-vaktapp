@@ -27,7 +27,7 @@ import { Loader2, Bell } from "lucide-react";
 import { NestworkLogo } from "@/components/nestwork-logo";
 import { useLocation, Link } from "wouter";
 import { useEffect } from "react";
-import { subscribeToPush } from "@/lib/push";
+import { initPush } from "@/lib/push";
 
 function AppContent() {
   const { user, isLoading } = useAuth();
@@ -41,7 +41,7 @@ function AppContent() {
 
   useEffect(() => {
     if (user) {
-      subscribeToPush();
+      initPush();
     }
   }, [user]);
 

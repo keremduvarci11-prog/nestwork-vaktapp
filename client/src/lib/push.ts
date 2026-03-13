@@ -1,5 +1,27 @@
 import { apiRequest } from "./queryClient";
 
+export async function initPush() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    console.log("[Push] Service Worker or PushManager not supported");
+    return;
+  }
+
+  try {
+    await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    await navigator.serviceWorker.ready;
+    console.log("[Push] Service Worker registered");
+
+    if (Notification.permission === "granted") {
+      console.log("[Push] Permission already granted, re-syncing subscription");
+      await subscribeToPush();
+    } else {
+      console.log("[Push] Permission:", Notification.permission);
+    }
+  } catch (err) {
+    console.error("[Push] Init error:", err);
+  }
+}
+
 export async function subscribeToPush() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     console.log("[Push] Service Worker or PushManager not supported");
@@ -10,6 +32,10 @@ export async function subscribeToPush() {
     const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     await navigator.serviceWorker.ready;
     console.log("[Push] Service Worker registered");
+
+    const permission = await Notification.requestPermission();
+    console.log("[Push] Permission:", permission);
+    if (permission !== "granted") return;
 
     let res: Response;
     try {
@@ -38,10 +64,6 @@ export async function subscribeToPush() {
       await sendSubscription(existing);
       return;
     }
-
-    const permission = await Notification.requestPermission();
-    console.log("[Push] Permission:", permission);
-    if (permission !== "granted") return;
 
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,

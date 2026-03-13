@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bell, Calendar, MessageSquare, UserCheck, Clock, CheckCheck } from "lucide-react";
 import { useLocation } from "wouter";
+import { PushPermissionBanner } from "@/components/push-banner";
 import type { Varsel } from "@shared/schema";
 
 const typeIcons: Record<string, typeof Bell> = {
@@ -82,6 +83,8 @@ export default function Varsler() {
           </Button>
         )}
       </div>
+
+      <PushPermissionBanner />
 
       {isLoading ? (
         <div className="space-y-2">
