@@ -125,7 +125,6 @@ export async function seedDatabase() {
     "Last opp profilbilde",
     "Last opp CV",
     "Last opp politiattest",
-    "Registrer bankinfo",
     "Signert kontrakt",
   ];
 

@@ -17,7 +17,6 @@ import {
   Camera,
   FileText,
   ShieldCheck,
-  CreditCard,
   FileSignature,
   Loader2,
   Check,
@@ -45,11 +44,6 @@ const itemConfig: Record<string, { icon: typeof KeyRound; description: string; a
     description: "Last opp gyldig politiattest (PDF, Word eller bilde). Maks 10 MB.",
     actionType: "upload",
   },
-  "Registrer bankinfo": {
-    icon: CreditCard,
-    description: "Registrer kontonummer for lønnsutbetaling under Innstillinger.",
-    actionType: "navigate",
-  },
   "Signert kontrakt": {
     icon: FileSignature,
     description: "Bekreft at du har signert arbeidskontrakt med Nestwork.",
@@ -62,7 +56,6 @@ const desiredOrder = [
   "Last opp profilbilde",
   "Last opp CV",
   "Last opp politiattest",
-  "Registrer bankinfo",
   "Signert kontrakt",
 ];
 

@@ -666,7 +666,7 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Ikke tilgang" });
     }
     let items = await storage.getOnboarding(req.params.userId);
-    const defaultItems = ["Bytt passord", "Last opp profilbilde", "Last opp CV", "Last opp politiattest", "Registrer bankinfo", "Signert kontrakt"];
+    const defaultItems = ["Bytt passord", "Last opp profilbilde", "Last opp CV", "Last opp politiattest", "Signert kontrakt"];
     const existingNames = new Set(items.map((i) => i.item));
     const missing = defaultItems.filter((d) => !existingNames.has(d));
     if (missing.length > 0) {
