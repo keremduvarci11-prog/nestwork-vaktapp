@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq, and, desc, inArray, or } from "drizzle-orm";
 import {
-  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions,
+  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser,
   type User, type InsertUser,
   type Barnehage, type InsertBarnehage,
   type Vakt, type InsertVakt,
@@ -10,6 +10,7 @@ import {
   type Favoritt, type InsertFavoritt,
   type Onboarding, type InsertOnboarding,
   type Varsel, type InsertVarsel,
+  type VaktInteresse, type InsertVaktInteresse,
   type PushSubscription, type InsertPushSubscription,
 } from "@shared/schema";
 
@@ -69,6 +70,12 @@ export interface IStorage {
   deletePushSubscription(endpoint: string): Promise<void>;
   getUsersByRegion(region: string): Promise<User[]>;
   getUsersByRegions(regions: string[]): Promise<User[]>;
+
+  getVaktInteresser(vaktId: string): Promise<VaktInteresse[]>;
+  getAllVaktInteresser(): Promise<VaktInteresse[]>;
+  createVaktInteresse(data: InsertVaktInteresse): Promise<VaktInteresse>;
+  deleteVaktInteresser(vaktId: string): Promise<void>;
+  getVaktInteresserByAnsatt(ansattId: string): Promise<VaktInteresse[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -298,6 +305,27 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersByRegions(regions: string[]): Promise<User[]> {
     return db.select().from(users).where(and(inArray(users.region, regions), eq(users.role, "ansatt")));
+  }
+
+  async getVaktInteresser(vaktId: string): Promise<VaktInteresse[]> {
+    return db.select().from(vaktInteresser).where(eq(vaktInteresser.vaktId, vaktId));
+  }
+
+  async getAllVaktInteresser(): Promise<VaktInteresse[]> {
+    return db.select().from(vaktInteresser);
+  }
+
+  async createVaktInteresse(data: InsertVaktInteresse): Promise<VaktInteresse> {
+    const [created] = await db.insert(vaktInteresser).values(data).returning();
+    return created;
+  }
+
+  async deleteVaktInteresser(vaktId: string): Promise<void> {
+    await db.delete(vaktInteresser).where(eq(vaktInteresser.vaktId, vaktId));
+  }
+
+  async getVaktInteresserByAnsatt(ansattId: string): Promise<VaktInteresse[]> {
+    return db.select().from(vaktInteresser).where(eq(vaktInteresser.ansattId, ansattId));
   }
 }
 

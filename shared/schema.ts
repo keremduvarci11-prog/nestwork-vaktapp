@@ -108,6 +108,13 @@ export const varsler = pgTable("varsler", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const vaktInteresser = pgTable("vakt_interesser", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vaktId: varchar("vakt_id").notNull(),
+  ansattId: varchar("ansatt_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
@@ -125,6 +132,7 @@ export const insertSamtaleMeldingSchema = createInsertSchema(samtaleMeldinger).o
 export const insertFavorittSchema = createInsertSchema(favoritter).omit({ id: true });
 export const insertOnboardingSchema = createInsertSchema(onboarding).omit({ id: true });
 export const insertVarselSchema = createInsertSchema(varsler).omit({ id: true, createdAt: true });
+export const insertVaktInteresseSchema = createInsertSchema(vaktInteresser).omit({ id: true, createdAt: true });
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -143,5 +151,7 @@ export type InsertOnboarding = z.infer<typeof insertOnboardingSchema>;
 export type Onboarding = typeof onboarding.$inferSelect;
 export type InsertVarsel = z.infer<typeof insertVarselSchema>;
 export type Varsel = typeof varsler.$inferSelect;
+export type InsertVaktInteresse = z.infer<typeof insertVaktInteresseSchema>;
+export type VaktInteresse = typeof vaktInteresser.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;

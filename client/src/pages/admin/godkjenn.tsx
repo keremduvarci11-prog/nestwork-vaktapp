@@ -4,8 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, Calendar, Clock, Building2, User, AlertCircle } from "lucide-react";
-import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
+import { Check, X, Calendar, Clock, Building2, User, AlertCircle, Users } from "lucide-react";
+import type { Vakt, Barnehage, User as UserType, VaktInteresse } from "@shared/schema";
 
 export default function GodkjennVakter() {
   const { toast } = useToast();
@@ -19,16 +19,31 @@ export default function GodkjennVakter() {
   const { data: users } = useQuery<UserType[]>({
     queryKey: ["/api/users"],
   });
+  const { data: alleInteresser } = useQuery<VaktInteresse[]>({
+    queryKey: ["/api/vakt-interesser"],
+  });
 
   const bhMap = new Map(barnehager?.map((b) => [b.id, b]) || []);
   const userMap = new Map(users?.map((u) => [u.id, u]) || []);
-  const venterVakter = vakter?.filter((v) => v.status === "venter") || [];
+
+  const interesserByVakt = new Map<string, VaktInteresse[]>();
+  alleInteresser?.forEach((i) => {
+    const list = interesserByVakt.get(i.vaktId) || [];
+    list.push(i);
+    interesserByVakt.set(i.vaktId, list);
+  });
+
+  const vakterMedInteresse = vakter?.filter(
+    (v) => v.status === "ledig" && (interesserByVakt.get(v.id)?.length || 0) > 0
+  ) || [];
 
   const godkjenn = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/vakter/${id}/godkjenn`),
+    mutationFn: ({ vaktId, ansattId }: { vaktId: string; ansattId: string }) =>
+      apiRequest("POST", `/api/vakter/${vaktId}/godkjenn`, { ansattId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
-      toast({ title: "Vakt godkjent!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/vakt-interesser"] });
+      toast({ title: "Vakt godkjent og tildelt!" });
     },
   });
 
@@ -36,6 +51,7 @@ export default function GodkjennVakter() {
     mutationFn: (id: string) => apiRequest("POST", `/api/vakter/${id}/avslaa`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vakt-interesser"] });
       toast({ title: "Vakt avslått" });
     },
   });
@@ -49,26 +65,26 @@ export default function GodkjennVakter() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold">Godkjenn vakter</h1>
-        <p className="text-sm text-muted-foreground mt-1">{venterVakter.length} venter på godkjenning</p>
+        <p className="text-sm text-muted-foreground mt-1">{vakterMedInteresse.length} vakter med interesserte ansatte</p>
       </div>
 
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2].map((i) => <Skeleton key={i} className="h-40 w-full rounded-md" />)}
         </div>
-      ) : venterVakter.length === 0 ? (
+      ) : vakterMedInteresse.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
             <p className="font-medium">Ingen vakter venter</p>
-            <p className="text-sm text-muted-foreground mt-1">Alle forespørsler er behandlet.</p>
+            <p className="text-sm text-muted-foreground mt-1">Ingen ansatte har meldt interesse enda.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {venterVakter.map((vakt) => {
+        <div className="space-y-4">
+          {vakterMedInteresse.map((vakt) => {
             const bh = bhMap.get(vakt.barnehageId);
-            const emp = vakt.ansattId ? userMap.get(vakt.ansattId) : null;
+            const interesser = interesserByVakt.get(vakt.id) || [];
             return (
               <Card key={vakt.id} data-testid={`card-pending-${vakt.id}`}>
                 <CardContent className="p-4">
@@ -79,14 +95,13 @@ export default function GodkjennVakter() {
                         {vakt.vikarkode}
                       </span>
                     </div>
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Users className="w-3.5 h-3.5" />
+                      {interesser.length} interessert{interesser.length !== 1 ? "e" : ""}
+                    </span>
                   </div>
 
                   <div className="space-y-2 mb-4 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <User className="w-3.5 h-3.5" />
-                      <span className="font-medium text-foreground">{emp?.name || "Ukjent ansatt"}</span>
-                      <span className="text-xs">({emp?.stilling})</span>
-                    </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Calendar className="w-3.5 h-3.5" />
                       <span>{formatDate(vakt.dato)}</span>
@@ -101,26 +116,29 @@ export default function GodkjennVakter() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      data-testid={`button-godkjenn-${vakt.id}`}
-                      className="flex-1"
-                      onClick={() => godkjenn.mutate(vakt.id)}
-                      disabled={godkjenn.isPending}
-                    >
-                      <Check className="w-4 h-4 mr-1" />
-                      Godkjenn
-                    </Button>
-                    <Button
-                      data-testid={`button-avslaa-${vakt.id}`}
-                      variant="secondary"
-                      className="flex-1"
-                      onClick={() => avslaa.mutate(vakt.id)}
-                      disabled={avslaa.isPending}
-                    >
-                      <X className="w-4 h-4 mr-1" />
-                      Avslå
-                    </Button>
+                  <div className="border-t pt-3 space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Interesserte ansatte</p>
+                    {interesser.map((interesse) => {
+                      const emp = userMap.get(interesse.ansattId);
+                      return (
+                        <div key={interesse.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <User className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                            <span className="text-sm font-medium truncate">{emp?.name || "Ukjent"}</span>
+                            <span className="text-xs text-muted-foreground">({emp?.stilling})</span>
+                          </div>
+                          <Button
+                            data-testid={`button-godkjenn-${vakt.id}-${interesse.ansattId}`}
+                            size="sm"
+                            onClick={() => godkjenn.mutate({ vaktId: vakt.id, ansattId: interesse.ansattId })}
+                            disabled={godkjenn.isPending}
+                          >
+                            <Check className="w-3.5 h-3.5 mr-1" />
+                            Velg
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>

@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2 } from "lucide-react";
+import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2, HandMetal } from "lucide-react";
 import { PushPermissionBanner } from "@/components/push-banner";
-import type { Vakt, Barnehage, Onboarding } from "@shared/schema";
+import type { Vakt, Barnehage, Onboarding, VaktInteresse } from "@shared/schema";
 
 
 export default function EmployeeHome() {
@@ -30,16 +30,22 @@ export default function EmployeeHome() {
     refetchInterval: 30000,
   });
 
+  const { data: mineInteresser } = useQuery<VaktInteresse[]>({
+    queryKey: ["/api/vakt-interesser"],
+    refetchInterval: 30000,
+  });
+
   const taVaktMutation = useMutation({
     mutationFn: (vaktId: string) =>
       apiRequest("POST", `/api/vakter/${vaktId}/ta`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vakter/mine"] });
-      toast({ title: "Vakt registrert!", description: "Venter på godkjenning fra admin." });
+      queryClient.invalidateQueries({ queryKey: ["/api/vakt-interesser"] });
+      toast({ title: "Interesse registrert!", description: "Venter på godkjenning fra admin." });
     },
     onError: () => {
-      toast({ title: "Feil", description: "Kunne ikke ta vakten", variant: "destructive" });
+      toast({ title: "Feil", description: "Kunne ikke melde interesse", variant: "destructive" });
     },
   });
 
@@ -63,6 +69,8 @@ export default function EmployeeHome() {
   const today = new Date().toISOString().split("T")[0];
   const ledigeVakter = vakter?.filter((v) => v.status === "ledig" && v.dato >= today) || [];
   const tildelte = mineVakter?.filter((v) => v.status === "tildelt" && v.dato >= today) || [];
+
+  const interesseVaktIds = new Set(mineInteresser?.map(i => i.vaktId) || []);
 
   const onboardingDone = onboardingItems?.filter((i) => i.completed).length || 0;
   const onboardingTotal = onboardingItems?.length || 0;
@@ -179,6 +187,7 @@ export default function EmployeeHome() {
         <div className="space-y-3">
           {ledigeVakter.map((vakt) => {
             const bh = bhMap.get(vakt.barnehageId);
+            const harMeldtInteresse = interesseVaktIds.has(vakt.id);
             return (
               <Card key={vakt.id} className="hover-elevate">
                 <CardContent className="p-4">
@@ -207,14 +216,26 @@ export default function EmployeeHome() {
                     <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{vakt.beskrivelse}</p>
                   )}
 
-                  <Button
-                    data-testid={`button-ta-vakt-${vakt.id}`}
-                    className="w-full"
-                    onClick={() => taVaktMutation.mutate(vakt.id)}
-                    disabled={taVaktMutation.isPending}
-                  >
-                    TA VAKT
-                  </Button>
+                  {harMeldtInteresse ? (
+                    <Button
+                      data-testid={`button-interesse-sendt-${vakt.id}`}
+                      className="w-full"
+                      variant="secondary"
+                      disabled
+                    >
+                      <HandMetal className="w-4 h-4 mr-1.5" />
+                      Interesse sendt — venter på svar
+                    </Button>
+                  ) : (
+                    <Button
+                      data-testid={`button-ta-vakt-${vakt.id}`}
+                      className="w-full"
+                      onClick={() => taVaktMutation.mutate(vakt.id)}
+                      disabled={taVaktMutation.isPending}
+                    >
+                      TA VAKT
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );

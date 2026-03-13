@@ -356,20 +356,28 @@ export async function registerRoutes(
   });
 
   app.post("/api/vakter/:id/ta", requireAuth, async (req, res) => {
-    const updated = await storage.updateVakt(req.params.id, {
-      status: "venter",
+    const vakt = await storage.getVakt(req.params.id);
+    if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
+    if (vakt.status !== "ledig") return res.status(400).json({ message: "Vakten er ikke ledig" });
+
+    const existing = await storage.getVaktInteresser(req.params.id);
+    if (existing.some(i => i.ansattId === req.session.userId)) {
+      return res.status(400).json({ message: "Du har allerede meldt interesse for denne vakten" });
+    }
+
+    const interesse = await storage.createVaktInteresse({
+      vaktId: req.params.id,
       ansattId: req.session.userId!,
     });
-    if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
-    res.json(updated);
+    res.json(interesse);
 
     (async () => {
       try {
         const ansatt = await storage.getUser(req.session.userId!);
-        const bh = await storage.getBarnehage(updated.barnehageId);
+        const bh = await storage.getBarnehage(vakt.barnehageId);
         await notifyAdmins(
           "Ny vaktforespørsel",
-          `${ansatt?.name || "En ansatt"} ønsker vakt ${updated.dato} hos ${bh?.name || "ukjent"}.`,
+          `${ansatt?.name || "En ansatt"} ønsker vakt ${vakt.dato} hos ${bh?.name || "ukjent"}.`,
           "vakt",
           "/admin/godkjenn"
         );
@@ -377,6 +385,21 @@ export async function registerRoutes(
         console.error("[Notify] Feil ved admin-varsling (ta vakt):", err);
       }
     })();
+  });
+
+  app.get("/api/vakter/:id/interesser", requireAuth, async (req, res) => {
+    const interesser = await storage.getVaktInteresser(req.params.id);
+    res.json(interesser);
+  });
+
+  app.get("/api/vakt-interesser", requireAuth, async (req, res) => {
+    const currentUser = await storage.getUser(req.session.userId!);
+    if (currentUser?.role === "admin") {
+      const all = await storage.getAllVaktInteresser();
+      return res.json(all);
+    }
+    const mine = await storage.getVaktInteresserByAnsatt(req.session.userId!);
+    res.json(mine);
   });
 
   app.post("/api/vakter/:id/tildel", requireAdmin, async (req, res) => {
@@ -455,8 +478,29 @@ export async function registerRoutes(
   });
 
   app.post("/api/vakter/:id/godkjenn", requireAdmin, async (req, res) => {
-    const updated = await storage.updateVakt(req.params.id, { status: "godkjent" });
+    const { ansattId } = req.body || {};
+    const updateData: any = { status: "godkjent" };
+    if (ansattId) updateData.ansattId = ansattId;
+
+    const updated = await storage.updateVakt(req.params.id, updateData);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+
+    await storage.deleteVaktInteresser(req.params.id);
+
+    if (updated.ansattId) {
+      try {
+        const bh = await storage.getBarnehage(updated.barnehageId);
+        await notifyUser(
+          updated.ansattId,
+          "Vakten din er godkjent!",
+          `Din vakt ${updated.dato} hos ${bh?.name || "ukjent"} (${updated.startTid?.slice(0, 5)} - ${updated.sluttTid?.slice(0, 5)}) er bekreftet.`,
+          "vakt",
+          "/mine-vakter"
+        );
+      } catch (err) {
+        console.error("[Notify] Feil ved godkjenn-varsling:", err);
+      }
+    }
 
     res.json(updated);
 
