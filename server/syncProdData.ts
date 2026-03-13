@@ -77,7 +77,9 @@ export async function syncProductionData() {
 ('2bf38f82-5e98-4bf6-a077-066a0156e817', 'A003', 'Rakkungan Barnehagedrift AS', 'Kirsebærveien 10A, 4635 Kristiansand', 'Kristiansand', 'Monica Tanche Bergh Ahlstrøm', '971 31 108', NULL, NULL, NULL, NULL, '996 501 884', NULL, NULL, NULL, true),
 ('e03b1e77-b8eb-4a38-aff5-6be5a8cd404c', 'A001', 'Skorvane Fus Barnehage', 'Skeismyra 14, 5217 Hagavik', 'Os', 'Kristin Tellefsen', '902 19 798', NULL, NULL, '207.00', '250.00', '927 311 097', NULL, NULL, NULL, true),
 ('2d23e409-b144-46e8-b3ff-2cb0d61af5e6', 'A006', 'Søre Neset Fus Barnehage', 'Reset 32, 5200 Os', 'Os', 'Edle Nøkleby', '415 88 670', NULL, NULL, '207.00', '250.00', '922 043 639', NULL, NULL, NULL, true),
-('e33e3b0d-6a02-48d6-9249-a6d3695b61c9', 'A009', 'Tyse Fus Barnehage', 'Tysemarkjo 47, 5414 Stord', 'Stord', 'Anne Kristin Aaseth / Lillian', '417 81 108 / 486 08 162', NULL, NULL, '207.00', '250.00', '927 311 232', NULL, NULL, NULL, true)`);
+('e33e3b0d-6a02-48d6-9249-a6d3695b61c9', 'A009', 'Tyse Fus Barnehage', 'Tysemarkjo 47, 5414 Stord', 'Stord', 'Anne Kristin Aaseth / Lillian', '417 81 108 / 486 08 162', NULL, NULL, '207.00', '250.00', '927 311 232', NULL, NULL, NULL, true),
+('a4ff645b-37a5-4bce-9648-c93fdbe30bfa', 'A012', 'Buggeland Barnehage', 'Buggelandbakken 145, 4324 Sandnes', 'Stavanger', 'Kjersti Fiskå', '476 45 717', NULL, NULL, NULL, NULL, '887 493 812', NULL, NULL, NULL, true),
+('99caabb6-6068-42e4-8aad-defadbb578f2', 'A013', 'Espira Kuventræ Barnehage', 'Industrivegen 99, 5210 Osøyro', 'Os', 'Ine-Henriette Lynum', '932 58 658', NULL, NULL, NULL, NULL, '989 838 563', NULL, NULL, NULL, true)`);
     const ansatte = await client.query("SELECT id FROM users WHERE role = 'ansatt'");
     const onboardingItems = ['Bytt passord', 'Last opp profilbilde', 'Last opp CV', 'Last opp politiattest', 'Signert kontrakt'];
     for (const row of ansatte.rows) {
