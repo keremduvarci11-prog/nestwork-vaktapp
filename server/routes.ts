@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -98,8 +99,13 @@ export async function registerRoutes(
     next();
   });
 
+  const PgStore = connectPgSimple(session);
   app.use(
     session({
+      store: new PgStore({
+        conString: process.env.DATABASE_URL,
+        createTableIfMissing: true,
+      }),
       secret: process.env.SESSION_SECRET || "nestwork-secret-key",
       resave: false,
       saveUninitialized: false,
