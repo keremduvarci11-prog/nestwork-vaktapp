@@ -28,9 +28,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     const applyThemeColor = (isDark: boolean) => {
       const meta = document.querySelector('meta[name="theme-color"]');
-      const statusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
       if (meta) meta.setAttribute("content", isDark ? "#121212" : "#1a5f5f");
-      if (statusBar) statusBar.setAttribute("content", isDark ? "black" : "default");
     };
 
     if (theme === "system") {
