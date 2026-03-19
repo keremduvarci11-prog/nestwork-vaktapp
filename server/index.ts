@@ -6,6 +6,18 @@ import { seedDatabase } from "./seed";
 import { startCronJobs } from "./cronJobs";
 import { syncProductionData } from "./syncProdData";
 
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err.message);
+  console.error('[FATAL] Stack:', err.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  console.error('[FATAL] Unhandled rejection:', reason?.message || reason);
+  console.error('[FATAL] Stack:', reason?.stack);
+  process.exit(1);
+});
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -63,10 +75,20 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await seedDatabase();
-  await syncProductionData();
-  await registerRoutes(httpServer, app);
-  startCronJobs();
+  try {
+    console.log('[Startup] Step 1: seedDatabase...');
+    await seedDatabase();
+    console.log('[Startup] Step 2: syncProductionData...');
+    await syncProductionData();
+    console.log('[Startup] Step 3: registerRoutes...');
+    await registerRoutes(httpServer, app);
+    console.log('[Startup] Step 4: startCronJobs...');
+    startCronJobs();
+  } catch (err: any) {
+    console.error('[FATAL STARTUP ERROR]', err.message);
+    console.error('[FATAL STARTUP STACK]', err.stack);
+    process.exit(1);
+  }
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
