@@ -127,7 +127,9 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertBarnehageSchema = createInsertSchema(barnehager).omit({ id: true });
 export const insertVaktSchema = createInsertSchema(vakter).omit({ id: true, createdAt: true });
-export const insertMeldingSchema = createInsertSchema(meldinger).omit({ id: true, createdAt: true });
+export const insertMeldingSchema = createInsertSchema(meldinger).omit({ id: true, createdAt: true }).extend({
+  fromUserId: z.string().optional(),
+});
 export const insertSamtaleMeldingSchema = createInsertSchema(samtaleMeldinger).omit({ id: true, createdAt: true });
 export const insertFavorittSchema = createInsertSchema(favoritter).omit({ id: true });
 export const insertOnboardingSchema = createInsertSchema(onboarding).omit({ id: true });
