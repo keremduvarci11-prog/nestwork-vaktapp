@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Mail, MailOpen, AlertCircle, Send, Lock, ArrowLeft, User, Trash2, RotateCcw, Plus, Search, ChevronDown } from "lucide-react";
 import type { Melding, User as UserType, SamtaleMelding } from "@shared/schema";
 
@@ -268,7 +269,12 @@ function NyMeldingView({
               data-testid="selected-user-display"
             >
               <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-muted-foreground" />
+                <Avatar className="w-7 h-7 flex-shrink-0">
+                  {selectedUser.profileImage && <AvatarImage src={selectedUser.profileImage} alt={selectedUser.name} />}
+                  <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
+                    {selectedUser.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
                 <span className="text-sm font-medium">{selectedUser.name}</span>
                 <span className="text-xs text-muted-foreground">{selectedUser.region}</span>
               </div>
@@ -299,7 +305,12 @@ function NyMeldingView({
                     className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted transition-colors"
                     onClick={() => { setSelectedUser(u); setShowDropdown(false); setSearch(""); }}
                   >
-                    <User className="w-4 h-4 text-muted-foreground" />
+                    <Avatar className="w-7 h-7 flex-shrink-0">
+                      {u.profileImage && <AvatarImage src={u.profileImage} alt={u.name} />}
+                      <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
+                        {u.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                     <span className="text-sm font-medium">{u.name}</span>
                     <span className="text-xs text-muted-foreground ml-auto">{u.region}</span>
                   </button>
@@ -437,13 +448,15 @@ export default function AdminMeldinger() {
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5">
-                      {m.closed ? (
-                        <Lock className="w-4 h-4 text-muted-foreground" />
-                      ) : m.read ? (
-                        <MailOpen className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <Mail className="w-4 h-4 text-primary" />
+                    <div className="mt-0.5 relative">
+                      <Avatar className="w-9 h-9">
+                        {otherUser?.profileImage && <AvatarImage src={otherUser.profileImage} alt={otherUser?.name} />}
+                        <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+                          {otherUser?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      {!m.read && !m.closed && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-primary rounded-full border-2 border-background" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

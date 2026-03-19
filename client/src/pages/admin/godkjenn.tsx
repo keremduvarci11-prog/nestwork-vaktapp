@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Check, X, Calendar, Clock, Building2, User, AlertCircle, Users } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType, VaktInteresse } from "@shared/schema";
 
@@ -123,7 +124,12 @@ export default function GodkjennVakter() {
                       return (
                         <div key={interesse.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50">
                           <div className="flex items-center gap-2 min-w-0">
-                            <User className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                            <Avatar className="w-7 h-7 flex-shrink-0">
+                              {emp?.profileImage && <AvatarImage src={emp.profileImage} alt={emp?.name} />}
+                              <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
+                                {emp?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                              </AvatarFallback>
+                            </Avatar>
                             <span className="text-sm font-medium truncate">{emp?.name || "Ukjent"}</span>
                             <span className="text-xs text-muted-foreground">({emp?.stilling})</span>
                           </div>

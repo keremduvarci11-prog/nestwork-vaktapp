@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Users, Calendar, Clock, TrendingUp, List } from "lucide-react";
 import { Link } from "wouter";
 import type { Vakt, Barnehage, User } from "@shared/schema";
@@ -123,9 +124,19 @@ export default function AdminDashboard() {
                     <Card key={v.id}>
                       <CardContent className="p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{emp?.name || "Venter..."}</p>
-                            <p className="text-xs text-muted-foreground truncate">{bh?.name}</p>
+                          <div className="flex items-center gap-2 min-w-0">
+                            {emp && (
+                              <Avatar className="w-7 h-7 flex-shrink-0">
+                                {emp.profileImage && <AvatarImage src={emp.profileImage} alt={emp.name} />}
+                                <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
+                                  {emp.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{emp?.name || "Venter..."}</p>
+                              <p className="text-xs text-muted-foreground truncate">{bh?.name}</p>
+                            </div>
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="text-xs font-medium">{date.toLocaleDateString("nb-NO", { day: "numeric", month: "short" })}</p>

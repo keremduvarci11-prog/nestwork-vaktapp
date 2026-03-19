@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus, Coffee } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
@@ -362,7 +363,12 @@ export default function AlleVakter() {
                   <div className="space-y-1 text-sm">
                     {emp && (
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <User className="w-3.5 h-3.5" />
+                        <Avatar className="w-6 h-6 flex-shrink-0">
+                          {emp.profileImage && <AvatarImage src={emp.profileImage} alt={emp.name} />}
+                          <AvatarFallback className="bg-primary text-primary-foreground text-[9px] font-bold">
+                            {emp.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
                         <span>{emp.name}</span>
                       </div>
                     )}
