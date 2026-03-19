@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,13 +11,19 @@ import { useToast } from "@/hooks/use-toast";
 import { Mail, MailOpen, AlertCircle, Send, Lock, ArrowLeft, User, Trash2, RotateCcw, Plus, Search, ChevronDown } from "lucide-react";
 import type { Melding, User as UserType, SamtaleMelding } from "@shared/schema";
 
+function isAdminMessage(fromUserId: string, adminIds: Set<string>) {
+  return fromUserId === "admin" || adminIds.has(fromUserId);
+}
+
 function SamtaleView({
   melding,
   sender,
+  adminIds,
   onBack,
 }: {
   melding: Melding;
   sender: UserType | undefined;
+  adminIds: Set<string>;
   onBack: () => void;
 }) {
   const { toast } = useToast();
@@ -30,7 +37,6 @@ function SamtaleView({
     mutationFn: (message: string) =>
       apiRequest("POST", `/api/meldinger/${melding.id}/samtale`, {
         message,
-        fromUserId: "admin",
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/meldinger", melding.id, "samtale"] });
@@ -131,14 +137,14 @@ function SamtaleView({
       </div>
 
       <div className="space-y-2">
-        <div className={`flex ${melding.fromUserId === "admin" ? "justify-end" : "justify-start"}`}>
-          <div className={`max-w-[85%] rounded-lg p-3 ${melding.fromUserId === "admin" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            <p className={`text-xs font-medium mb-1 ${melding.fromUserId === "admin" ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-              {melding.fromUserId === "admin" ? "Nestwork" : sender?.name}
+        <div className={`flex ${isAdminMessage(melding.fromUserId, adminIds) ? "justify-end" : "justify-start"}`}>
+          <div className={`max-w-[85%] rounded-lg p-3 ${isAdminMessage(melding.fromUserId, adminIds) ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+            <p className={`text-xs font-medium mb-1 ${isAdminMessage(melding.fromUserId, adminIds) ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+              {isAdminMessage(melding.fromUserId, adminIds) ? "Deg" : sender?.name}
             </p>
             <p className="text-sm">{melding.message}</p>
             {melding.createdAt && (
-              <p className={`text-[10px] mt-1 ${melding.fromUserId === "admin" ? "text-primary-foreground/50" : "text-muted-foreground"}`}>
+              <p className={`text-[10px] mt-1 ${isAdminMessage(melding.fromUserId, adminIds) ? "text-primary-foreground/50" : "text-muted-foreground"}`}>
                 {new Date(melding.createdAt).toLocaleDateString("nb-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
               </p>
             )}
@@ -149,16 +155,16 @@ function SamtaleView({
           <Skeleton className="h-16 w-3/4" />
         ) : (
           samtale?.map((msg) => {
-            const isAdmin = msg.fromUserId === "admin";
+            const isSentByAdmin = isAdminMessage(msg.fromUserId, adminIds);
             return (
-              <div key={msg.id} className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-lg p-3 ${isAdmin ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                  <p className={`text-xs font-medium mb-1 ${isAdmin ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                    {isAdmin ? "Nestwork" : sender?.name}
+              <div key={msg.id} className={`flex ${isSentByAdmin ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] rounded-lg p-3 ${isSentByAdmin ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                  <p className={`text-xs font-medium mb-1 ${isSentByAdmin ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                    {isSentByAdmin ? "Deg" : sender?.name}
                   </p>
                   <p className="text-sm">{msg.message}</p>
                   {msg.createdAt && (
-                    <p className={`text-[10px] mt-1 ${isAdmin ? "text-primary-foreground/50" : "text-muted-foreground"}`}>
+                    <p className={`text-[10px] mt-1 ${isSentByAdmin ? "text-primary-foreground/50" : "text-muted-foreground"}`}>
                       {new Date(msg.createdAt).toLocaleDateString("nb-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   )}
@@ -229,7 +235,6 @@ function NyMeldingView({
   const sendMelding = useMutation({
     mutationFn: () =>
       apiRequest("POST", "/api/meldinger", {
-        fromUserId: "admin",
         toUserId: selectedUser!.id,
         subject,
         message,
@@ -340,6 +345,7 @@ function NyMeldingView({
 }
 
 export default function AdminMeldinger() {
+  const { user: currentAdmin } = useAuth();
   const [openMeldingId, setOpenMeldingId] = useState<string | null>(null);
   const [showNyMelding, setShowNyMelding] = useState(false);
 
@@ -351,9 +357,19 @@ export default function AdminMeldinger() {
   });
 
   const userMap = new Map(users?.map((u) => [u.id, u]) || []);
+  const adminIds = new Set(
+    users?.filter((u) => u.role === "admin").map((u) => u.id) || []
+  );
 
-  const unreadCount = meldinger?.filter((m) => !m.read).length || 0;
-  const openMelding = meldinger?.find((m) => m.id === openMeldingId);
+  const myMeldinger = meldinger?.filter((m) => {
+    if (m.toUserId === currentAdmin?.id || m.fromUserId === currentAdmin?.id) return true;
+    if (m.fromUserId === "admin") return true;
+    if (!m.toUserId && !adminIds.has(m.fromUserId) && m.fromUserId !== "admin") return true;
+    return false;
+  }) || [];
+
+  const unreadCount = myMeldinger.filter((m) => !m.read).length || 0;
+  const openMelding = myMeldinger.find((m) => m.id === openMeldingId);
 
   if (showNyMelding && users) {
     return (
@@ -365,14 +381,15 @@ export default function AdminMeldinger() {
   }
 
   if (openMelding) {
-    const isAdminSent = openMelding.fromUserId === "admin";
-    const otherUser = isAdminSent
+    const fromAdmin = isAdminMessage(openMelding.fromUserId, adminIds);
+    const otherUser = fromAdmin
       ? userMap.get(openMelding.toUserId || "")
       : userMap.get(openMelding.fromUserId);
     return (
       <SamtaleView
         melding={openMelding}
         sender={otherUser}
+        adminIds={adminIds}
         onBack={() => setOpenMeldingId(null)}
       />
     );
@@ -399,7 +416,7 @@ export default function AdminMeldinger() {
         <div className="space-y-3">
           {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-md" />)}
         </div>
-      ) : !meldinger?.length ? (
+      ) : !myMeldinger.length ? (
         <Card>
           <CardContent className="py-12 text-center">
             <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
@@ -408,9 +425,9 @@ export default function AdminMeldinger() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {meldinger.map((m) => {
-            const isAdminSent = m.fromUserId === "admin";
-            const otherUser = isAdminSent ? userMap.get(m.toUserId || "") : userMap.get(m.fromUserId);
+          {myMeldinger.map((m) => {
+            const fromAdmin = isAdminMessage(m.fromUserId, adminIds);
+            const otherUser = fromAdmin ? userMap.get(m.toUserId || "") : userMap.get(m.fromUserId);
             return (
               <Card
                 key={m.id}
@@ -433,7 +450,7 @@ export default function AdminMeldinger() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold">
-                            {isAdminSent && <span className="text-xs text-muted-foreground mr-1">Til:</span>}
+                            {fromAdmin && <span className="text-xs text-muted-foreground mr-1">Til:</span>}
                             {otherUser?.name || "Ukjent"}
                           </p>
                           <p className="text-xs text-muted-foreground">{otherUser?.region}</p>

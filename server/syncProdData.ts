@@ -11,6 +11,13 @@ export async function syncProductionData() {
         ('99caabb6-6068-42e4-8aad-defadbb578f2', 'A013', 'Espira Kuventræ Barnehage', 'Industrivegen 99, 5210 Osøyro', 'Os', 'Ine-Henriette Lynum', '932 58 658', NULL, NULL, NULL, NULL, '989 838 563', NULL, NULL, NULL, true)
         ON CONFLICT (id) DO NOTHING
       `);
+      await client.query(`UPDATE users SET name = 'Kerem Nestwork Admin' WHERE username = 'admin' AND name != 'Kerem Nestwork Admin'`);
+      await client.query(`INSERT INTO users (id, username, password, name, email, phone, address, kontonummer, role, region, stilling, timelonn, available, available_weekend, user_status)
+        VALUES ('b8d1a3c5-7e2f-4d9b-8c6a-1f5e3d7b9c4a', 'shakarmahmod', '$2b$10$w.aYCiEAYA4tqGo4bLA1UOetaxhxSKNp.lcQ1wXDwgiQWAvMZ.aai', 'Shakar Nestwork Admin', 'shakarr@live.no', '', '', '', 'admin', 'Alle', 'Admin', 0.00, true, false, 'Aktiv')
+        ON CONFLICT (id) DO NOTHING`);
+      await client.query(`INSERT INTO users (id, username, password, name, email, phone, address, kontonummer, role, region, stilling, timelonn, available, available_weekend, user_status)
+        VALUES ('c9e2b4d6-8f3a-5e0c-9d7b-2a6f4e8c0d5b', 'sunnivahaugland', '$2b$10$w.aYCiEAYA4tqGo4bLA1UOetaxhxSKNp.lcQ1wXDwgiQWAvMZ.aai', 'Sunniva Nestwork Admin', 'sunniva@nestwork.no', '', '', '', 'admin', 'Alle', 'Admin', 0.00, true, false, 'Aktiv')
+        ON CONFLICT (id) DO NOTHING`);
       return;
     }
     console.log('[Migration] Synkroniserer produksjonsdatabasen...');
@@ -24,7 +31,9 @@ export async function syncProductionData() {
     await client.query('DELETE FROM users');
     await client.query('DELETE FROM barnehager');
     await client.query(`INSERT INTO users (id, username, password, name, email, phone, address, kontonummer, role, region, stilling, timelonn, profile_image, cv_file, politiattest_file, available, available_weekend, user_status, external_id) VALUES
-('62b122eb-fb3c-4cc1-a4db-f03d8e29fee6', 'admin', '$2b$10$w.aYCiEAYA4tqGo4bLA1UOetaxhxSKNp.lcQ1wXDwgiQWAvMZ.aai', 'Nestwork Admin', 'post@nestwork.no', '465 30 651', '', '', 'admin', 'Alle', 'Daglig leder', 0.00, '/uploads/profiles/1773057110248-tycga0deax9.png', NULL, NULL, true, false, 'Aktiv', NULL),
+('62b122eb-fb3c-4cc1-a4db-f03d8e29fee6', 'admin', '$2b$10$w.aYCiEAYA4tqGo4bLA1UOetaxhxSKNp.lcQ1wXDwgiQWAvMZ.aai', 'Kerem Nestwork Admin', 'post@nestwork.no', '465 30 651', '', '', 'admin', 'Alle', 'Daglig leder', 0.00, '/uploads/profiles/1773057110248-tycga0deax9.png', NULL, NULL, true, false, 'Aktiv', NULL),
+('b8d1a3c5-7e2f-4d9b-8c6a-1f5e3d7b9c4a', 'shakarmahmod', '$2b$10$w.aYCiEAYA4tqGo4bLA1UOetaxhxSKNp.lcQ1wXDwgiQWAvMZ.aai', 'Shakar Nestwork Admin', 'shakarr@live.no', '', '', '', 'admin', 'Alle', 'Admin', 0.00, NULL, NULL, NULL, true, false, 'Aktiv', NULL),
+('c9e2b4d6-8f3a-5e0c-9d7b-2a6f4e8c0d5b', 'sunnivahaugland', '$2b$10$w.aYCiEAYA4tqGo4bLA1UOetaxhxSKNp.lcQ1wXDwgiQWAvMZ.aai', 'Sunniva Nestwork Admin', 'sunniva@nestwork.no', '', '', '', 'admin', 'Alle', 'Admin', 0.00, NULL, NULL, NULL, true, false, 'Aktiv', NULL),
 ('3863c55d-3241-419e-9856-d35f49afb3d2', 'amandafrederich', '$2b$10$RXLhBzE5TtFm/NF3H2dEL./7i7p25mHyXuHGqWaIF8HArsvU3nL8m', 'Amanda Frederich', '13amanda.frederich@gmail.com', '412 79 536', '', '', 'ansatt', 'Fusa', 'Barnehageassistent', 0.00, NULL, NULL, NULL, true, false, 'Aktiv', 9048),
 ('b5ba2597-14c7-4462-891d-101e04c141b6', 'amyien', '$2b$10$RXLhBzE5TtFm/NF3H2dEL./7i7p25mHyXuHGqWaIF8HArsvU3nL8m', 'Amy Øien', 'amyoein@icloud.com', '938 81 606', '', '', 'ansatt', 'Kristiansand', 'Barnehageassistent', 0.00, NULL, NULL, NULL, true, false, 'Aktiv', 9026),
 ('4a85f278-b1eb-40f8-a6fa-84c0f8617f5d', 'andrineshikoswejahre', '$2b$10$RXLhBzE5TtFm/NF3H2dEL./7i7p25mHyXuHGqWaIF8HArsvU3nL8m', 'Andrine Shikoswe Jahren', 'andrine.s.j@icloud.com', '966 09 218', '', '', 'ansatt', 'Drammen', 'Barnehageassistent', 0.00, NULL, NULL, NULL, true, false, 'Aktiv', 9041),

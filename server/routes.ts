@@ -169,6 +169,14 @@ export async function registerRoutes(
     res.json(safe);
   });
 
+  app.get("/api/admins/meldinger-mottakere", requireAuth, async (_req, res) => {
+    const all = await storage.getAllUsers();
+    const mottakere = all
+      .filter((u) => u.role === "admin" && u.username !== "shakarmahmod")
+      .map(({ password: _, ...u }) => u);
+    res.json(mottakere);
+  });
+
   app.patch("/api/users/:id", requireAuth, async (req, res) => {
     const { password: pw, ...safeData } = req.body;
     const updated = await storage.updateUser(req.params.id, safeData);
@@ -681,19 +689,22 @@ export async function registerRoutes(
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const data = parsed.data;
     const currentUser = await storage.getUser(req.session.userId!);
-    if (currentUser?.role === "admin") {
-      data.fromUserId = "admin";
-    } else {
-      data.fromUserId = req.session.userId!;
-      data.toUserId = undefined;
+    data.fromUserId = req.session.userId!;
+
+    if (currentUser?.role !== "admin" && data.toUserId) {
+      const recipient = await storage.getUser(data.toUserId);
+      if (!recipient || recipient.role !== "admin" || recipient.username === "shakarmahmod") {
+        return res.status(400).json({ message: "Ugyldig mottaker" });
+      }
     }
+
     const created = await storage.createMelding(data);
 
     if (currentUser?.role === "admin" && data.toUserId) {
       try {
         await notifyUser(
           data.toUserId,
-          "Nestwork Admin sendte deg en melding",
+          `${currentUser.name} sendte deg en melding`,
           data.subject,
           "melding",
           "/meldinger"
@@ -701,9 +712,10 @@ export async function registerRoutes(
       } catch (err) {
         console.error("[Notify] Feil ved ny-melding-varsling:", err);
       }
-    } else if (currentUser?.role !== "admin") {
+    } else if (currentUser?.role !== "admin" && data.toUserId) {
       try {
-        await notifyAdmins(
+        await notifyUser(
+          data.toUserId,
           "Ny melding fra ansatt",
           `${currentUser?.name || "En ansatt"}: ${data.subject}`,
           "melding",
@@ -764,6 +776,14 @@ export async function registerRoutes(
   });
 
   app.get("/api/meldinger/:id/samtale", requireAuth, async (req, res) => {
+    const melding = await storage.getMelding(req.params.id);
+    if (!melding) return res.status(404).json({ message: "Samtale ikke funnet" });
+    const currentUser = await storage.getUser(req.session.userId!);
+    const isAdmin = currentUser?.role === "admin";
+    const isParticipant = melding.fromUserId === req.session.userId || melding.toUserId === req.session.userId || melding.fromUserId === "admin";
+    if (!isAdmin && !isParticipant) {
+      return res.status(403).json({ message: "Ikke tilgang" });
+    }
     const msgs = await storage.getSamtaleMeldinger(req.params.id);
     res.json(msgs);
   });
@@ -780,32 +800,50 @@ export async function registerRoutes(
     }
     const { message } = req.body;
     if (!message?.trim()) return res.status(400).json({ message: "Melding kan ikke vere tom" });
-    const actualFromUserId = isAdmin ? "admin" : req.session.userId!;
     const created = await storage.createSamtaleMelding({
       meldingId: req.params.id,
-      fromUserId: actualFromUserId,
+      fromUserId: req.session.userId!,
       message,
     });
 
     try {
       if (isAdmin) {
-        const targetUserId = melding.fromUserId === "admin" ? melding.toUserId : melding.fromUserId;
-        if (targetUserId) {
+        const allAdmins = (await storage.getAllUsers()).filter(u => u.role === "admin");
+        const adminIdSet = new Set(allAdmins.map(a => a.id));
+        let targetUserId: string | null = null;
+        if (melding.fromUserId === "admin" || adminIdSet.has(melding.fromUserId)) {
+          targetUserId = melding.toUserId || null;
+        } else {
+          targetUserId = melding.fromUserId;
+        }
+        const adminUser = await storage.getUser(req.session.userId!);
+        if (targetUserId && !adminIdSet.has(targetUserId)) {
           await notifyUser(
             targetUserId,
-            "Ny melding fra Nestwork Admin",
-            "Du har fatt en ny melding fra Nestwork Admin.",
+            `Ny melding fra ${adminUser?.name || "Nestwork Admin"}`,
+            `Du har fatt en ny melding.`,
             "melding",
             "/meldinger"
           );
         }
       } else {
-        await notifyAdmins(
-          "Ny melding fra ansatt",
-          `${currentUser?.name || "En ansatt"} har sendt en melding.`,
-          "melding",
-          "/admin/meldinger"
-        );
+        const allAdmins = (await storage.getAllUsers()).filter(u => u.role === "admin");
+        const adminIdSet = new Set(allAdmins.map(a => a.id));
+        let targetAdminId: string | null = null;
+        if (melding.toUserId && adminIdSet.has(melding.toUserId)) {
+          targetAdminId = melding.toUserId;
+        } else if (adminIdSet.has(melding.fromUserId)) {
+          targetAdminId = melding.fromUserId;
+        }
+        if (targetAdminId) {
+          await notifyUser(
+            targetAdminId,
+            "Ny melding fra ansatt",
+            `${currentUser?.name || "En ansatt"} har sendt en melding.`,
+            "melding",
+            "/admin/meldinger"
+          );
+        }
       }
     } catch (err) {
       console.error("[Notify] Feil ved melding-varsling:", err);
@@ -814,15 +852,20 @@ export async function registerRoutes(
     res.json(created);
   });
 
-  app.get("/api/meldinger/unread-count/admin", requireAdmin, async (_req, res) => {
+  app.get("/api/meldinger/unread-count/admin", requireAdmin, async (req, res) => {
     const all = await storage.getMeldinger();
+    const myId = req.session.userId!;
+    const allAdmins = (await storage.getAllUsers()).filter(u => u.role === "admin");
+    const adminIds = new Set(allAdmins.map(a => a.id));
     let count = 0;
     for (const m of all) {
       if (m.closed) continue;
+      const isMyConversation = m.toUserId === myId || m.fromUserId === myId || m.fromUserId === "admin";
+      if (!isMyConversation) continue;
       const samtale = await storage.getSamtaleMeldinger(m.id);
       const lastAdminSeen = m.lastSeenByAdmin || new Date(0);
       const hasNewFromUser = !m.read || samtale.some(
-        (s) => s.fromUserId !== "admin" && s.createdAt && new Date(s.createdAt) > lastAdminSeen
+        (s) => !adminIds.has(s.fromUserId) && s.fromUserId !== "admin" && s.createdAt && new Date(s.createdAt) > lastAdminSeen
       );
       if (hasNewFromUser) count++;
     }
@@ -834,19 +877,22 @@ export async function registerRoutes(
     if (req.session.userId !== req.params.userId && currentUser?.role !== "admin") {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
+    const allAdmins = (await storage.getAllUsers()).filter(u => u.role === "admin");
+    const adminIds = new Set(allAdmins.map(a => a.id));
+    adminIds.add("admin");
     const userMeldinger = await storage.getMeldingerByUser(req.params.userId);
     let count = 0;
     for (const m of userMeldinger) {
       if (m.hiddenByUser) continue;
       const lastUserSeen = m.lastSeenByUser ? new Date(m.lastSeenByUser) : null;
-      if (m.fromUserId === "admin" && !lastUserSeen) {
+      if (adminIds.has(m.fromUserId) && !lastUserSeen) {
         count++;
         continue;
       }
       const samtale = await storage.getSamtaleMeldinger(m.id);
       const seenTime = lastUserSeen || (m.createdAt ? new Date(m.createdAt) : new Date(0));
       const hasNewFromAdmin = samtale.some(
-        (s) => s.fromUserId === "admin" && s.createdAt && new Date(s.createdAt) > seenTime
+        (s) => adminIds.has(s.fromUserId) && s.createdAt && new Date(s.createdAt) > seenTime
       );
       if (hasNewFromAdmin) count++;
     }

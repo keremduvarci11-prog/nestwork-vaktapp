@@ -8,20 +8,29 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, MessageSquare, AlertCircle, Lock, ArrowLeft, Plus, Trash2 } from "lucide-react";
-import type { Melding, SamtaleMelding } from "@shared/schema";
+import type { Melding, SamtaleMelding, User as UserType } from "@shared/schema";
 
 function SamtaleView({
   melding,
   userId,
   userName,
+  adminUsers,
   onBack,
 }: {
   melding: Melding;
   userId: string;
   userName: string;
+  adminUsers: UserType[];
   onBack: () => void;
 }) {
+  const adminMap = new Map(adminUsers.map(a => [a.id, a]));
+  const getAdminName = (id: string) => {
+    if (id === "admin") return "Nestwork";
+    const admin = adminMap.get(id);
+    return admin ? admin.name.replace(" Nestwork Admin", "") : "Nestwork";
+  };
   const [replyText, setReplyText] = useState("");
 
   const { data: samtale, isLoading } = useQuery<SamtaleMelding[]>({
@@ -75,7 +84,7 @@ function SamtaleView({
         <div className={`flex ${melding.fromUserId === userId ? "justify-end" : "justify-start"}`}>
           <div className={`max-w-[85%] rounded-lg p-3 ${melding.fromUserId === userId ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
             {melding.fromUserId !== userId && (
-              <p className="text-xs font-medium text-muted-foreground mb-1">Nestwork</p>
+              <p className="text-xs font-medium text-muted-foreground mb-1">{getAdminName(melding.fromUserId)}</p>
             )}
             <p className="text-sm">{melding.message}</p>
             {melding.createdAt && (
@@ -95,7 +104,7 @@ function SamtaleView({
               <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] rounded-lg p-3 ${isMine ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
                   <p className={`text-xs font-medium mb-1 ${isMine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                    {isMine ? "Deg" : "Nestwork"}
+                    {isMine ? "Deg" : getAdminName(msg.fromUserId)}
                   </p>
                   <p className="text-sm">{msg.message}</p>
                   {msg.createdAt && (
@@ -152,10 +161,15 @@ export default function Meldinger() {
   const [openMeldingId, setOpenMeldingId] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [selectedAdminId, setSelectedAdminId] = useState("");
 
   const { data: rawMeldinger, isLoading } = useQuery<Melding[]>({
     queryKey: ["/api/meldinger/user", user?.id],
     refetchInterval: 30000,
+  });
+
+  const { data: adminMottakere } = useQuery<UserType[]>({
+    queryKey: ["/api/admins/meldinger-mottakere"],
   });
 
   const meldinger = rawMeldinger?.filter((m) => !m.hiddenByUser) || [];
@@ -172,6 +186,7 @@ export default function Meldinger() {
     mutationFn: () =>
       apiRequest("POST", "/api/meldinger", {
         fromUserId: user?.id,
+        toUserId: selectedAdminId,
         subject,
         message,
         read: false,
@@ -180,6 +195,7 @@ export default function Meldinger() {
       queryClient.invalidateQueries({ queryKey: ["/api/meldinger/user"] });
       setSubject("");
       setMessage("");
+      setSelectedAdminId("");
       setShowNewForm(false);
       toast({ title: "Melding sendt!", description: "Du vil se svaret her." });
     },
@@ -187,7 +203,7 @@ export default function Meldinger() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subject.trim() || !message.trim()) return;
+    if (!subject.trim() || !message.trim() || !selectedAdminId) return;
     sendMelding.mutate();
   };
 
@@ -199,6 +215,7 @@ export default function Meldinger() {
         melding={openMelding}
         userId={user.id}
         userName={user.name}
+        adminUsers={adminMottakere || []}
         onBack={() => setOpenMeldingId(null)}
       />
     );
@@ -227,6 +244,18 @@ export default function Meldinger() {
               <h2 className="text-sm font-semibold">Ny melding</h2>
             </div>
             <form onSubmit={handleSubmit} className="space-y-3">
+              <Select value={selectedAdminId} onValueChange={setSelectedAdminId}>
+                <SelectTrigger data-testid="select-admin-mottaker">
+                  <SelectValue placeholder="Velg mottaker..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {adminMottakere?.map((admin) => (
+                    <SelectItem key={admin.id} value={admin.id}>
+                      {admin.name.replace(" Nestwork Admin", "")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 data-testid="input-subject"
                 placeholder="Emne"
@@ -259,6 +288,7 @@ export default function Meldinger() {
                     setShowNewForm(false);
                     setSubject("");
                     setMessage("");
+                    setSelectedAdminId("");
                   }}
                 >
                   Avbryt
@@ -305,6 +335,12 @@ export default function Meldinger() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{m.subject}</p>
                       <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{m.message}</p>
+                      {m.toUserId && (() => {
+                        const admin = adminMottakere?.find(a => a.id === m.toUserId);
+                        return admin ? (
+                          <p className="text-[10px] text-primary/70 mt-0.5">Til: {admin.name.replace(" Nestwork Admin", "")}</p>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {m.closed ? (

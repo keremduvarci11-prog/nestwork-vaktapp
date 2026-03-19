@@ -53,9 +53,11 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 ## Key Features
 - Bergen region sees both Bergen + Os shifts (regionGroups mapping)
 - Admin can assign shifts directly to employees ("tildelt" status); employee sees and accepts ("Godta vakt")
-- Multi-turn conversation messaging with unread badges
+- Multi-turn conversation messaging with unread badges; per-admin routing (employees select Kerem or Sunniva as recipient; Shakar excluded from messaging)
+- Admin sees only conversations directed to them (fromUserId/toUserId matching); legacy `fromUserId="admin"` messages visible to all admins
 - Admin can initiate new conversations with specific employees (Ny melding with employee search/select)
 - Admin can close/reopen/delete conversations; employees can hide conversations
+- `/api/admins/meldinger-mottakere` - GET message-eligible admins (excludes Shakar)
 - Password change with bcrypt hashing
 - Profile picture upload (clickable avatar on profil page, camera icon overlay)
 - Admin avatar shows Nestwork logo; employees show initials or uploaded photo
@@ -86,4 +88,6 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 
 ## Demo Credentials
 - All employees start with password: nestwork2026
-- Admin: admin / admin123
+- Admin (Kerem): admin / admin123
+- Admin (Shakar): shakarmahmod / admin123
+- Admin (Sunniva): sunnivahaugland / admin123
