@@ -877,6 +877,16 @@ export async function registerRoutes(
             "melding",
             "/admin/meldinger"
           );
+        } else {
+          for (const admin of allAdmins) {
+            await notifyUser(
+              admin.id,
+              "Ny melding fra ansatt",
+              `${currentUser?.name || "En ansatt"} har sendt en melding.`,
+              "melding",
+              "/admin/meldinger"
+            );
+          }
         }
       }
     } catch (err) {
