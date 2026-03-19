@@ -9,7 +9,7 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - **Database**: PostgreSQL with Drizzle ORM
 - **Routing**: Wouter (client-side), Express (server-side)
 - **Auth**: bcrypt password hashing (supports legacy plain-text for migration)
-- **File uploads**: multer for profile images (/uploads/profiles) and documents (/uploads/documents)
+- **File uploads**: multer (memory storage for profile images stored as base64 data URLs in DB to survive redeploys; disk storage for documents in /uploads/documents)
 - **Google Sheets**: Auto-appends approved shifts via integration
 
 ## Key Data Models

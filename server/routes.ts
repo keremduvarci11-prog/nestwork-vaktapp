@@ -38,14 +38,8 @@ const docUpload = multer({
 });
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-    },
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = [".jpg", ".jpeg", ".png", ".webp"];
     const ext = path.extname(file.originalname).toLowerCase();
@@ -153,6 +147,16 @@ export async function registerRoutes(
     });
   });
 
+  function resolveProfileImage(img: string | null | undefined): string | null {
+    if (!img) return null;
+    if (img.startsWith("data:")) return img;
+    if (img.startsWith("/uploads/")) {
+      const filePath = path.join(process.cwd(), img.startsWith("/") ? `.${img}` : img);
+      return fs.existsSync(filePath) ? img : null;
+    }
+    return img;
+  }
+
   app.get("/api/auth/me", async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Ikke innlogget" });
@@ -160,12 +164,36 @@ export async function registerRoutes(
     const user = await storage.getUser(req.session.userId);
     if (!user) return res.status(401).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = user;
-    res.json(safeUser);
+    res.json({ ...safeUser, profileImage: resolveProfileImage(safeUser.profileImage) });
+  });
+
+  function resolveProfileImageForList(img: string | null | undefined, userId: string): string | null {
+    const resolved = resolveProfileImage(img);
+    if (!resolved) return null;
+    if (resolved.startsWith("data:")) return `/api/users/${userId}/profile-image-data`;
+    return resolved;
+  }
+
+  app.get("/api/users/:id/profile-image-data", async (req, res) => {
+    const user = await storage.getUser(req.params.id);
+    if (!user?.profileImage || !user.profileImage.startsWith("data:")) {
+      return res.status(404).json({ message: "Ingen profilbilde" });
+    }
+    const match = user.profileImage.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return res.status(404).json({ message: "Ugyldig bildeformat" });
+    const [, mimeType, base64Data] = match;
+    const buffer = Buffer.from(base64Data, "base64");
+    res.set("Content-Type", mimeType);
+    res.set("Cache-Control", "public, max-age=3600");
+    res.send(buffer);
   });
 
   app.get("/api/users", requireAuth, async (_req, res) => {
     const all = await storage.getAllUsers();
-    const safe = all.map(({ password: _, ...u }) => u);
+    const safe = all.map(({ password: _, ...u }) => ({
+      ...u,
+      profileImage: resolveProfileImageForList(u.profileImage, u.id),
+    }));
     res.json(safe);
   });
 
@@ -213,8 +241,14 @@ export async function registerRoutes(
     if (!req.file) {
       return res.status(400).json({ message: "Ingen fil valgt" });
     }
-    const imageUrl = `/uploads/profiles/${req.file.filename}`;
-    const updated = await storage.updateUser(req.params.id, { profileImage: imageUrl });
+    const allowedMimes = ["image/jpeg", "image/png", "image/webp"];
+    const mimeType = req.file.mimetype;
+    if (!allowedMimes.includes(mimeType)) {
+      return res.status(400).json({ message: "Ugyldig bildeformat" });
+    }
+    const base64 = req.file.buffer.toString("base64");
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+    const updated = await storage.updateUser(req.params.id, { profileImage: dataUrl });
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
     res.json(safeUser);
@@ -928,7 +962,7 @@ export async function registerRoutes(
           userId: u.id,
           name: u.name,
           region: u.region,
-          profileImage: u.profileImage,
+          profileImage: resolveProfileImageForList(u.profileImage, u.id),
           cvFile: u.cvFile,
           politiattestFile: u.politiattestFile,
           progress,
