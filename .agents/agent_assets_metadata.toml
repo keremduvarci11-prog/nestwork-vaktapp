@@ -6,3 +6,9 @@ id = "d2Dpph4f-ls1sjd-65QDT"
 uri = "file://Nestwork_Android_Veiledning.md"
 type = "text"
 title = "Android-veiledning (Chrome + Samsung Internet)"
+
+[[outputs]]
+id = "aZo2Iufl_MIQdwSTYm_Ha"
+uri = "file://nestwork-vaktapp.tar.gz"
+type = "unspecified"
+title = "Nestwork Vaktapp - Prosjektfiler"
