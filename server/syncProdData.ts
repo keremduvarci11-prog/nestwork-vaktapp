@@ -18,6 +18,9 @@ export async function syncProductionData() {
       await client.query(`INSERT INTO users (id, username, password, name, email, phone, address, kontonummer, role, region, stilling, timelonn, available, available_weekend, user_status)
         VALUES ('c9e2b4d6-8f3a-5e0c-9d7b-2a6f4e8c0d5b', 'sunnivahaugland', '$2b$10$w.aYCiEAYA4tqGo4bLA1UOetaxhxSKNp.lcQ1wXDwgiQWAvMZ.aai', 'Sunniva Nestwork Admin', 'sunniva@nestwork.no', '', '', '', 'admin', 'Alle', 'Admin', 0.00, true, false, 'Aktiv')
         ON CONFLICT (id) DO NOTHING`);
+      await client.query(`INSERT INTO users (id, username, password, name, email, phone, address, kontonummer, role, region, stilling, timelonn, available, available_weekend, user_status)
+        VALUES ('d0e1f2a3-b4c5-6d7e-8f9a-0b1c2d3e4f5a', 'testnestwork', '$2b$10$CeTfR6VntsaanGPq6V6NtOHerHsqKuBQ9PUilRTZWq7/9tb4b2Cci', 'Test Bruker', 'test@nestwork.no', '', '', '', 'ansatt', 'Alle', 'Barnehageassistent', 0.00, true, false, 'Aktiv')
+        ON CONFLICT (id) DO NOTHING`);
       return;
     }
     console.log('[Migration] Synkroniserer produksjonsdatabasen...');
