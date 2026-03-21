@@ -11,33 +11,31 @@ workflows:
       vars:
         PACKAGE_NAME: "no.nestwork.vaktapp"
     scripts:
-      - name: Kill Duplicate Kotlin Libraries
+      - name: Set up code signing
         script: |
-          # Dette er 'sleggemetoden' - vi tvinger Android til å ignorere de gamle bibliotekene helt
-          echo "
-          allprojects {
-              configurations.all {
-                  exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
-                  exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
-              }
-          }" >> android/build.gradle
+          # Gjør om Base64-teksten til en ekte nøkkelfil
+          echo $CM_KEYSTORE | base64 --decode > /tmp/nestwork.keystore
+      - name: Fix Kotlin Duplicate Classes
+        script: |
+          echo "allprojects { configurations.all { exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+          exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8' } }" >> android/build.gradle
       - name: Install npm dependencies
-        script: |
-          npm install
+        script: npm install
       - name: Build web assets
-        script: |
-          npm run build
+        script: npm run build
       - name: Sync Capacitor
-        script: |
-          npx cap sync android
+        script: npx cap sync android
       - name: Set Android SDK location
-        script: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+        script: echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
       - name: Build Android App Bundle
         script: |
           cd android
           chmod +x gradlew
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=/tmp/nestwork.keystore \
+            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
     artifacts:
       - android/app/build/outputs/**/*.aab
     publishing:
