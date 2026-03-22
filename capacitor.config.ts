@@ -7,6 +7,7 @@ const config: CapacitorConfig = {
   server: {
     url: "https://nestwork-vaktapp.replit.app",
     cleartext: true,
+    allowNavigation: ["nestwork-vaktapp.replit.app"],
   },
   plugins: {
     SplashScreen: {
@@ -22,6 +23,12 @@ const config: CapacitorConfig = {
     Keyboard: {
       resize: "body",
       resizeOnFullScreen: true,
+    },
+    CapacitorCookies: {
+      enabled: true,
+    },
+    CapacitorHttp: {
+      enabled: true,
     },
   },
   ios: {
