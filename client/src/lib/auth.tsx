@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { apiRequest } from "./queryClient";
 import { queryClient } from "./queryClient";
+import { getAuthToken, setAuthToken, clearAuthToken } from "./token";
 
 type User = {
   id: string;
@@ -35,7 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/auth/me", { credentials: "include" })
+    const headers: Record<string, string> = {};
+    const token = getAuthToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    fetch("/api/auth/me", { credentials: "include", headers })
       .then((r) => (r.ok ? r.json() : null))
       .then((u) => setUser(u))
       .catch(() => setUser(null))
@@ -45,12 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const res = await apiRequest("POST", "/api/auth/login", { username, password });
     const u = await res.json();
+    if (u.token) {
+      setAuthToken(u.token);
+    }
     setUser(u);
     queryClient.clear();
   }, []);
 
   const logout = useCallback(async () => {
     await apiRequest("POST", "/api/auth/logout");
+    clearAuthToken();
     setUser(null);
     queryClient.clear();
   }, []);

@@ -6,10 +6,30 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema } from "@shared/schema";
 import { appendVaktToSheet, removeVaktFromSheet, getSpreadsheetUrl } from "./googleSheets";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
+
+const JWT_SECRET = process.env.SESSION_SECRET || "nestwork-secret-key";
+
+function getUserIdFromRequest(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.slice(7);
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+      return decoded.userId;
+    } catch {
+      return null;
+    }
+  }
+  if (req.session?.userId) {
+    return req.session?.userId || null;
+  }
+  return null;
+}
 
 const uploadDir = path.join(process.cwd(), "uploads", "profiles");
 if (!fs.existsSync(uploadDir)) {
@@ -65,20 +85,24 @@ declare module "express-session" {
 }
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.session.userId) {
+  const userId = getUserIdFromRequest(req);
+  if (!userId) {
     return res.status(401).json({ message: "Ikke innlogget" });
   }
+  (req as any)._userId = userId;
   next();
 }
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!req.session.userId) {
+  const userId = getUserIdFromRequest(req);
+  if (!userId) {
     return res.status(401).json({ message: "Ikke innlogget" });
   }
-  const user = await storage.getUser(req.session.userId);
+  const user = await storage.getUser(userId);
   if (!user || user.role !== "admin") {
     return res.status(403).json({ message: "Ingen tilgang" });
   }
+  (req as any)._userId = userId;
   next();
 }
 
@@ -137,14 +161,19 @@ export async function registerRoutes(
       return res.status(401).json({ message: "Feil brukernavn/e-post eller passord" });
     }
     req.session.userId = user.id;
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "365d" });
     const { password: _, ...safeUser } = user;
-    res.json(safeUser);
+    res.json({ ...safeUser, token });
   });
 
   app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy(() => {
+    if (req.session) {
+      req.session.destroy(() => {
+        res.json({ message: "Logget ut" });
+      });
+    } else {
       res.json({ message: "Logget ut" });
-    });
+    }
   });
 
   function resolveProfileImage(img: string | null | undefined): string | null {
@@ -158,10 +187,11 @@ export async function registerRoutes(
   }
 
   app.get("/api/auth/me", async (req, res) => {
-    if (!req.session.userId) {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
       return res.status(401).json({ message: "Ikke innlogget" });
     }
-    const user = await storage.getUser(req.session.userId);
+    const user = await storage.getUser(userId);
     if (!user) return res.status(401).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = user;
     res.json({ ...safeUser, profileImage: resolveProfileImage(safeUser.profileImage) });
@@ -214,7 +244,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/users/:id/change-password", requireAuth, async (req, res) => {
-    if (req.session.userId !== req.params.id) {
+    if (getUserIdFromRequest(req) !== req.params.id) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
     const { currentPassword, newPassword } = req.body;
@@ -235,7 +265,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/users/:id/profile-image", requireAuth, upload.single("image"), async (req, res) => {
-    if (req.session.userId !== req.params.id) {
+    if (getUserIdFromRequest(req) !== req.params.id) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
     if (!req.file) {
@@ -255,7 +285,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/users/:id/upload-cv", requireAuth, docUpload.single("file"), async (req, res) => {
-    if (req.session.userId !== req.params.id) {
+    if (getUserIdFromRequest(req) !== req.params.id) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
     if (!req.file) {
@@ -269,7 +299,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/users/:id/upload-politiattest", requireAuth, docUpload.single("file"), async (req, res) => {
-    if (req.session.userId !== req.params.id) {
+    if (getUserIdFromRequest(req) !== req.params.id) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
     if (!req.file) {
@@ -317,8 +347,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/vakter/mine/:ansattId", requireAuth, async (req, res) => {
-    if (req.session.userId !== req.params.ansattId) {
-      const currentUser = await storage.getUser(req.session.userId!);
+    if (getUserIdFromRequest(req) !== req.params.ansattId) {
+      const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
       if (!currentUser || currentUser.role !== "admin") {
         return res.status(403).json({ message: "Ingen tilgang" });
       }
@@ -482,19 +512,19 @@ export async function registerRoutes(
     if (vakt.status !== "ledig") return res.status(400).json({ message: "Vakten er ikke ledig" });
 
     const existing = await storage.getVaktInteresser(req.params.id);
-    if (existing.some(i => i.ansattId === req.session.userId)) {
+    if (existing.some(i => i.ansattId === getUserIdFromRequest(req))) {
       return res.status(400).json({ message: "Du har allerede meldt interesse for denne vakten" });
     }
 
     const interesse = await storage.createVaktInteresse({
       vaktId: req.params.id,
-      ansattId: req.session.userId!,
+      ansattId: getUserIdFromRequest(req)!,
     });
     res.json(interesse);
 
     (async () => {
       try {
-        const ansatt = await storage.getUser(req.session.userId!);
+        const ansatt = await storage.getUser(getUserIdFromRequest(req)!);
         const bh = await storage.getBarnehage(vakt.barnehageId);
         await notifyAdmins(
           "Ny vaktforespørsel",
@@ -514,12 +544,12 @@ export async function registerRoutes(
   });
 
   app.get("/api/vakt-interesser", requireAuth, async (req, res) => {
-    const currentUser = await storage.getUser(req.session.userId!);
+    const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
     if (currentUser?.role === "admin") {
       const all = await storage.getAllVaktInteresser();
       return res.json(all);
     }
-    const mine = await storage.getVaktInteresserByAnsatt(req.session.userId!);
+    const mine = await storage.getVaktInteresserByAnsatt(getUserIdFromRequest(req)!);
     res.json(mine);
   });
 
@@ -562,7 +592,7 @@ export async function registerRoutes(
   app.post("/api/vakter/:id/godta", requireAuth, async (req, res) => {
     const vakt = await storage.getVakt(req.params.id);
     if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
-    if (vakt.status !== "tildelt" || vakt.ansattId !== req.session.userId) {
+    if (vakt.status !== "tildelt" || vakt.ansattId !== getUserIdFromRequest(req)) {
       return res.status(403).json({ message: "Denne vakten er ikke tildelt deg" });
     }
     const updated = await storage.updateVakt(req.params.id, { status: "godkjent" });
@@ -572,7 +602,7 @@ export async function registerRoutes(
 
     (async () => {
       try {
-        const ansatt = await storage.getUser(req.session.userId!);
+        const ansatt = await storage.getUser(getUserIdFromRequest(req)!);
         const bh = await storage.getBarnehage(updated.barnehageId);
         let timer = 0;
         if (updated.startTid && updated.sluttTid) {
@@ -710,8 +740,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/meldinger/user/:userId", requireAuth, async (req, res) => {
-    const currentUser = await storage.getUser(req.session.userId!);
-    if (req.session.userId !== req.params.userId && currentUser?.role !== "admin") {
+    const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
+    if (getUserIdFromRequest(req) !== req.params.userId && currentUser?.role !== "admin") {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
     const m = await storage.getMeldingerByUser(req.params.userId);
@@ -722,8 +752,8 @@ export async function registerRoutes(
     const parsed = insertMeldingSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const data = parsed.data;
-    const currentUser = await storage.getUser(req.session.userId!);
-    data.fromUserId = req.session.userId!;
+    const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
+    data.fromUserId = getUserIdFromRequest(req)!;
 
     if (currentUser?.role !== "admin" && data.toUserId) {
       const recipient = await storage.getUser(data.toUserId);
@@ -812,9 +842,9 @@ export async function registerRoutes(
   app.get("/api/meldinger/:id/samtale", requireAuth, async (req, res) => {
     const melding = await storage.getMelding(req.params.id);
     if (!melding) return res.status(404).json({ message: "Samtale ikke funnet" });
-    const currentUser = await storage.getUser(req.session.userId!);
+    const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
     const isAdmin = currentUser?.role === "admin";
-    const isParticipant = melding.fromUserId === req.session.userId || melding.toUserId === req.session.userId || melding.fromUserId === "admin";
+    const isParticipant = melding.fromUserId === getUserIdFromRequest(req) || melding.toUserId === getUserIdFromRequest(req) || melding.fromUserId === "admin";
     if (!isAdmin && !isParticipant) {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
@@ -826,9 +856,9 @@ export async function registerRoutes(
     const melding = await storage.getMelding(req.params.id);
     if (!melding) return res.status(404).json({ message: "Samtale ikke funnet" });
     if (melding.closed) return res.status(400).json({ message: "Samtalen er avsluttet" });
-    const currentUser = await storage.getUser(req.session.userId!);
+    const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
     const isAdmin = currentUser?.role === "admin";
-    const isParticipant = melding.fromUserId === req.session.userId || melding.toUserId === req.session.userId;
+    const isParticipant = melding.fromUserId === getUserIdFromRequest(req) || melding.toUserId === getUserIdFromRequest(req);
     if (!isAdmin && !isParticipant) {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
@@ -836,7 +866,7 @@ export async function registerRoutes(
     if (!message?.trim()) return res.status(400).json({ message: "Melding kan ikke vere tom" });
     const created = await storage.createSamtaleMelding({
       meldingId: req.params.id,
-      fromUserId: req.session.userId!,
+      fromUserId: getUserIdFromRequest(req)!,
       message,
     });
 
@@ -850,7 +880,7 @@ export async function registerRoutes(
         } else {
           targetUserId = melding.fromUserId;
         }
-        const adminUser = await storage.getUser(req.session.userId!);
+        const adminUser = await storage.getUser(getUserIdFromRequest(req)!);
         if (targetUserId && !adminIdSet.has(targetUserId)) {
           await notifyUser(
             targetUserId,
@@ -898,7 +928,7 @@ export async function registerRoutes(
 
   app.get("/api/meldinger/unread-count/admin", requireAdmin, async (req, res) => {
     const all = await storage.getMeldinger();
-    const myId = req.session.userId!;
+    const myId = getUserIdFromRequest(req)!;
     const allAdmins = (await storage.getAllUsers()).filter(u => u.role === "admin");
     const adminIds = new Set(allAdmins.map(a => a.id));
     let count = 0;
@@ -917,8 +947,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/meldinger/unread-count/user/:userId", requireAuth, async (req, res) => {
-    const currentUser = await storage.getUser(req.session.userId!);
-    if (req.session.userId !== req.params.userId && currentUser?.role !== "admin") {
+    const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
+    if (getUserIdFromRequest(req) !== req.params.userId && currentUser?.role !== "admin") {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
     const allAdmins = (await storage.getAllUsers()).filter(u => u.role === "admin");
@@ -991,8 +1021,8 @@ export async function registerRoutes(
   });
 
   app.get("/api/onboarding/:userId", requireAuth, async (req, res) => {
-    const currentUser = await storage.getUser(req.session.userId!);
-    if (req.session.userId !== req.params.userId && currentUser?.role !== "admin") {
+    const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
+    if (getUserIdFromRequest(req) !== req.params.userId && currentUser?.role !== "admin") {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
     let items = await storage.getOnboarding(req.params.userId);
@@ -1026,12 +1056,12 @@ export async function registerRoutes(
   });
 
   app.get("/api/varsler", requireAuth, async (req, res) => {
-    const v = await storage.getVarsler(req.session.userId!);
+    const v = await storage.getVarsler(getUserIdFromRequest(req)!);
     res.json(v);
   });
 
   app.get("/api/varsler/unread-count", requireAuth, async (req, res) => {
-    const count = await storage.getUnreadVarselCount(req.session.userId!);
+    const count = await storage.getUnreadVarselCount(getUserIdFromRequest(req)!);
     res.json({ count });
   });
 
@@ -1041,7 +1071,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/varsler/read-all", requireAuth, async (req, res) => {
-    await storage.markAllVarslerRead(req.session.userId!);
+    await storage.markAllVarslerRead(getUserIdFromRequest(req)!);
     res.json({ success: true });
   });
 
@@ -1062,18 +1092,18 @@ export async function registerRoutes(
   app.post("/api/push/subscribe", requireAuth, async (req, res) => {
     const { endpoint, keys } = req.body;
     if (!endpoint || !keys?.p256dh || !keys?.auth) {
-      console.log(`[Push] Subscribe rejected: missing fields for user ${req.session.userId}`);
+      console.log(`[Push] Subscribe rejected: missing fields for user ${getUserIdFromRequest(req)}`);
       return res.status(400).json({ message: "Ugyldig subscription" });
     }
-    console.log(`[Push] Saving subscription for user ${req.session.userId}, endpoint: ${endpoint.substring(0, 60)}...`);
+    console.log(`[Push] Saving subscription for user ${getUserIdFromRequest(req)}, endpoint: ${endpoint.substring(0, 60)}...`);
     await storage.savePushSubscription({
-      userId: req.session.userId!,
+      userId: getUserIdFromRequest(req)!,
       endpoint,
       p256dh: keys.p256dh,
       auth: keys.auth,
     });
-    const allSubs = await storage.getPushSubscriptions(req.session.userId!);
-    console.log(`[Push] User ${req.session.userId} now has ${allSubs.length} subscription(s)`);
+    const allSubs = await storage.getPushSubscriptions(getUserIdFromRequest(req)!);
+    console.log(`[Push] User ${getUserIdFromRequest(req)} now has ${allSubs.length} subscription(s)`);
     res.json({ success: true });
   });
 
