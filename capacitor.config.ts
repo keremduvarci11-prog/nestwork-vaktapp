@@ -5,9 +5,9 @@ const config: CapacitorConfig = {
   appName: "Nestwork",
   webDir: "dist/public",
   server: {
-    url: "https://nestwork-vaktapp.replit.app",
+    url: "https://nestwork-shift-manager.replit.app",
     cleartext: true,
-    allowNavigation: ["nestwork-vaktapp.replit.app"],
+    allowNavigation: ["nestwork-shift-manager.replit.app"],
   },
   plugins: {
     SplashScreen: {
