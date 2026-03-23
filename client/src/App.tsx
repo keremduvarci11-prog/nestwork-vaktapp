@@ -104,7 +104,7 @@ function AppContent() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 pt-4 pb-24" style={{ marginTop: "calc(env(safe-area-inset-top, 0px) + 48px)" }}>
+      <main className="max-w-lg mx-auto px-4 pt-4" style={{ marginTop: "calc(env(safe-area-inset-top, 0px) + 48px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 70px)" }}>
         <PullToRefresh>
         <Switch>
           {isAdmin ? (
