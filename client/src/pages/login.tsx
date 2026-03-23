@@ -44,7 +44,9 @@ export default function LoginPage() {
                 <label className="text-sm font-medium" htmlFor="username">E-post eller brukernavn</label>
                 <Input
                   id="username"
+                  name="username"
                   data-testid="input-username"
+                  autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="din.epost@gmail.com"
@@ -55,8 +57,10 @@ export default function LoginPage() {
                 <label className="text-sm font-medium" htmlFor="password">Passord</label>
                 <Input
                   id="password"
+                  name="password"
                   data-testid="input-password"
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Skriv inn passord"
