@@ -1,6 +1,95 @@
 import { apiRequest } from "./queryClient";
+import { getAuthToken } from "./token";
+
+function isCapacitorNative(): boolean {
+  return !!(window as any).Capacitor?.isNativePlatform?.();
+}
 
 export async function initPush() {
+  if (isCapacitorNative()) {
+    await initCapacitorPush();
+  } else {
+    await initWebPush();
+  }
+}
+
+export async function subscribeToPush() {
+  if (isCapacitorNative()) {
+    await requestCapacitorPermission();
+  } else {
+    await subscribeWebPush();
+  }
+}
+
+async function initCapacitorPush() {
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+
+    const permStatus = await PushNotifications.checkPermissions();
+    console.log("[Push] Capacitor permission status:", permStatus.receive);
+
+    if (permStatus.receive === "granted") {
+      await registerCapacitorPush();
+    } else if (permStatus.receive !== "denied") {
+      await requestCapacitorPermission();
+    }
+  } catch (err) {
+    console.error("[Push] Capacitor init error:", err);
+  }
+}
+
+async function requestCapacitorPermission() {
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+
+    const result = await PushNotifications.requestPermissions();
+    console.log("[Push] Capacitor permission result:", result.receive);
+
+    if (result.receive === "granted") {
+      await registerCapacitorPush();
+    }
+  } catch (err) {
+    console.error("[Push] Capacitor permission error:", err);
+  }
+}
+
+async function registerCapacitorPush() {
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+
+    PushNotifications.addListener("registration", async (token) => {
+      console.log("[Push] Capacitor FCM token:", token.value.substring(0, 20) + "...");
+      try {
+        await apiRequest("POST", "/api/push/subscribe", {
+          endpoint: `fcm://${token.value}`,
+          keys: { fcmToken: token.value },
+        });
+        console.log("[Push] Capacitor token sent to server");
+      } catch (err) {
+        console.error("[Push] Failed to send Capacitor token:", err);
+      }
+    });
+
+    PushNotifications.addListener("registrationError", (err) => {
+      console.error("[Push] Capacitor registration error:", err);
+    });
+
+    PushNotifications.addListener("pushNotificationReceived", (notification) => {
+      console.log("[Push] Notification received:", notification.title);
+    });
+
+    PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+      console.log("[Push] Notification action:", action.notification.title);
+    });
+
+    await PushNotifications.register();
+    console.log("[Push] Capacitor push registered");
+  } catch (err) {
+    console.error("[Push] Capacitor register error:", err);
+  }
+}
+
+async function initWebPush() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     console.log("[Push] Service Worker or PushManager not supported");
     return;
@@ -13,7 +102,7 @@ export async function initPush() {
 
     if (Notification.permission === "granted") {
       console.log("[Push] Permission already granted, re-syncing subscription");
-      await subscribeToPush();
+      await subscribeWebPush();
     } else {
       console.log("[Push] Permission:", Notification.permission);
     }
@@ -22,7 +111,7 @@ export async function initPush() {
   }
 }
 
-export async function subscribeToPush() {
+async function subscribeWebPush() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     console.log("[Push] Service Worker or PushManager not supported");
     return;
@@ -37,9 +126,15 @@ export async function subscribeToPush() {
     console.log("[Push] Permission:", permission);
     if (permission !== "granted") return;
 
+    const headers: Record<string, string> = {};
+    const token = getAuthToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     let res: Response;
     try {
-      res = await fetch("/api/push/vapid-key");
+      res = await fetch("/api/push/vapid-key", { headers });
       if (!res.ok) {
         console.log("[Push] VAPID key fetch failed:", res.status);
         return;
