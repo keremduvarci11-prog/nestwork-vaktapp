@@ -2,22 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
+html, body {
   height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
   background-color: #ffffff !important;
-  overscroll-behavior: none;
-}
-
-body {
-  margin: 0 !important;
-  padding: 0 !important;
-  background-color: #ffffff !important;
-  overscroll-behavior: none;
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
+  overscroll-behavior-y: none;
 }
 
 html.dark, html.dark body {
@@ -25,11 +15,10 @@ html.dark, html.dark body {
 }
 
 #root {
-  height: 100%;
+  min-height: 100vh;
   background-color: #ffffff !important;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: none;
 }
 
 html.dark #root {
