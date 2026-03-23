@@ -2,7 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
+html {
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: hsl(var(--background)) !important;
+  overscroll-behavior: none;
+}
+
+body {
   height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -11,7 +19,7 @@ html, body {
 }
 
 #root {
-  min-height: 100vh;
+  height: 100%;
   background-color: hsl(var(--background)) !important;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
