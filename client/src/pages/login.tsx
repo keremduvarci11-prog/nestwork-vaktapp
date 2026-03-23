@@ -29,7 +29,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-8">
-        <p className="text-center text-red-600 font-extrabold text-2xl">VERSJON 2.0 - OPPDATERT</p>
         <div className="text-center space-y-3">
           <NestworkLogo size={64} className="mx-auto" />
           <h1 className="text-2xl font-bold tracking-tight">Nestwork</h1>
@@ -45,7 +44,8 @@ export default function LoginPage() {
                 <label className="text-sm font-medium" htmlFor="username">E-post eller brukernavn</label>
                 <Input
                   id="username"
-                  name="username"
+                  name="email"
+                  type="email"
                   data-testid="input-username"
                   autoComplete="username"
                   value={username}

@@ -74,7 +74,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur border-b z-40" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <header className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur border-b z-40">
         <div className="max-w-lg mx-auto px-4 py-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <NestworkLogo size={32} />
@@ -104,7 +104,7 @@ function AppContent() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 pt-4" style={{ marginTop: "calc(env(safe-area-inset-top, 0px) + 48px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 70px)" }}>
+      <main className="max-w-lg mx-auto px-4 pt-4 pb-24" style={{ marginTop: "48px" }}>
         <PullToRefresh>
         <Switch>
           {isAdmin ? (

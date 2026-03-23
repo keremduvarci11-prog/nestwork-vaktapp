@@ -3,23 +3,19 @@
 @tailwind utilities;
 
 html, body {
-  background-color: #ffffff !important;
-  overscroll-behavior-y: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
+  background-color: #DDEEEB !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
   overflow: hidden;
-  padding: 0;
-  margin: 0;
+  overscroll-behavior-y: none;
 }
 
 #root {
-  width: 100%;
-  height: 100%;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  background-color: #DDEEEB;
+  min-height: 100vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
