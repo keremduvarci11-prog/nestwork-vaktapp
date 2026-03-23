@@ -160,6 +160,10 @@ export async function registerRoutes(
     if (!user || !(await comparePassword(password, user.password))) {
       return res.status(401).json({ message: "Feil brukernavn/e-post eller passord" });
     }
+    const blockedUserIds = ["bb5e32b9-f7d6-4e6e-934e-95937dd828df"];
+    if (user.status === "Deaktivert" || blockedUserIds.includes(user.id)) {
+      return res.status(403).json({ message: "Du har ikke tilgang" });
+    }
     req.session.userId = user.id;
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "365d" });
     const { password: _, ...safeUser } = user;
@@ -193,6 +197,10 @@ export async function registerRoutes(
     }
     const user = await storage.getUser(userId);
     if (!user) return res.status(401).json({ message: "Bruker ikke funnet" });
+    const blockedIds = ["bb5e32b9-f7d6-4e6e-934e-95937dd828df"];
+    if (user.status === "Deaktivert" || blockedIds.includes(user.id)) {
+      return res.status(403).json({ message: "Du har ikke tilgang" });
+    }
     const { password: _, ...safeUser } = user;
     res.json({ ...safeUser, profileImage: resolveProfileImage(safeUser.profileImage) });
   });
