@@ -26,10 +26,11 @@ const config: CapacitorConfig = {
     },
   },
   ios: {
-    contentInset: "automatic",
+    contentInset: "never",
     preferredContentMode: "mobile",
     scheme: "Nestwork",
     appendUserAgent: "NestworkApp",
+    backgroundColor: "#ffffff",
   },
   android: {
     allowMixedContent: true,

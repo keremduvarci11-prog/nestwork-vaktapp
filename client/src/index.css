@@ -2,12 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
-  background-color: #ffffff !important;
+html {
   background: #ffffff !important;
-  height: 100% !important;
+  background-color: #ffffff !important;
   margin: 0 !important;
   padding: 0 !important;
+  height: 100% !important;
+  min-height: 100vh !important;
+  min-height: 100dvh !important;
+  min-height: -webkit-fill-available !important;
+  overflow: hidden;
+  overscroll-behavior-y: none;
+}
+
+body {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+  min-height: 100vh !important;
+  min-height: 100dvh !important;
+  min-height: -webkit-fill-available !important;
   overflow: hidden;
   overscroll-behavior-y: none;
 }
@@ -15,8 +31,11 @@ html, body {
 #root {
   width: 100%;
   height: 100%;
-  background-color: #ffffff !important;
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
   background: #ffffff !important;
+  background-color: #ffffff !important;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
