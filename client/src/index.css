@@ -2,26 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
+html {
   height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
   background-color: #ffffff !important;
-  overscroll-behavior-y: none;
+  overscroll-behavior: none;
 }
 
-.dark html, .dark body, html.dark, html.dark body {
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: #ffffff !important;
+  overscroll-behavior: none;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+html.dark, html.dark body {
   background-color: hsl(0 0% 10%) !important;
 }
 
 #root {
-  min-height: 100vh;
+  height: 100%;
   background-color: #ffffff !important;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
 }
 
-.dark #root {
+html.dark #root {
   background-color: hsl(0 0% 10%) !important;
 }
 
