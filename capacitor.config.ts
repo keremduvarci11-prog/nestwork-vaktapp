@@ -24,17 +24,12 @@ const config: CapacitorConfig = {
       resize: "body",
       resizeOnFullScreen: true,
     },
-    CapacitorCookies: {
-      enabled: true,
-    },
-    CapacitorHttp: {
-      enabled: true,
-    },
   },
   ios: {
     contentInset: "automatic",
     preferredContentMode: "mobile",
     scheme: "Nestwork",
+    appendUserAgent: "NestworkApp",
   },
   android: {
     allowMixedContent: true,
