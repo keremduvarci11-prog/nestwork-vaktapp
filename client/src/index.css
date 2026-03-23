@@ -6,21 +6,23 @@ html, body {
   height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: hsl(var(--background)) !important;
-  overscroll-behavior: none;
-  overflow: hidden;
+  background-color: #ffffff !important;
+  overscroll-behavior-y: none;
+}
+
+.dark html, .dark body, html.dark, html.dark body {
+  background-color: hsl(0 0% 10%) !important;
 }
 
 #root {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: hsl(var(--background)) !important;
+  min-height: 100vh;
+  background-color: #ffffff !important;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: none;
+}
+
+.dark #root {
+  background-color: hsl(0 0% 10%) !important;
 }
 
 /* LIGHT MODE */
