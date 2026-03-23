@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 html, body {
-  background-color: #DDEEEB;
+  background-color: #ffffff !important;
   overscroll-behavior-y: none;
   position: fixed;
   top: 0;
