@@ -6,13 +6,13 @@ html, body {
   height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: #ffffff !important;
+  background-color: hsl(var(--background)) !important;
   overscroll-behavior-y: none;
 }
 
 #root {
   min-height: 100vh;
-  background-color: #ffffff !important;
+  background-color: hsl(var(--background)) !important;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }

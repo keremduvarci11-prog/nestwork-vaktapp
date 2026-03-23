@@ -74,7 +74,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="fixed top-0 left-0 right-0 backdrop-blur border-b z-40" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)", backgroundColor: "#ffffff" }}>
+      <header className="fixed top-0 left-0 right-0 backdrop-blur border-b z-40 bg-background" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}>
         <div className="max-w-lg mx-auto px-4 py-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <NestworkLogo size={32} />
