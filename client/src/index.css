@@ -3,8 +3,7 @@
 @tailwind utilities;
 
 html, body {
-  background-color: hsl(var(--background));
-  transition: background-color 0.2s ease;
+  background-color: #DDEEEB;
   overscroll-behavior-y: none;
   position: fixed;
   top: 0;
