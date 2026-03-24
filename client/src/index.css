@@ -3,14 +3,13 @@
 @tailwind utilities;
 
 html, body {
-  position: fixed;
-  overflow: hidden;
-  width: 100%;
   height: 100%;
-  margin: 0 !important;
-  padding: 0 !important;
-  background-color: #ffffff !important;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
   overscroll-behavior: none;
+  background-color: #ffffff !important;
 }
 
 html.dark, html.dark body {
@@ -19,9 +18,9 @@ html.dark, html.dark body {
 
 #root {
   height: 100%;
-  background-color: #ffffff !important;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  background-color: #ffffff !important;
 }
 
 html.dark #root {
