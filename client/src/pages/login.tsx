@@ -44,13 +44,13 @@ export default function LoginPage() {
                 <label className="text-sm font-medium" htmlFor="username">E-post eller brukernavn</label>
                 <Input
                   id="username"
-                  name="email"
-                  type="email"
+                  name="username"
+                  type="text"
                   data-testid="input-username"
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="din.epost@gmail.com"
+                  placeholder="Brukernavn eller e-post"
                   required
                 />
               </div>
