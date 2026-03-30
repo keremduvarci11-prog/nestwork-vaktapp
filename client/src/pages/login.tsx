@@ -19,8 +19,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(username, password);
-    } catch {
-      toast({ title: "Feil", description: "Feil brukernavn eller passord", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Feil", description: err?.message || "Noe gikk galt", variant: "destructive" });
     } finally {
       setLoading(false);
     }

@@ -49,7 +49,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const res = await apiRequest("POST", "/api/auth/login", { username, password });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+        credentials: "include",
+      });
+    } catch (err) {
+      throw new Error("Kunne ikke koble til serveren. Sjekk internettforbindelsen.");
+    }
+    if (!res.ok) {
+      let msg = "Feil brukernavn eller passord";
+      try {
+        const errData = await res.json();
+        if (errData.message) msg = errData.message;
+      } catch {}
+      throw new Error(msg);
+    }
     const u = await res.json();
     if (u.token) {
       setAuthToken(u.token);
