@@ -74,15 +74,12 @@ workflows:
           pod install
       - name: Keychain initialize
         script: keychain initialize
-      - name: Force Signing Setup
+      - name: Full Signing and Project Setup
         script: |
-          openssl genrsa -out ios_dist.key 2048
-          keychain add-certificates --key ios_dist.key
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --delete-stale-profiles
+          app-store-connect certificates create --type IOS_DISTRIBUTION --save
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
-      - name: Link Profiles to Xcode
-        script: |
-          xcode-project use-profiles --bundle-id "$BUNDLE_ID"
+          xcode-project use-profiles
       - name: Build iOS IPA
         script: |
           xcode-project build-ipa \
