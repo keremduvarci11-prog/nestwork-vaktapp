@@ -1,50 +1,7 @@
-workflows:
-  android-release:
-    name: Android Release Build
-    max_build_duration: 30
-    instance_type: mac_mini_m2
-    environment:
-      java: 21
-      node: 20
-      groups:
-        - keystore_credentials
-      vars:
-        PACKAGE_NAME: "no.nestwork.vaktapp"
-    scripts:
-      - name: Set up code signing
-        script: |
-          echo $CM_KEYSTORE | base64 --decode > /tmp/nestwork.keystore
-      - name: Fix Kotlin Duplicate Classes
-        script: |
-          echo "allprojects { configurations.all { exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
-          exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8' } }" >> android/build.gradle
-      - name: Install npm dependencies
-        script: npm install
-      - name: Build web assets
-        script: npm run build
-      - name: Sync Capacitor
-        script: npx cap sync android
-      - name: Set Android SDK location
-        script: echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
-      - name: Build Android App Bundle
-        script: |
-          cd android
-          chmod +x gradlew
-          ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=/tmp/nestwork.keystore \
-            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
-    artifacts:
-      - android/app/build/outputs/**/*.aab
-    publishing:
-      email:
-        recipients:
-          - post@nestwork.no
-        notify:
-          success: true
-          failure: true
+Vi har nå en helt ren Apple-konto. Erstatt HELE codemagic.yaml med denne koden. Vi bruker --save-flagget som lager både sertifikat og privat nøkkel automatisk, og vi beholder use-profiles for å unngå Error 65:
 
+YAML
+workflows:
   ios-release:
     name: iOS Release Build
     instance_type: mac_mini_m2
@@ -76,11 +33,17 @@ workflows:
         script: keychain initialize
       - name: Fetch and Create Signing Files
         script: |
+          # 1. Lag sertifikat og privat nøkkel automatisk og lagre i keychain
           app-store-connect certificates create --type IOS_DISTRIBUTION --save
+          
+          # 2. Hent eller lag profil (den vil nå finne den nye nøkkelen automatisk)
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          
+          # 3. Legg alt til i nøkkelringen
           keychain add-certificates
       - name: Link Profiles to Xcode
         script: |
+          # Dette fikser Error 65 (provisioning profile error)
           xcode-project use-profiles
       - name: Build iOS IPA
         script: |
@@ -93,3 +56,4 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+Pushet til GitHub med en gang!
