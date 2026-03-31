@@ -74,16 +74,19 @@ workflows:
           pod install
       - name: Keychain initialize
         script: keychain initialize
-      - name: Manual Signing (No-Fail Method)
+      - name: Fetch Signing Files
         script: |
-          openssl genrsa -out ios.key 2048
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
-          xcode-project use-profiles
+          keychain add-certificates
+      - name: Patch Xcode Project for Signing
+        script: |
+          xcode-project use-profiles --warn-only
       - name: Build iOS IPA
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --provisioning-profile="no.nestwork.vaktapp"
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
