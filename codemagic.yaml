@@ -51,11 +51,13 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
-      node: 20
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: no.nestwork.vaktapp
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
-        BUNDLE_ID: "no.nestwork.vaktapp"
+      node: 20
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -72,23 +74,11 @@ workflows:
         script: |
           cd ios/App
           pod install
-      - name: Keychain initialize
-        script: keychain initialize
-      - name: Force Create Certificates and Profiles
-        script: |
-          # 1. Vi lager et helt nytt sertifikat og tvinger frem en ny privat nøkkel lokalt
-          app-store-connect certificates create --type IOS_DISTRIBUTION --save
-          
-          # 2. Vi lager profilen på nytt fra bunnen av så den SKAL matche det nye sertifikatet
-          app-store-connect profiles create --bundle-id "$BUNDLE_ID" --type IOS_APP_STORE --name "Codemagic Direct Profile" --save
-      - name: Set up code signing
-        script: xcode-project use-profiles
       - name: Build iOS IPA
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME" \
-            --ad-hoc # Vi bruker ad-hoc eller app-store her for å tvinge frem signering
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
