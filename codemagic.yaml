@@ -74,16 +74,14 @@ workflows:
           pod install
       - name: Keychain initialize
         script: keychain initialize
-      - name: Signing Setup
+      - name: Fetch and Setup Signing
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
-          xcode-project use-profiles
+          keychain add-certificates
       - name: Build iOS IPA
         script: |
-          xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME" \
-            --app-store-connect-integration Codemagic
+          xcodebuild build -workspace "$XCODE_WORKSPACE" -scheme "$XCODE_SCHEME" -configuration Release -sdk iphoneos
+          xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
