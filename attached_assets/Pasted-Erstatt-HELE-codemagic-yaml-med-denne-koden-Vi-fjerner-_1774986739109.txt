@@ -1,0 +1,59 @@
+Erstatt HELE codemagic.yaml med denne koden. Vi fjerner ios_signing fra miljøet for å tvinge bygget til å starte, og vi genererer sertifikatet og profilen manuelt med vår egen nøkkel siden Apple-kontoen nå er ren:
+
+YAML
+workflows:
+  ios-release:
+    name: iOS Release Build
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      node: 20
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+        BUNDLE_ID: "no.nestwork.vaktapp"
+    scripts:
+      - name: Install npm dependencies
+        script: npm install
+      - name: Build web assets
+        script: npm run build
+      - name: Sync Capacitor
+        script: |
+          rm -rf ios
+          npx cap add ios
+          find ios -type f -name "Podfile" -exec sed -i '' "s/platform :ios, '[0-9.]*'/platform :ios, '15.0'/g" {} +
+          find ios -type f -name "*.pbxproj" -exec sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.0/g' {} +
+          npx cap sync ios
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
+      - name: Keychain initialize
+        script: keychain initialize
+      - name: Generate and Fetch Profiles
+        script: |
+          # 1. Vi lager en ekte privat nøkkel først så Codemagic CLI ikke krasjer
+          openssl genrsa -out cert_key.pem 2048
+          
+          # 2. Vi tvinger opprettelse av alt, og mater inn nøkkelen vår
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create \
+            --certificate-key cert_key.pem
+            
+          # 3. Knytt alt sammen i Xcode
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Build iOS IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+Pushet til GitHub med en gang!
