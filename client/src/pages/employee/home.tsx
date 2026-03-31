@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2, HandMetal } from "lucide-react";
 import { PushPermissionBanner } from "@/components/push-banner";
-import { InstallBanner } from "@/components/install-banner";
 import type { Vakt, Barnehage, Onboarding, VaktInteresse } from "@shared/schema";
 
 
@@ -92,7 +91,6 @@ export default function EmployeeHome() {
         </p>
       </div>
 
-      <InstallBanner />
       <PushPermissionBanner compact />
 
       {hasUnfinishedOnboarding && (
