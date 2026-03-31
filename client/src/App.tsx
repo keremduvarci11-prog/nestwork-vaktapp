@@ -144,6 +144,26 @@ function AppContent() {
 }
 
 function App() {
+  useEffect(() => {
+    const askPushPermission = async () => {
+      try {
+        const cap = (window as any).Capacitor;
+        if (cap?.isNativePlatform?.()) {
+          const { PushNotifications } = await import("@capacitor/push-notifications");
+          const result = await PushNotifications.requestPermissions();
+          console.log("[Push] Permission result:", result.receive);
+          if (result.receive === "granted") {
+            await PushNotifications.register();
+            console.log("[Push] Registered for push notifications");
+          }
+        }
+      } catch (err) {
+        console.error("[Push] Permission request error:", err);
+      }
+    };
+    askPushPermission();
+  }, []);
+
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
