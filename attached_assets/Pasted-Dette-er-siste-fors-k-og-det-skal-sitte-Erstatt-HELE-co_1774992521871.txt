@@ -1,50 +1,7 @@
-workflows:
-  android-release:
-    name: Android Release Build
-    max_build_duration: 30
-    instance_type: mac_mini_m2
-    environment:
-      java: 21
-      node: 20
-      groups:
-        - keystore_credentials
-      vars:
-        PACKAGE_NAME: "no.nestwork.vaktapp"
-    scripts:
-      - name: Set up code signing
-        script: |
-          echo $CM_KEYSTORE | base64 --decode > /tmp/nestwork.keystore
-      - name: Fix Kotlin Duplicate Classes
-        script: |
-          echo "allprojects { configurations.all { exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
-          exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8' } }" >> android/build.gradle
-      - name: Install npm dependencies
-        script: npm install
-      - name: Build web assets
-        script: npm run build
-      - name: Sync Capacitor
-        script: npx cap sync android
-      - name: Set Android SDK location
-        script: echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
-      - name: Build Android App Bundle
-        script: |
-          cd android
-          chmod +x gradlew
-          ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=/tmp/nestwork.keystore \
-            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
-    artifacts:
-      - android/app/build/outputs/**/*.aab
-    publishing:
-      email:
-        recipients:
-          - post@nestwork.no
-        notify:
-          success: true
-          failure: true
+Dette er siste forsøk og det skal sitte. Erstatt HELE codemagic.yaml med denne koden. Vi bruker nå en metode som tvinger den private nøkkelen inn i systemet manuelt før vi henter filer fra Apple:
 
+YAML
+workflows:
   ios-release:
     name: iOS Release Build
     instance_type: mac_mini_m2
@@ -76,9 +33,16 @@ workflows:
         script: keychain initialize
       - name: Force Signing Setup (Manual Key Injection)
         script: |
+          # 1. Generer privat nøkkel
           openssl genrsa -out ios_dist.key 2048
+          
+          # 2. Importer nøkkelen manuelt i nøkkelringen (Dette er det manglende leddet!)
           keychain add-certificates --key ios_dist.key
+          
+          # 3. Lag sertifikat og profil hos Apple (Nå vil den finne nøkkelen i nøkkelringen)
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --delete-stale-profiles
+          
+          # 4. Bekreft for Xcode
           keychain add-certificates
           xcode-project use-profiles
       - name: Build iOS IPA
@@ -92,3 +56,4 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+Pushet til GitHub med en gang!
