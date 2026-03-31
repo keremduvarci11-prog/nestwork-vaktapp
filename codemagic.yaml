@@ -76,7 +76,8 @@ workflows:
         script: keychain initialize
       - name: Signing Setup
         script: |
-          app-store-connect certificates create --type IOS_DISTRIBUTION --save
+          openssl genrsa -out /tmp/ios_dist.key 2048
+          keychain add-certificates --key /tmp/ios_dist.key
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
       - name: Inject Signing into Xcode Project
