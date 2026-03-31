@@ -51,14 +51,11 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: no.nestwork.vaktapp
+      node: 20
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
         BUNDLE_ID: "no.nestwork.vaktapp"
-      node: 20
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -75,6 +72,13 @@ workflows:
         script: |
           cd ios/App
           pod install
+      - name: Keychain initialize
+        script: keychain initialize
+      - name: Fetch and Create Signing Files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --delete-stale-profiles
+      - name: Set up code signing
+        script: xcode-project use-profiles
       - name: Build iOS IPA
         script: |
           xcode-project build-ipa \
