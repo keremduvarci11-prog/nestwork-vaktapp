@@ -74,16 +74,21 @@ workflows:
           pod install
       - name: Keychain initialize
         script: keychain initialize
-      - name: Fetch and Create Signing Files
+      - name: Force Create Certificates and Profiles
         script: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --delete-stale-profiles
+          # 1. Vi lager et helt nytt sertifikat og tvinger frem en ny privat nøkkel lokalt
+          app-store-connect certificates create --type IOS_DISTRIBUTION --save
+          
+          # 2. Vi lager profilen på nytt fra bunnen av så den SKAL matche det nye sertifikatet
+          app-store-connect profiles create --bundle-id "$BUNDLE_ID" --type IOS_APP_STORE --name "Codemagic Direct Profile" --save
       - name: Set up code signing
         script: xcode-project use-profiles
       - name: Build iOS IPA
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --ad-hoc # Vi bruker ad-hoc eller app-store her for å tvinge frem signering
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
