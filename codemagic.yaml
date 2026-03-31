@@ -79,28 +79,71 @@ workflows:
           app-store-connect certificates create --type IOS_DISTRIBUTION --save
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
-          xcode-project use-profiles
-      - name: Set Team and Profile in Xcode Project
+      - name: Inject Signing into Xcode Project
         script: |
-          PROFILE_NAME=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
-          if [ -n "$PROFILE_NAME" ]; then
-            PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_NAME"))
-            TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print TeamIdentifier:0" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_NAME"))
-            PROFILE_SPECIFIER=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_NAME"))
-            echo "Found profile: $PROFILE_SPECIFIER (UUID: $PROFILE_UUID, Team: $TEAM_ID)"
-            sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" ios/App/App.xcodeproj/project.pbxproj
-            sed -i '' "s/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" ios/App/App.xcodeproj/project.pbxproj
-            sed -i '' "s/CODE_SIGN_STYLE = .*;/CODE_SIGN_STYLE = Manual;/g" ios/App/App.xcodeproj/project.pbxproj
-            sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_SPECIFIER\";/g" ios/App/App.xcodeproj/project.pbxproj
-            if ! grep -q "PROVISIONING_PROFILE_SPECIFIER" ios/App/App.xcodeproj/project.pbxproj; then
-              sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID; PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_SPECIFIER\";/g" ios/App/App.xcodeproj/project.pbxproj
-            fi
-          fi
-      - name: Build iOS IPA
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+          TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print TeamIdentifier:0" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+          SIGNING_IDENTITY=$(security find-identity -v -p codesigning | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "Profile: $PROFILE_NAME"
+          echo "UUID: $PROFILE_UUID"
+          echo "Team: $TEAM_ID"
+          echo "Identity: $SIGNING_IDENTITY"
+          PBXPROJ="ios/App/App.xcodeproj/project.pbxproj"
+          ruby -e "
+            content = File.read('$PBXPROJ')
+            content.gsub!(/DEVELOPMENT_TEAM = [^;]*;/, 'DEVELOPMENT_TEAM = $TEAM_ID;')
+            content.gsub!(/CODE_SIGN_STYLE = [^;]*;/, 'CODE_SIGN_STYLE = Manual;')
+            content.gsub!(/\"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]\" = [^;]*;/, '\"CODE_SIGN_IDENTITY[sdk=iphoneos*]\" = \"$SIGNING_IDENTITY\";')
+            content.gsub!(/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/, 'PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;')
+            content.gsub!(/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/, 'PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_NAME\";')
+            unless content.include?('PROVISIONING_PROFILE_SPECIFIER')
+              content.gsub!(/PRODUCT_BUNDLE_IDENTIFIER = #{Regexp.escape('$BUNDLE_ID')};/) do |m|
+                m + \"\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \\\"$PROFILE_NAME\\\";\"
+              end
+            end
+            File.write('$PBXPROJ', content)
+          "
+          echo "Signing injected into pbxproj"
+      - name: Archive iOS App
         script: |
-          xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+          xcodebuild \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
+            -archivePath build/ios/App.xcarchive \
+            archive \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$(PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1) && /usr/libexec/PlistBuddy -c 'Print TeamIdentifier:0' /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))"
+      - name: Export IPA
+        script: |
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
+          TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print TeamIdentifier:0" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+          cat > build/ios/ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>$TEAM_ID</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$BUNDLE_ID</key>
+              <string>$PROFILE_NAME</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath build/ios/App.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist build/ios/ExportOptions.plist
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
