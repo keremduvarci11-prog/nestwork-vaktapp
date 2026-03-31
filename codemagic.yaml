@@ -80,6 +80,22 @@ workflows:
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
           xcode-project use-profiles
+      - name: Set Team and Profile in Xcode Project
+        script: |
+          PROFILE_NAME=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          if [ -n "$PROFILE_NAME" ]; then
+            PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_NAME"))
+            TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print TeamIdentifier:0" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_NAME"))
+            PROFILE_SPECIFIER=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_NAME"))
+            echo "Found profile: $PROFILE_SPECIFIER (UUID: $PROFILE_UUID, Team: $TEAM_ID)"
+            sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" ios/App/App.xcodeproj/project.pbxproj
+            sed -i '' "s/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" ios/App/App.xcodeproj/project.pbxproj
+            sed -i '' "s/CODE_SIGN_STYLE = .*;/CODE_SIGN_STYLE = Manual;/g" ios/App/App.xcodeproj/project.pbxproj
+            sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = .*;/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_SPECIFIER\";/g" ios/App/App.xcodeproj/project.pbxproj
+            if ! grep -q "PROVISIONING_PROFILE_SPECIFIER" ios/App/App.xcodeproj/project.pbxproj; then
+              sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID; PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_SPECIFIER\";/g" ios/App/App.xcodeproj/project.pbxproj
+            fi
+          fi
       - name: Build iOS IPA
         script: |
           xcode-project build-ipa \
