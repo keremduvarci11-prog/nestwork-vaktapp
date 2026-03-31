@@ -1,50 +1,7 @@
-workflows:
-  android-release:
-    name: Android Release Build
-    max_build_duration: 30
-    instance_type: mac_mini_m2
-    environment:
-      java: 21
-      node: 20
-      groups:
-        - keystore_credentials
-      vars:
-        PACKAGE_NAME: "no.nestwork.vaktapp"
-    scripts:
-      - name: Set up code signing
-        script: |
-          echo $CM_KEYSTORE | base64 --decode > /tmp/nestwork.keystore
-      - name: Fix Kotlin Duplicate Classes
-        script: |
-          echo "allprojects { configurations.all { exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
-          exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8' } }" >> android/build.gradle
-      - name: Install npm dependencies
-        script: npm install
-      - name: Build web assets
-        script: npm run build
-      - name: Sync Capacitor
-        script: npx cap sync android
-      - name: Set Android SDK location
-        script: echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
-      - name: Build Android App Bundle
-        script: |
-          cd android
-          chmod +x gradlew
-          ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=/tmp/nestwork.keystore \
-            -Pandroid.injected.signing.store.password=$CM_KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$CM_KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$CM_KEY_PASSWORD
-    artifacts:
-      - android/app/build/outputs/**/*.aab
-    publishing:
-      email:
-        recipients:
-          - post@nestwork.no
-        notify:
-          success: true
-          failure: true
+Erstatt HELE codemagic.yaml med denne koden. Vi driter i de automatiske verktøyene og lager CSR-en manuelt med OpenSSL for å tvinge Apple til å koble sertifikatet til vår lokale nøkkel:
 
+YAML
+workflows:
   ios-release:
     name: iOS Release Build
     instance_type: mac_mini_m2
@@ -76,9 +33,14 @@ workflows:
         script: keychain initialize
       - name: Force Signing (CSR Method)
         script: |
+          # 1. Lag privat nøkkel og CSR manuelt
           openssl genrsa -out ios.key 2048
           openssl req -new -key ios.key -out request.csr -subj "/CN=Nestwork/O=Nestwork Group AS/C=NO"
+          
+          # 2. Send CSR til Apple for å få et sertifikat (dette SKAL fungere når vi sender CSR)
           app-store-connect certificates create --type IOS_DISTRIBUTION --csr @request.csr --save
+          
+          # 3. Hent/oppdater profil
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create --delete-stale-profiles
       - name: Set up code signing
         script: xcode-project use-profiles
@@ -93,3 +55,4 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+Pushet til GitHub med en gang
