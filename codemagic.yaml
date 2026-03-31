@@ -74,15 +74,14 @@ workflows:
           pod install
       - name: Keychain initialize
         script: keychain initialize
-      - name: Full Signing and Project Setup
+      - name: Force Signing Setup
         script: |
           app-store-connect certificates create --type IOS_DISTRIBUTION --save
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain add-certificates
-          xcode-project use-profiles
-      - name: Build iOS IPA
+      - name: Link Profiles and Build
         script: |
-          sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' ios/App/App.xcodeproj/project.pbxproj
+          xcode-project use-profiles --warn-only
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
