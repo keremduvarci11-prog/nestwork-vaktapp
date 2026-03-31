@@ -65,8 +65,8 @@ workflows:
         script: |
           rm -rf ios
           npx cap add ios
-          sed -i '' "s/platform :ios, '[0-9.]*'/platform :ios, '14.0'/g" ios/App/Podfile
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 14.0/g' ios/App/App.xcodeproj/project.pbxproj
+          find ios -type f -name "Podfile" -exec sed -i '' "s/platform :ios, '[0-9.]*'/platform :ios, '15.0'/g" {} +
+          find ios -type f -name "*.pbxproj" -exec sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.0/g' {} +
           npx cap sync ios
       - name: Install CocoaPods
         script: |
