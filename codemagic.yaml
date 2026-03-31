@@ -51,9 +51,6 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: no.nestwork.vaktapp
       node: 20
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
