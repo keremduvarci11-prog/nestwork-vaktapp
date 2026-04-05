@@ -45,6 +45,12 @@
         </array>
         <key>UIViewControllerBasedStatusBarAppearance</key>
         <true/>
+        <key>NSCameraUsageDescription</key>
+        <string>Vi trenger tilgang til kameraet ditt slik at du kan ta og laste opp et profilbilde.</string>
+        <key>NSPhotoLibraryUsageDescription</key>
+        <string>Vi trenger tilgang til bildebiblioteket ditt slik at du kan velge et profilbilde.</string>
+        <key>NSPhotoLibraryAddUsageDescription</key>
+        <string>Vi trenger tilgang til å lagre bilder du tar i appen til bildebiblioteket ditt.</string>
         <key>NSAppTransportSecurity</key>
         <dict>
                 <key>NSAllowsArbitraryLoads</key>
