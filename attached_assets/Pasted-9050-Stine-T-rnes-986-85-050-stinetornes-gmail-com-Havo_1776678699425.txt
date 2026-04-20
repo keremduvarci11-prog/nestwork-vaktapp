@@ -1,0 +1,23 @@
+9050	Stine Tørnes	986 85 050	stinetornes@gmail.com	Havodden 2, 4823 Nedenes	Kristiansand	Barnehageassistent		09.03.2026	Aktiv	80306 95616
+9051	Alice Thorland	900 39 552	alicethorland_@live.no	Sjøbrekko 15, 5419 Fitjar	Stord	Barnehageassistent		10.03.2026	Aktiv	070695 36810
+9052	Nora Aicha Hagen	406 13 902	nora.hagen2@icloud.com	Heptekjerrvegen 73, 4707 Vannesla	Kristiansand	Barnehageassistent		11.03.2026	Aktiv	140404 85474
+9053	Zainab Alhasan	455 05 193	zeinabalhasan9@gmail.com	Håmoen 3, 4619 Mosby	Kristiansand	Barnehageassistent		12.03.2026	Aktiv	050193 15608
+9054	Elisa Davidsen Tingvatn	418 43 819	elisadavidsen@icloud.com	Banktjørnhaugen 15, 5210 Os	Os	Barnehageassistent		13.03.2026	Aktiv	300604 93401
+9055	Adelen Eira Mikkelsen	917 78 758	adeleneiraa@gmail.com	Eikhovda 20, 5641 Fusa	Fusa/Os	Barnehageassistent		13.03.2026	Aktiv	031207 97297
+9056	Fredrik Lindseth	910 07 472	fredriklindseth9@gmail.com	Lund torv 6, 4631 Kristiansand	Kristiansand	Barnehageassistent		13.03.2026	Aktiv	090504 84170
+9057	Gina Indiana Bendiksen	477 11 672	ginagjer@gmail.com	Søre Stølen 64, 5419 Fitjar	Stord	Barnehageassistent		14.03.2026	Aktiv	280205 94278
+9058	Oksana Kizim	925 18 819	alloi5040807@gmail.com	Moldefaret 19j, 4848 Arendal	Arendal	Barnehageassistent		15.03.2026	Aktiv	120584 20296
+9059	Gavin Mitchell	975 95 322	mrgavin.mitchell@gmail.com	Lyngveien 57, 5101 Eidsvågneset	Bergen	Barnehageassistent		17.03.2026	Aktiv	200205 91995
+9060	Amalie Klevedal Træet	909 91 833	ama.treet@hotmail.com	Venjanesvegen 240, 5641 Fusa	Fusa / Os	Barnehageassistent		17.03.2026	Aktiv	170799 49612
+9061	Thea Vågen Edvardsen	466 42 221	thea.edvardsen@icloud.com	Gullveien 27, 4629 Kristiansand	Kristiansand	Barnehageassistent		18.03.2026	Aktiv	021006 82640
+9062	Josephine Jennifer Taylor	921 70 984	josie.taylo@googlemail.com	Rugdeveien 8, Konnerud, Drammen, 3030	Drammen/Asker	Barnehageassistent		15.04.2026	Aktiv	220798 21466
+9063	Eline Melaas	467 75 313	eline.melaas@gmail.com	Asdal 38, 4824 Bjorbekk	Arendal	Barnehageassistent		25.03.2026	Aktiv	191106 98812
+9064	Hilary Sein	925 26 153	hillarys0505@icloud.com	Sætre Terrasse 73 B, Heggedal 1389	Drammen/Asker	Barnehageassistent		25.03.2026	Aktiv	020905 77878
+9065	Ava Wighus	413 47 160	avawig49@gmail.com	Hyllebakken 49, 4622 Kristiansand 	Kristiansand	Barnehageassistent		25.03.2026	Aktiv	291103 93006
+9066	Valza Malici	991 97 377	 valzamalici@gmail.com	Grågåsveien 47 A	Kristiandsand	Barnehageassistent		15.04.2026	Aktiv	120807 93047
+9067	Weldab Elos	409 68 265	weldab.elos@outlook.com	Rabbenveien 5B, 3039 Drammen	Drammen/Asker/Bærum	Barnehageassistent			Aktiv	
+9068	Yaeli Linda Massawe	485 03 072	yaelimassawe@gmail.com	Moldegata 27, 0445 Oslo, Norway	Oslo/Bærum/Lørenskog	Barnehageassistent		15.04.2026	Aktiv	011095 26408
+9069	Yasmin Dawood	929 21 667	yasmindawo@gmail.com	Fjelleveien 11, 3086 Holmestrand	Drammen, Holmestrand, Høvik, Asker	Barnehageassistent		08.04.2026	Aktiv	011006 80005
+9070	Hanna Hrytsenko	925 10 684	nannajanis344@gmail.com	Jessadalen 2, 25212 Syfteland	Os/Bergen	Barnehageassistent		08.04.2026	Aktiv	091100 78487
+9071	Thomas Sandven	921 62 715	thomas.sandven2006@gmail.com	Huoddveien 35, 4821 Rykene	Arendal/Grimstad	Barnehageassistent		08.04.2026	Aktiv	230306 78370
+9072	Dorthe Øygard Eide	484 47 373	dortheeide14@gmail.com	Hovden 17, 5640 Eikelandsosen	Bergen	Barnehageassistent		15.04.2026	Aktiv	140803 88056

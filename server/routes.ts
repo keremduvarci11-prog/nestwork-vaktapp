@@ -251,6 +251,49 @@ export async function registerRoutes(
     res.json(safeUser);
   });
 
+  app.post("/api/users", requireAdmin, async (req, res) => {
+    try {
+      const { name, email, phone, address, region, stilling, externalId, role, username: providedUsername, password: providedPassword } = req.body;
+      if (!name || !email) {
+        return res.status(400).json({ message: "Navn og e-post må fylles ut" });
+      }
+      const makeUsername = (n: string) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "").slice(0, 20);
+      let uname = providedUsername || makeUsername(name);
+      const existing = await storage.getUserByUsername(uname);
+      if (existing) {
+        uname = uname + (externalId || Date.now().toString().slice(-4));
+      }
+      const plainPassword = providedPassword || "nestwork2026";
+      const hashed = await hashPassword(plainPassword);
+      const created = await storage.createUser({
+        username: uname,
+        password: hashed,
+        name,
+        email,
+        phone: phone || "",
+        address: address || "",
+        kontonummer: "",
+        role: role || "ansatt",
+        region: region || "Alle",
+        stilling: stilling || "Barnehageassistent",
+        timelonn: "0",
+        available: true,
+        availableWeekend: false,
+        status: "Aktiv",
+        externalId: externalId ?? null,
+      });
+      const onboardingItems = ["Bytt passord", "Last opp profilbilde", "Last opp CV", "Last opp politiattest", "Signert kontrakt"];
+      for (const item of onboardingItems) {
+        await storage.createOnboarding({ userId: created.id, item, completed: false });
+      }
+      const { password: _, ...safe } = created;
+      res.json(safe);
+    } catch (err: any) {
+      console.error("Create user error:", err);
+      res.status(500).json({ message: err.message || "Kunne ikke opprette bruker" });
+    }
+  });
+
   app.post("/api/users/:id/change-password", requireAuth, async (req, res) => {
     if (getUserIdFromRequest(req) !== req.params.id) {
       return res.status(403).json({ message: "Ingen tilgang" });
