@@ -68,6 +68,33 @@ workflows:
           find ios -type f -name "Podfile" -exec sed -i '' "s/platform :ios, '[0-9.]*'/platform :ios, '15.0'/g" {} +
           find ios -type f -name "*.pbxproj" -exec sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 15.0/g' {} +
           npx cap sync ios
+      - name: Set Version and Build Number
+        script: |
+          PBXPROJ="ios/App/App.xcodeproj/project.pbxproj"
+          sed -i '' 's/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = 1.5;/g' "$PBXPROJ"
+          sed -i '' 's/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = 6;/g' "$PBXPROJ"
+          echo "Version set to 1.5, build 6"
+      - name: Add Push Notifications Capability
+        script: |
+          ENTITLEMENTS="ios/App/App/App.entitlements"
+          cat > "$ENTITLEMENTS" << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>aps-environment</key>
+            <string>production</string>
+          </dict>
+          </plist>
+          EOF
+          PBXPROJ="ios/App/App.xcodeproj/project.pbxproj"
+          if ! grep -q "CODE_SIGN_ENTITLEMENTS" "$PBXPROJ"; then
+            sed -i '' 's|PRODUCT_BUNDLE_IDENTIFIER = no.nestwork.vaktapp;|PRODUCT_BUNDLE_IDENTIFIER = no.nestwork.vaktapp;\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;|g' "$PBXPROJ"
+          fi
+          INFO_PLIST="ios/App/App/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$INFO_PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string remote-notification" "$INFO_PLIST" 2>/dev/null || true
+          echo "Push Notifications capability added"
       - name: Install CocoaPods
         script: |
           cd ios/App
