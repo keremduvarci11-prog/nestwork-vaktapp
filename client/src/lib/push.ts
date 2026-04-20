@@ -21,74 +21,76 @@ export async function subscribeToPush() {
   }
 }
 
+function debugAlert(msg: string) {
+  console.log("[Push]", msg);
+  try {
+    (window as any).__pushDebug = ((window as any).__pushDebug || []).concat([new Date().toISOString() + " " + msg]);
+  } catch {}
+}
+
 async function initCapacitorPush() {
   try {
     const { PushNotifications } = await import("@capacitor/push-notifications");
-
     const permStatus = await PushNotifications.checkPermissions();
-    console.log("[Push] Capacitor permission status:", permStatus.receive);
-
+    debugAlert("perm status: " + permStatus.receive);
     if (permStatus.receive === "granted") {
       await registerCapacitorPush();
-    } else if (permStatus.receive !== "denied") {
+    } else {
       await requestCapacitorPermission();
     }
-  } catch (err) {
-    console.error("[Push] Capacitor init error:", err);
+  } catch (err: any) {
+    debugAlert("init error: " + (err?.message || err));
   }
 }
 
 async function requestCapacitorPermission() {
   try {
     const { PushNotifications } = await import("@capacitor/push-notifications");
-
     const result = await PushNotifications.requestPermissions();
-    console.log("[Push] Capacitor permission result:", result.receive);
-
+    debugAlert("perm result: " + result.receive);
     if (result.receive === "granted") {
       await registerCapacitorPush();
+    } else {
+      debugAlert("PERMISSION DENIED - cannot register push");
     }
-  } catch (err) {
-    console.error("[Push] Capacitor permission error:", err);
+  } catch (err: any) {
+    debugAlert("perm request error: " + (err?.message || err));
   }
 }
 
 async function registerCapacitorPush() {
   try {
     const { PushNotifications } = await import("@capacitor/push-notifications");
-
     const platform = (window as any).Capacitor?.getPlatform?.() || "unknown";
     const scheme = platform === "ios" ? "apns" : "fcm";
 
-    PushNotifications.addListener("registration", async (token) => {
-      console.log(`[Push] Capacitor ${platform} token:`, token.value.substring(0, 20) + "...");
+    PushNotifications.removeAllListeners?.();
+
+    await PushNotifications.addListener("registration", async (token) => {
+      debugAlert(`got ${platform} token (${token.value.length} chars): ${token.value.substring(0, 16)}...`);
       try {
         await apiRequest("POST", "/api/push/subscribe", {
           endpoint: `${scheme}://${token.value}`,
           keys: { deviceToken: token.value },
         });
-        console.log(`[Push] Capacitor ${scheme} token sent to server`);
-      } catch (err) {
-        console.error("[Push] Failed to send Capacitor token:", err);
+        debugAlert(`token sent to server (${scheme}://) OK`);
+      } catch (err: any) {
+        debugAlert("send token FAILED: " + (err?.message || err));
       }
     });
 
-    PushNotifications.addListener("registrationError", (err) => {
-      console.error("[Push] Capacitor registration error:", err);
+    await PushNotifications.addListener("registrationError", (err: any) => {
+      debugAlert("REGISTRATION ERROR: " + JSON.stringify(err));
     });
 
-    PushNotifications.addListener("pushNotificationReceived", (notification) => {
-      console.log("[Push] Notification received:", notification.title);
-    });
-
-    PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-      console.log("[Push] Notification action:", action.notification.title);
+    await PushNotifications.addListener("pushNotificationReceived", (notification) => {
+      debugAlert("notification received: " + notification.title);
     });
 
     await PushNotifications.register();
-    console.log("[Push] Capacitor push registered");
-  } catch (err) {
-    console.error("[Push] Capacitor register error:", err);
+    debugAlert("register() called");
+  } catch (err: any) {
+    debugAlert("register error: " + (err?.message || err));
   }
 }
 
