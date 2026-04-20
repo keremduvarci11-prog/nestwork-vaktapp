@@ -1,0 +1,22 @@
+A001✅	Skorvane Fus Barnehage (Os)	Kristin Tellefsen	902 19 798	28.01.2026	927 311 097	Skeismyra 14, 5217 Hagavik
+A002✅	Hjellemarka Fus Barnehage (Os)	Birte Strømsø	954 24 405	04.02.2026	927 308 754	Storestraumen 275, 5212 Søfteland
+A003✅	Rakkungan Barnehagedrift AS (Kristiansand)	Monica Tanche Bergh Ahlstrøm	971 31 108	20.02.2026	996 501 884	Kirsebærveien 10A, 4635 Kristiansand
+A004 ✅	Rakkerungan Gårdbarnehage AS (Kristiansand)	Monica Tanche Bergh Ahlstrøm	971 31 108	23.02.2026	930 696 552	Støleveien 21, 4639 Kristiansand
+A005 ✅	Jegersberg Barnehage (Kristiansand)	Monica Tanche Bergh Ahlstrøm	971 31 108	24.02.2026	998 282 225	Gillsveien 45, 4633 Kristiansand
+A006 ✅	Søre Neset Fus Barnehag (Os)	Edle Nøkleby	415 88 670	25.02.2026	922 043 639	Reset 32, 5200 Os
+A007✅	Håkonshella Fus Barnehage (Bergen)	Gro Seberg	483 99 222	26.02.2026	922 042 993	Håkonshellaveien 125, 5174
+A008✅	Prestagardskogen Fus Barnehage (Stord)	Anne Kristin Aaseth	416 81 108 (Anne) - 486 08 162 (Lillian	26.02.2026	916 072 848	Vestlivegen 40, 5414 Stord
+A009✅	Tyse Fus Barnehage (Stord)	Anne Kristin Aaseth	417 81 108 (Anne) - 486 08 162 (Lillian	26.02.2026	927 311 232	Tysemarkjo 47, 5414 Stord
+A010✅	Jettegryto Barnehage (Fusa)	Line Ragnhildstveit	482 65 55	06.03.2026	994 735 284	Brakabygda 49, 5640 Eikelandsosen
+A011✅	Valvatna Fus Barnehage (Stord)	Hildegunn Grundvold	941 47 098	12.03.2026	822 043 712	Åsaheio 1, 5412 Stord
+A012✅	Buggeland Barnehage (Sandnes)	Kjersti Fiskå	476 45 717	13.03.2026	887 493 812	Buggelandbakken 145, 4324 Sandnes
+A013✅	Espira Kuventræ Barnehage (Os)	Ine-Henriette Lynum 	932 58 658	16.03.2026	989 838 563 	Industrivegen 99, 5210 Osøyro
+A014✅	Læringsverkstedet Tyholmen (Arendal)	Hanne Randby 	452 88 382	16.03.2026	930 870 765	Rådhusgaten 6, 4836 Arendal
+A015	Læringsverkstedet Gimlekollen (Kristiansand)	Gyro	415 38 017	18.03.2026	930 869 090	Bergtoras vei 8, 4633 Kristiansand S
+A016✅	Nedre Høvik Fus Barnehage (Drammen)	Hanne Kviserud 	404 85 725	19.03.2026	922 043 434	Høvikskogen 2, 3477 Båtstø
+A017✅	Skeisbotnen Barnehage (Os)	Ruth Therese Lundekvam Nyheim	938 61 541 	08.04.2026	895 637 912	Skeisbotnen 58, 5217 Hagavik
+A018	Havhesten Fus Barnehage (Bergen)	Line Karlsen	402 88 899	10.04.2026	927 308 606	Kolltveitvegen 140, 5360 Kolltveit
+A019 	Skårungen Barnehave (Lørenskog)	Sahar Sabouri	928 82 536	10.04.2026	971 449 780	Løkenåsveien 41, 1473 Lørenskog
+A020✅	Sæverhagen Fus (Stord)	Kari Vraspalli	908 70 663	13.04.2026	922 043 590	Sævarhagen 47, 5416 Stord
+A021✅	Hegglandsdalen Barnehage (Os)	Grethe 	918 69 063	14.04.2026	971 486 929	Hegglandsdalsvegen 539, 5211 Os
+A022✅	Olderdalen Fus Barnehage (Stord)	Anne Marit	415 32 347	15.04.2026	922 043 329	Myrateigen 2, 5412 Stord

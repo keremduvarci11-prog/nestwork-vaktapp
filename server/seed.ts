@@ -137,7 +137,8 @@ export async function seedDatabase() {
     { externalId: "A007", name: "Håkonshella Fus Barnehage", address: "Håkonshellaveien 125, 5174 Bergen", region: "Bergen", contactPerson: "Gro Seberg", contactPhone: "483 99 222", tariffAssistent: "207", tariffLaerer: "250", orgnr: "922 042 993", aktiv: true },
     { externalId: "A008", name: "Prestagardskogen Fus Barnehage", address: "Vestlivegen 40, 5414 Stord", region: "Stord", contactPerson: "Anne Kristin Aaseth / Lillian", contactPhone: "416 81 108 / 486 08 162", tariffAssistent: "207", tariffLaerer: "250", orgnr: "916 072 848", aktiv: true },
     { externalId: "A009", name: "Tyse Fus Barnehage", address: "Tysemarkjo 47, 5414 Stord", region: "Stord", contactPerson: "Anne Kristin Aaseth / Lillian", contactPhone: "417 81 108 / 486 08 162", tariffAssistent: "207", tariffLaerer: "250", orgnr: "927 311 232", aktiv: true },
-    { externalId: "A010", name: "Jettegryto Barnehage", address: "Brakabygda 49, 5640 Eikelandsosen", region: "Stord", contactPerson: "Line Ragnhildstveit", contactPhone: "482 65 55", orgnr: "994 735 284", aktiv: true },
+    { externalId: "A010", name: "Jettegryto Barnehage", address: "Brakabygda 49, 5640 Eikelandsosen", region: "Fusa", contactPerson: "Line Ragnhildstveit", contactPhone: "482 65 55", orgnr: "994 735 284", aktiv: true },
+    { externalId: "A011", name: "Valvatna Fus Barnehage", address: "Åsaheio 1, 5412 Stord", region: "Stord", contactPerson: "Hildegunn Grundvold", contactPhone: "941 47 098", orgnr: "822 043 712", tariffAssistent: "207", tariffLaerer: "250", aktiv: true },
   ]);
 
   const allUsers = await db.select().from(users);
