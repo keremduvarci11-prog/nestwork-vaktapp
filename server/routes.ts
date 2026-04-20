@@ -857,8 +857,7 @@ export async function registerRoutes(
       }
     } else if (currentUser?.role !== "admin" && data.toUserId) {
       try {
-        await notifyUser(
-          data.toUserId,
+        await notifyAdmins(
           "Ny melding fra ansatt",
           `${currentUser?.name || "En ansatt"}: ${data.subject}`,
           "melding",
