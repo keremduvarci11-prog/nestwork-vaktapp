@@ -237,9 +237,16 @@ export async function registerRoutes(
 
   app.get("/api/admins/meldinger-mottakere", requireAuth, async (_req, res) => {
     const all = await storage.getAllUsers();
+    const displayOverrides: Record<string, string> = {
+      admin: "Kerem (Daglig Leder)",
+      shakarmahmod: "Nestwork Admin",
+      simenandreasson: "Simen (HR Ansvarlig)",
+    };
+    const order = ["admin", "shakarmahmod", "simenandreasson"];
     const mottakere = all
-      .filter((u) => u.role === "admin" && u.username !== "shakarmahmod")
-      .map(({ password: _, ...u }) => u);
+      .filter((u) => u.role === "admin" && order.includes(u.username))
+      .map(({ password: _, ...u }) => ({ ...u, name: displayOverrides[u.username] || u.name }))
+      .sort((a, b) => order.indexOf(a.username) - order.indexOf(b.username));
     res.json(mottakere);
   });
 
