@@ -41,6 +41,30 @@ interface EmployeeOnboarding {
   items: OnboardingItem[];
 }
 
+async function downloadAuthed(url: string, suggestedName: string) {
+  try {
+    const token = localStorage.getItem("token");
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(url, { credentials: "include", headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const ext = url.split(".").pop()?.split("?")[0] || "";
+    const filename = ext ? `${suggestedName}.${ext}` : suggestedName;
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  } catch (e) {
+    console.error("Download failed:", e);
+    alert("Kunne ikke laste ned filen. Prøv igjen.");
+  }
+}
+
 export default function AnsattesOnboarding() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -194,9 +218,8 @@ export default function AnsattesOnboarding() {
                             <FileText className="w-4 h-4 flex-shrink-0" />
                             {emp.cvFile ? (
                               <a
-                                href={emp.cvFile}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); downloadAuthed(emp.cvFile!, `CV-${emp.name}`); }}
                                 className="flex items-center gap-1.5 text-primary hover:underline"
                                 data-testid={`link-cv-${emp.userId}`}
                               >
@@ -211,9 +234,8 @@ export default function AnsattesOnboarding() {
                             <ShieldCheck className="w-4 h-4 flex-shrink-0" />
                             {emp.politiattestFile ? (
                               <a
-                                href={emp.politiattestFile}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); downloadAuthed(emp.politiattestFile!, `Politiattest-${emp.name}`); }}
                                 className="flex items-center gap-1.5 text-primary hover:underline"
                                 data-testid={`link-politiattest-${emp.userId}`}
                               >
