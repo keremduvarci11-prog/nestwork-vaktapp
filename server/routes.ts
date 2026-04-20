@@ -258,6 +258,17 @@ export async function registerRoutes(
     res.json(safeUser);
   });
 
+  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
+    try {
+      const ok = await storage.deleteUser(req.params.id);
+      if (!ok) return res.status(404).json({ message: "Bruker ikke funnet" });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("Delete user error:", err);
+      res.status(500).json({ message: err.message || "Kunne ikke slette bruker" });
+    }
+  });
+
   app.post("/api/users", requireAdmin, async (req, res) => {
     try {
       const { name, email, phone, address, region, stilling, externalId, role, username: providedUsername, password: providedPassword } = req.body;

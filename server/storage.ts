@@ -21,6 +21,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
 
   getAllBarnehager(): Promise<Barnehage[]>;
   getBarnehage(id: string): Promise<Barnehage | undefined>;
@@ -106,6 +107,16 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
     const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
     return updated;
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    await db.delete(onboarding).where(eq(onboarding.userId, id));
+    await db.delete(varsler).where(eq(varsler.userId, id));
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, id));
+    await db.delete(favoritter).where(eq(favoritter.userId, id));
+    await db.delete(vaktInteresser).where(eq(vaktInteresser.ansattId, id));
+    const result = await db.delete(users).where(eq(users.id, id)).returning();
+    return result.length > 0;
   }
 
   async getAllBarnehager(): Promise<Barnehage[]> {
