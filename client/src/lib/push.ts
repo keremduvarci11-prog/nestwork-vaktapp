@@ -57,14 +57,17 @@ async function registerCapacitorPush() {
   try {
     const { PushNotifications } = await import("@capacitor/push-notifications");
 
+    const platform = (window as any).Capacitor?.getPlatform?.() || "unknown";
+    const scheme = platform === "ios" ? "apns" : "fcm";
+
     PushNotifications.addListener("registration", async (token) => {
-      console.log("[Push] Capacitor FCM token:", token.value.substring(0, 20) + "...");
+      console.log(`[Push] Capacitor ${platform} token:`, token.value.substring(0, 20) + "...");
       try {
         await apiRequest("POST", "/api/push/subscribe", {
-          endpoint: `fcm://${token.value}`,
-          keys: { fcmToken: token.value },
+          endpoint: `${scheme}://${token.value}`,
+          keys: { deviceToken: token.value },
         });
-        console.log("[Push] Capacitor token sent to server");
+        console.log(`[Push] Capacitor ${scheme} token sent to server`);
       } catch (err) {
         console.error("[Push] Failed to send Capacitor token:", err);
       }
