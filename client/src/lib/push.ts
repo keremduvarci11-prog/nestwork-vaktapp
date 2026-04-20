@@ -25,6 +25,16 @@ function debugAlert(msg: string) {
   console.log("[Push]", msg);
   try {
     (window as any).__pushDebug = ((window as any).__pushDebug || []).concat([new Date().toISOString() + " " + msg]);
+    if (typeof document === "undefined") return;
+    let box = document.getElementById("__push_debug_box");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "__push_debug_box";
+      box.style.cssText = "position:fixed;bottom:8px;left:8px;right:8px;max-height:40vh;overflow:auto;background:rgba(0,0,0,0.85);color:#0f0;font:11px/1.3 monospace;padding:8px;border-radius:8px;z-index:99999;white-space:pre-wrap;word-break:break-all;";
+      box.onclick = () => box && box.remove();
+      document.body.appendChild(box);
+    }
+    box.textContent = ((window as any).__pushDebug as string[]).slice(-20).join("\n") + "\n\n(tap to close)";
   } catch {}
 }
 
