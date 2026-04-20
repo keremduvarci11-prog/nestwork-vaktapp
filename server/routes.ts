@@ -372,7 +372,17 @@ export async function registerRoutes(
 
   app.get("/api/barnehager", requireAuth, async (_req, res) => {
     const all = await storage.getAllBarnehager();
-    res.json(all);
+    const regionOrder = ["Bergen", "Os", "Fusa", "Stord", "Haugesund", "Stavanger", "Bryne", "Kristiansand", "Arendal", "Drammen", "Oslo", "Lørenskog", "Fredrikstad", "Trondheim"];
+    const sorted = [...all].sort((a, b) => {
+      const ai = regionOrder.indexOf(a.region);
+      const bi = regionOrder.indexOf(b.region);
+      const ax = ai === -1 ? 999 : ai;
+      const bx = bi === -1 ? 999 : bi;
+      if (ax !== bx) return ax - bx;
+      if (ai === -1 && bi === -1 && a.region !== b.region) return a.region.localeCompare(b.region, "no");
+      return a.name.localeCompare(b.name, "no");
+    });
+    res.json(sorted);
   });
 
   app.get("/api/barnehager/:id", requireAuth, async (req, res) => {
