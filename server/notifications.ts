@@ -17,18 +17,32 @@ const APNS_KEY_ID = process.env.APNS_KEY_ID || "";
 const APNS_TEAM_ID = process.env.APNS_TEAM_ID || "";
 const APNS_BUNDLE_ID = process.env.APNS_BUNDLE_ID || "";
 
+function normalizeP8Key(raw: string): string {
+  let key = raw.trim();
+  if (key.includes("\\n")) key = key.replace(/\\n/g, "\n");
+  if (!key.includes("-----BEGIN")) {
+    const body = key.replace(/\s+/g, "");
+    key =
+      "-----BEGIN PRIVATE KEY-----\n" +
+      (body.match(/.{1,64}/g) || []).join("\n") +
+      "\n-----END PRIVATE KEY-----\n";
+  }
+  return key;
+}
+
 let apnProvider: apn.Provider | null = null;
 if (APNS_AUTH_KEY && APNS_KEY_ID && APNS_TEAM_ID && APNS_BUNDLE_ID) {
   try {
+    const normalizedKey = normalizeP8Key(APNS_AUTH_KEY);
     apnProvider = new apn.Provider({
       token: {
-        key: Buffer.from(APNS_AUTH_KEY),
+        key: normalizedKey,
         keyId: APNS_KEY_ID,
         teamId: APNS_TEAM_ID,
       },
       production: true,
     });
-    console.log("[Push] APNS provider configured successfully (bundle:", APNS_BUNDLE_ID + ")");
+    console.log("[Push] APNS provider configured successfully (bundle:", APNS_BUNDLE_ID + ", keyId:", APNS_KEY_ID + ", teamId:", APNS_TEAM_ID + ")");
   } catch (err) {
     console.error("[Push] APNS provider failed to initialize:", err);
   }
