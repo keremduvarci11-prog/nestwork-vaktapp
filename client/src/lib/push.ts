@@ -5,17 +5,27 @@ function isCapacitorNative(): boolean {
   return !!(window as any).Capacitor?.isNativePlatform?.();
 }
 
+function getPlatform(): string {
+  return (window as any).Capacitor?.getPlatform?.() || "web";
+}
+
 export async function initPush() {
-  if (isCapacitorNative()) {
+  const platform = getPlatform();
+  if (platform === "ios") {
     await initCapacitorPush();
+  } else if (platform === "android") {
+    console.log("[Push] Android native push disabled (FCM not configured)");
   } else {
     await initWebPush();
   }
 }
 
 export async function subscribeToPush() {
-  if (isCapacitorNative()) {
+  const platform = getPlatform();
+  if (platform === "ios") {
     await requestCapacitorPermission();
+  } else if (platform === "android") {
+    console.log("[Push] Android native push disabled (FCM not configured)");
   } else {
     await subscribeWebPush();
   }
