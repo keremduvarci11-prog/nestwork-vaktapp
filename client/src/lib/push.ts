@@ -33,6 +33,19 @@ export async function subscribeToPush() {
 
 function debugAlert(msg: string) {
   console.log("[Push]", msg);
+  try {
+    (window as any).__pushDebug = ((window as any).__pushDebug || []).concat([new Date().toISOString().substring(11, 19) + " " + msg]);
+    if (typeof document === "undefined") return;
+    let box = document.getElementById("__push_debug_box");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "__push_debug_box";
+      box.style.cssText = "position:fixed;bottom:8px;left:8px;right:8px;max-height:30vh;overflow:auto;background:rgba(0,0,0,0.85);color:#0f0;font:11px/1.3 monospace;padding:8px;border-radius:8px;z-index:99999;white-space:pre-wrap;word-break:break-all;";
+      box.onclick = () => box && box.remove();
+      document.body.appendChild(box);
+    }
+    box.textContent = ((window as any).__pushDebug as string[]).slice(-15).join("\n") + "\n\n(tap to close)";
+  } catch {}
 }
 
 async function initCapacitorPush() {
@@ -65,37 +78,47 @@ async function requestCapacitorPermission() {
   }
 }
 
+let capacitorListenersInstalled = false;
+let capacitorRegisterCalled = false;
+
 async function registerCapacitorPush() {
   try {
     const { PushNotifications } = await import("@capacitor/push-notifications");
     const platform = (window as any).Capacitor?.getPlatform?.() || "unknown";
     const scheme = platform === "ios" ? "apns" : "fcm";
 
-    PushNotifications.removeAllListeners?.();
+    if (!capacitorListenersInstalled) {
+      capacitorListenersInstalled = true;
 
-    await PushNotifications.addListener("registration", async (token) => {
-      debugAlert(`got ${platform} token (${token.value.length} chars): ${token.value.substring(0, 16)}...`);
-      try {
-        await apiRequest("POST", "/api/push/subscribe", {
-          endpoint: `${scheme}://${token.value}`,
-          keys: { deviceToken: token.value },
-        });
-        debugAlert(`token sent to server (${scheme}://) OK`);
-      } catch (err: any) {
-        debugAlert("send token FAILED: " + (err?.message || err));
-      }
-    });
+      await PushNotifications.addListener("registration", async (token) => {
+        debugAlert(`got ${platform} token (${token.value.length} chars): ${token.value.substring(0, 16)}...`);
+        try {
+          await apiRequest("POST", "/api/push/subscribe", {
+            endpoint: `${scheme}://${token.value}`,
+            keys: { deviceToken: token.value },
+          });
+          debugAlert(`token sent to server (${scheme}://) OK`);
+        } catch (err: any) {
+          debugAlert("send token FAILED: " + (err?.message || err));
+        }
+      });
 
-    await PushNotifications.addListener("registrationError", (err: any) => {
-      debugAlert("REGISTRATION ERROR: " + JSON.stringify(err));
-    });
+      await PushNotifications.addListener("registrationError", (err: any) => {
+        debugAlert("REGISTRATION ERROR: " + JSON.stringify(err));
+      });
 
-    await PushNotifications.addListener("pushNotificationReceived", (notification) => {
-      debugAlert("notification received: " + notification.title);
-    });
+      await PushNotifications.addListener("pushNotificationReceived", (notification) => {
+        debugAlert("notification received: " + notification.title);
+      });
+    }
 
-    await PushNotifications.register();
-    debugAlert("register() called");
+    if (!capacitorRegisterCalled) {
+      capacitorRegisterCalled = true;
+      await PushNotifications.register();
+      debugAlert("register() called");
+    } else {
+      debugAlert("register() already called, skipping");
+    }
   } catch (err: any) {
     debugAlert("register error: " + (err?.message || err));
   }
