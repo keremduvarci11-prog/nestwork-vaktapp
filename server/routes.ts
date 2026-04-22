@@ -1169,16 +1169,17 @@ export async function registerRoutes(
 
   app.post("/api/push/subscribe", requireAuth, async (req, res) => {
     const { endpoint, keys } = req.body;
-    if (!endpoint || !keys?.p256dh || !keys?.auth) {
-      console.log(`[Push] Subscribe rejected: missing fields for user ${getUserIdFromRequest(req)}`);
+    const isNative = typeof endpoint === "string" && (endpoint.startsWith("apns://") || endpoint.startsWith("fcm://"));
+    if (!endpoint || (!isNative && (!keys?.p256dh || !keys?.auth))) {
+      console.log(`[Push] Subscribe rejected: missing fields for user ${getUserIdFromRequest(req)} (endpoint: ${endpoint?.substring(0, 30)})`);
       return res.status(400).json({ message: "Ugyldig subscription" });
     }
     console.log(`[Push] Saving subscription for user ${getUserIdFromRequest(req)}, endpoint: ${endpoint.substring(0, 60)}...`);
     await storage.savePushSubscription({
       userId: getUserIdFromRequest(req)!,
       endpoint,
-      p256dh: keys.p256dh,
-      auth: keys.auth,
+      p256dh: keys?.p256dh ?? keys?.deviceToken ?? "",
+      auth: keys?.auth ?? keys?.deviceToken ?? "",
     });
     const allSubs = await storage.getPushSubscriptions(getUserIdFromRequest(req)!);
     console.log(`[Push] User ${getUserIdFromRequest(req)} now has ${allSubs.length} subscription(s)`);
