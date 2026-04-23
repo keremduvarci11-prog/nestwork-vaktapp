@@ -31,6 +31,7 @@ const config: CapacitorConfig = {
     scheme: "Nestwork",
     appendUserAgent: "NestworkApp",
     backgroundColor: "#ffffff",
+    scrollEnabled: false,
   },
   android: {
     allowMixedContent: true,
