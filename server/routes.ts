@@ -312,6 +312,16 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/users/:id/admin-reset-password", requireAdmin, async (req, res) => {
+    const { newPassword } = req.body;
+    const pw = newPassword || "nestwork2026";
+    if (pw.length < 6) return res.status(400).json({ message: "Passord må være minst 6 tegn" });
+    const hashed = await hashPassword(pw);
+    const updated = await storage.updateUser(req.params.id, { password: hashed });
+    if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
+    res.json({ success: true });
+  });
+
   app.post("/api/users/:id/change-password", requireAuth, async (req, res) => {
     if (getUserIdFromRequest(req) !== req.params.id) {
       return res.status(403).json({ message: "Ingen tilgang" });
