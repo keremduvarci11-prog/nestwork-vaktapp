@@ -160,8 +160,7 @@ export async function registerRoutes(
     if (!user || !(await comparePassword(password, user.password))) {
       return res.status(401).json({ message: "Feil brukernavn/e-post eller passord" });
     }
-    const blockedUserIds = ["bb5e32b9-f7d6-4e6e-934e-95937dd828df"];
-    if (user.status === "Deaktivert" || blockedUserIds.includes(user.id)) {
+    if (user.status === "Deaktivert") {
       return res.status(403).json({ message: "Du har ikke tilgang" });
     }
     req.session.userId = user.id;
