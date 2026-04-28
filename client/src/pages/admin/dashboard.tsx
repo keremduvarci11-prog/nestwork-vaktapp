@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,15 @@ export default function AdminDashboard() {
   const weekStart = thisWeekStart.toISOString().split("T")[0];
   const weekEnd = thisWeekEnd.toISOString().split("T")[0];
 
-  const activeVakter = vakter?.filter((v) => v.dato >= today && (v.status === "godkjent" || v.status === "venter" || v.status === "tildelt")) || [];
+  const activeVakter = useMemo(() => {
+    const list = vakter?.filter((v) => v.dato >= today && (v.status === "godkjent" || v.status === "venter" || v.status === "tildelt")) || [];
+    return list.slice().sort((a, b) => {
+      if (a.dato !== b.dato) return a.dato < b.dato ? -1 : 1;
+      const at = a.startTid || "00:00";
+      const bt = b.startTid || "00:00";
+      return at < bt ? -1 : at > bt ? 1 : 0;
+    });
+  }, [vakter, today]);
   const ledigeVakter = vakter?.filter((v) => v.dato >= today && v.status === "ledig") || [];
   const venterVakter = vakter?.filter((v) => v.status === "venter") || [];
   const tildelteVakter = vakter?.filter((v) => v.dato >= today && v.status === "tildelt") || [];
@@ -114,37 +123,65 @@ export default function AdminDashboard() {
 
           {activeVakter.length > 0 && (
             <div>
-              <h2 className="text-sm font-semibold mb-3">Hvem jobber hvor</h2>
-              <div className="space-y-2">
-                {activeVakter.slice(0, 8).map((v) => {
-                  const bh = bhMap.get(v.barnehageId);
-                  const emp = v.ansattId ? userMap.get(v.ansattId) : null;
-                  const date = new Date(v.dato + "T00:00:00");
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className="text-sm font-semibold">Hvem jobber hvor</h2>
+                <span className="text-xs text-muted-foreground" data-testid="text-active-count">{activeVakter.length} kommende</span>
+              </div>
+              <div className="space-y-4">
+                {Object.entries(
+                  activeVakter.reduce<Record<string, Vakt[]>>((acc, v) => {
+                    (acc[v.dato] = acc[v.dato] || []).push(v);
+                    return acc;
+                  }, {})
+                ).map(([dato, dayVakter]) => {
+                  const date = new Date(dato + "T00:00:00");
+                  const isToday = dato === today;
+                  const dateLabel = isToday
+                    ? "I dag"
+                    : date.toLocaleDateString("nb-NO", { weekday: "short", day: "numeric", month: "short" });
                   return (
-                    <Card key={v.id}>
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {emp && (
-                              <Avatar className="w-7 h-7 flex-shrink-0">
-                                {emp.profileImage && <AvatarImage src={emp.profileImage} alt={emp.name} />}
-                                <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
-                                  {emp.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                            )}
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{emp?.name || "Venter..."}</p>
-                              <p className="text-xs text-muted-foreground truncate">{bh?.name}</p>
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-xs font-medium">{date.toLocaleDateString("nb-NO", { day: "numeric", month: "short" })}</p>
-                            <p className="text-xs text-muted-foreground">{v.startTid?.slice(0, 5)}-{v.sluttTid?.slice(0, 5)}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div key={dato}>
+                      <div className="flex items-center gap-2 mb-1.5 px-1">
+                        <p className={`text-xs font-semibold uppercase tracking-wide ${isToday ? "text-primary" : "text-muted-foreground"}`}>{dateLabel}</p>
+                        <div className="h-px flex-1 bg-border" />
+                        <span className="text-[10px] text-muted-foreground">{dayVakter.length}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {dayVakter.map((v) => {
+                          const bh = bhMap.get(v.barnehageId);
+                          const emp = v.ansattId ? userMap.get(v.ansattId) : null;
+                          return (
+                            <Card key={v.id} data-testid={`card-vakt-${v.id}`}>
+                              <CardContent className="p-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {emp ? (
+                                      <Avatar className="w-7 h-7 flex-shrink-0">
+                                        {emp.profileImage && <AvatarImage src={emp.profileImage} alt={emp.name} />}
+                                        <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
+                                          {emp.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    ) : (
+                                      <div className="w-7 h-7 flex-shrink-0 rounded-full bg-muted flex items-center justify-center">
+                                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium truncate leading-tight">{emp?.name || "Venter..."}</p>
+                                      <p className="text-xs text-muted-foreground truncate leading-tight">{bh?.name}</p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    <p className="text-xs font-medium tabular-nums">{v.startTid?.slice(0, 5)}–{v.sluttTid?.slice(0, 5)}</p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
