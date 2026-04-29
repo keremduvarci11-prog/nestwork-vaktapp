@@ -251,6 +251,26 @@ export async function registerRoutes(
 
   app.patch("/api/users/:id", requireAuth, async (req, res) => {
     const { password: pw, ...safeData } = req.body;
+    const requesterId = getUserIdFromRequest(req);
+    const requester = requesterId ? await storage.getUser(requesterId) : null;
+    const isAdmin = requester?.role === "admin";
+    const isSelf = requesterId === req.params.id;
+
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ message: "Ingen tilgang" });
+    }
+
+    const adminOnlyFields = ["timelonn", "role", "externalId", "username", "status"] as const;
+    if (!isAdmin) {
+      for (const f of adminOnlyFields) {
+        if (f in safeData) {
+          return res.status(403).json({
+            message: `Bare admin kan endre ${f}`,
+          });
+        }
+      }
+    }
+
     const updated = await storage.updateUser(req.params.id, safeData);
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
@@ -1134,6 +1154,11 @@ export async function registerRoutes(
           userId: u.id,
           name: u.name,
           region: u.region,
+          username: u.username,
+          email: u.email,
+          phone: u.phone,
+          stilling: u.stilling,
+          timelonn: u.timelonn,
           profileImage: resolveProfileImageForList(u.profileImage, u.id),
           cvFile: u.cvFile,
           politiattestFile: u.politiattestFile,

@@ -116,6 +116,7 @@ function AppContent() {
               <Route path="/admin/godkjenn" component={GodkjennVakter} />
               <Route path="/admin/meldinger" component={AdminMeldinger} />
               <Route path="/admin/alle-vakter" component={AlleVakter} />
+              <Route path="/admin/ansatte" component={AnsattesOnboarding} />
               <Route path="/admin/ansattes-onboarding" component={AnsattesOnboarding} />
               <Route path="/varsler" component={Varsler} />
               <Route path="/profil" component={Profil} />

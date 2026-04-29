@@ -205,13 +205,13 @@ export default function Profil() {
         </Link>
 
         {isAdmin && (
-          <Link href="/admin/ansattes-onboarding">
-            <Card className="hover-elevate cursor-pointer">
+          <Link href="/admin/ansatte">
+            <Card className="hover-elevate cursor-pointer" data-testid="link-admin-ansatte">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <ClipboardList className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Ansattes onboarding</span>
+                    <span className="text-sm font-medium">Ansatte</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 </div>
