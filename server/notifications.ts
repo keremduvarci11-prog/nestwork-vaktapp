@@ -138,6 +138,11 @@ export async function sendNotification(userId: string, title: string, message: s
   }
 }
 
+const TEST_USERNAMES = (process.env.TEST_USERNAMES || "amandafrederich")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
 export async function notifyRegion(region: string, title: string, message: string, type: string = "vakt", link?: string) {
   const regionGroups: Record<string, string[]> = {
     Bergen: ["Bergen", "Os"],
@@ -146,8 +151,26 @@ export async function notifyRegion(region: string, title: string, message: strin
   const regions = regionGroups[region] || [region];
 
   const regionUsers = await storage.getUsersByRegions(regions);
-  console.log(`[Push] notifyRegion "${region}" -> ${regions.join(", ")} -> ${regionUsers.length} users`);
-  for (const user of regionUsers) {
+
+  // Test users always receive notifications regardless of region
+  let testUsers: typeof regionUsers = [];
+  if (TEST_USERNAMES.length > 0) {
+    const allUsers = await storage.getAllUsers();
+    testUsers = allUsers.filter(
+      (u) => u.role === "ansatt" && TEST_USERNAMES.includes(u.username.toLowerCase())
+    );
+  }
+
+  // Merge & dedupe by user id (test users in the matched region are not double-notified)
+  const byId = new Map<string, typeof regionUsers[number]>();
+  for (const u of [...regionUsers, ...testUsers]) byId.set(u.id, u);
+  const recipients = Array.from(byId.values());
+
+  console.log(
+    `[Push] notifyRegion "${region}" -> ${regions.join(", ")} -> ${regionUsers.length} region + ${testUsers.length} test = ${recipients.length} total`
+  );
+
+  for (const user of recipients) {
     await sendNotification(user.id, title, message, type, link);
   }
 }
