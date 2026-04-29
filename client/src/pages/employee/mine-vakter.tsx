@@ -26,8 +26,59 @@ export default function MineVakter() {
     queryKey: ["/api/barnehager"],
   });
 
-  const addToCalendar = (vaktId: string) => {
-    window.location.href = `/api/vakter/${vaktId}/kalender`;
+  const addToCalendar = async (vaktId: string) => {
+    try {
+      const res = await fetch(`/api/vakter/${vaktId}/kalender`, { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const ics = await res.text();
+
+      const { Capacitor } = await import("@capacitor/core");
+      const isNative = Capacitor.isNativePlatform();
+
+      if (isNative) {
+        const { Filesystem, Directory, Encoding } = await import("@capacitor/filesystem");
+        const { Share } = await import("@capacitor/share");
+
+        const fileName = `vakt-${vaktId}.ics`;
+        await Filesystem.writeFile({
+          path: fileName,
+          data: ics,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+        });
+        const { uri } = await Filesystem.getUri({
+          path: fileName,
+          directory: Directory.Cache,
+        });
+
+        await Share.share({
+          title: "Legg til vakt i kalender",
+          url: uri,
+          dialogTitle: "Legg til i kalender",
+        });
+      } else {
+        const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `vakt-${vaktId}.ics`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    } catch (err: any) {
+      console.error("[Calendar] failed:", err);
+      const msg = err?.message || "";
+      if (msg.toLowerCase().includes("share canceled") || msg.toLowerCase().includes("cancelled")) {
+        return;
+      }
+      toast({
+        title: "Kunne ikke åpne kalender",
+        description: "Prøv igjen, eller legg til manuelt i kalender-appen.",
+        variant: "destructive",
+      });
+    }
   };
 
   const godtaVakt = useMutation({
