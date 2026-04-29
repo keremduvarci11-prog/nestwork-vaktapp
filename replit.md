@@ -74,8 +74,11 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - Dark mode with three options: Lys/Mørk/Automatisk (localStorage "nestwork-theme"), ThemeProvider wraps app, defaults to light
 - syncProdData.ts: auto-syncs production DB with real data + creates onboarding items on startup
 - Onboarding auto-backfill: missing items are created on first fetch per employee
-- Employee bottom nav: Onboarding tab (replaces Lønn) with circular progress ring
+- Employee bottom nav: Hjem, Vakter, Meldinger, Lønn, Profil (Onboarding moved to Profil-side)
 - Admin "Ansattes onboarding" page: search employees, view progress, download documents
+- Lønn & Timer page (/lonn-timer): month dropdown, totals (timer, brutto, 12% feriepenger), per-vakt cards with "Send inn timer for godkjenning" button (active when shift has ended), client-side PDF lønnsslipp via jsPDF (Nestwork Group AS, orgnr 936 293 239)
+- vakter.timerInnsendt + timerInnsendtAt fields track ansatt timer-innsending; atomic conditional update prevents double-submit
+- Cron 15-min reminder: every 5 min sweep notifies ansatt 15-20 min after vakt-slutt to send inn timer (re-fetches vakt before push to avoid race with submit endpoint)
 
 ## Capacitor (Native Mobile)
 - Capacitor configured with `appId: no.nestwork.vaktapp`, `appName: Nestwork`

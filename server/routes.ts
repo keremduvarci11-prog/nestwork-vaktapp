@@ -725,6 +725,48 @@ export async function registerRoutes(
     })();
   });
 
+  app.post("/api/vakter/:id/innsend-timer", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req);
+    const vakt = await storage.getVakt(req.params.id);
+    if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
+    if (vakt.ansattId !== userId) {
+      return res.status(403).json({ message: "Du kan kun sende inn timer for dine egne vakter" });
+    }
+    if (vakt.status !== "godkjent") {
+      return res.status(400).json({ message: "Kun godkjente vakter kan sendes inn" });
+    }
+    if (vakt.timerInnsendt) {
+      return res.status(400).json({ message: "Timer er allerede sendt inn for denne vakten" });
+    }
+
+    const now = new Date();
+    const vaktEnd = new Date(`${vakt.dato}T${vakt.sluttTid}`);
+    if (now < vaktEnd) {
+      return res.status(400).json({ message: "Du kan ikke sende inn timer for en vakt som ikke er ferdig" });
+    }
+
+    const updated = await storage.markVaktTimerInnsendt(req.params.id);
+    if (!updated) {
+      return res.status(409).json({ message: "Timer er allerede sendt inn for denne vakten" });
+    }
+    res.json(updated);
+
+    (async () => {
+      try {
+        const ansatt = await storage.getUser(userId!);
+        const bh = await storage.getBarnehage(updated.barnehageId);
+        await notifyAdmins(
+          "Timer innsendt for godkjenning",
+          `${ansatt?.name || "En ansatt"} har sendt inn timer for vakt ${updated.dato} hos ${bh?.name || "ukjent"}.`,
+          "vakt",
+          "/admin/godkjenn"
+        );
+      } catch (err) {
+        console.error("[Notify] Feil ved innsend-varsling:", err);
+      }
+    })();
+  });
+
   app.post("/api/vakter/:id/godkjenn", requireAdmin, async (req, res) => {
     const { ansattId } = req.body || {};
     const updateData: any = { status: "godkjent" };

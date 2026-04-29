@@ -1,0 +1,35 @@
+STRENG INSTRUKS – LES NØYE FØR START:
+Du skal utføre en spesifikk omstrukturering av appens navigasjon og legge til en ny funksjon for lønnshåndtering.
+
+DETTE ER STRENGT FORBUDT: > - Ikke rør AppDelegate.swift, capacitor.config, eller push-varslings-konfigurasjonen i iOS-mappen.
+
+Ikke endre på design-stilen (farger/fonts) som allerede eksisterer.
+
+Ikke slett data fra databasen.
+
+OPPGAVE 1: NAVIGASJON (KIRURGISK ENDRING)
+
+Fjern "Onboarding" fra hovedmenyen nederst (Bottom Navigation).
+
+Flytt tilgangen til "Onboarding"-siden til Profil-siden. Den skal ligge som et valg under "Innstillinger" eller rett over "Historikk".
+
+Erstatt "Onboarding" i hovedmenyen med en ny side som heter "Lønn & Timer". Bruk et passende ikon (f.eks. BanknotesIcon eller ReceiptPercentIcon).
+
+OPPGAVE 2: NY SIDE - "LØNN & TIMER" (ALT PÅ ÉN SIDE)
+Lag en oversiktlig side for den ansatte som inneholder følgende (basert på vedlagte lønnsslipp-eksempel):
+
+Topp-oppsummering (Aktiv måned): Vise nåværende måned, totalt antall timer jobbet, ansattes timelønn (fra profil), og totalt opptjent beløp (timer x lønn).
+
+Vaktliste: En liste over alle vakter denne måneden som er godkjent. Vis: Dato, Barnehagens navn, og antall timer.
+
+Arkiv-funksjon: En enkel dropdown eller knapp øverst på siden for å velge tidligere måneder. Når en måned velges, oppdateres tallene og listen under.
+
+PDF-knapp: En knapp: "Last ned lønnsslipp (PDF)". Denne skal generere en PDF som ligner på det profesjonelle vedlegget (Nestwork Group AS, Org nr: 936 293 239, lønnsrader, og beregning av 12 % feriepenger).
+
+OPPGAVE 3: TIMEINNSENDING OG VARSLING
+
+Submit-funksjon: Når en vakt er ferdig (endTime er passert), skal det dukke opp en knapp på "Lønn & Timer"-siden eller Dashboard: "Send inn timer for godkjenning". Her skal den ansatte kunne bekrefte timene.
+
+Push-varsel Logikk: Sett opp en trigger (backend-side) som sender et push-varsel til den ansatte nøyaktig 15 minutter etter at vakten er over. Tekst: "Vakten din hos [Barnehage] er ferdig. Husk å sende inn timene dine til godkjenning!".
+
+BEKREFTELSE: Bekreft at du har forstått at du kun skal endre navigasjon og legge til denne funksjonaliteten uten å røre kritisk systemkode.

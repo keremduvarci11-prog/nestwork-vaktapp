@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Briefcase, Mail, Phone, LogOut, History, ClipboardList, ChevronRight, Settings, Camera, Sun, Moon } from "lucide-react";
+import { MapPin, Briefcase, Mail, Phone, LogOut, History, ClipboardList, ChevronRight, Settings, Camera, Sun, Moon, ClipboardCheck } from "lucide-react";
 import { Link } from "wouter";
 import logoSrc from "@assets/nestwork_logo_centered.png";
 import { useTheme } from "@/components/theme-provider";
@@ -222,6 +222,20 @@ export default function Profil() {
 
         {user?.role !== "admin" && (
           <>
+            <Link href="/onboarding">
+              <Card className="hover-elevate cursor-pointer" data-testid="link-onboarding">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <ClipboardCheck className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Onboarding</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
             <Link href="/historikk">
               <Card className="hover-elevate cursor-pointer">
                 <CardContent className="p-4">

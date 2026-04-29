@@ -47,6 +47,30 @@ export function startCronJobs() {
             );
           }
         }
+
+        if (
+          vakt.status === "godkjent" &&
+          vakt.ansattId &&
+          !vakt.timerInnsendt &&
+          vakt.dato &&
+          vakt.sluttTid
+        ) {
+          const vaktEnd = new Date(`${vakt.dato}T${vakt.sluttTid}`);
+          const minutesAfterEnd = (now.getTime() - vaktEnd.getTime()) / (1000 * 60);
+          if (minutesAfterEnd >= 15 && minutesAfterEnd < 20) {
+            const fresh = await storage.getVakt(vakt.id);
+            if (fresh && fresh.status === "godkjent" && fresh.ansattId && !fresh.timerInnsendt) {
+              const bh = await storage.getBarnehage(fresh.barnehageId);
+              await notifyUser(
+                fresh.ansattId,
+                "Husk a sende inn timer",
+                `Vakten din hos ${bh?.name || "ukjent"} er ferdig. Husk a sende inn timene dine til godkjenning!`,
+                "reminder",
+                "/lonn-timer"
+              );
+            }
+          }
+        }
       }
     } catch (err) {
       console.error("[Cron] Feil ved sjekk av vakter:", err);

@@ -12,6 +12,7 @@ import EmployeeHome from "@/pages/employee/home";
 import MineVakter from "@/pages/employee/mine-vakter";
 import Historikk from "@/pages/employee/historikk";
 import Inntjening from "@/pages/employee/inntjening";
+import LonnTimer from "@/pages/employee/lonn-timer";
 import Profil from "@/pages/employee/profil";
 import Meldinger from "@/pages/employee/meldinger";
 import OnboardingPage from "@/pages/employee/onboarding";
@@ -126,6 +127,7 @@ function AppContent() {
               <Route path="/mine-vakter" component={MineVakter} />
               <Route path="/historikk" component={Historikk} />
               <Route path="/inntjening" component={Inntjening} />
+              <Route path="/lonn-timer" component={LonnTimer} />
               <Route path="/profil" component={Profil} />
               <Route path="/innstillinger" component={Innstillinger} />
               <Route path="/meldinger" component={Meldinger} />
