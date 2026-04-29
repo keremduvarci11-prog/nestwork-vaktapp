@@ -35,18 +35,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const refetchMe = useCallback(async () => {
     const headers: Record<string, string> = {};
     const token = getAuthToken();
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
-    fetch("/api/auth/me", { credentials: "include", headers })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((u) => setUser(u))
-      .catch(() => setUser(null))
-      .finally(() => setIsLoading(false));
+    try {
+      const r = await fetch("/api/auth/me", { credentials: "include", headers });
+      if (r.ok) {
+        const u = await r.json();
+        setUser((prev) => {
+          if (!prev) return u;
+          // shallow compare — only update reference if something changed
+          for (const k of Object.keys(u) as Array<keyof User>) {
+            if ((prev as any)[k] !== (u as any)[k]) return u;
+          }
+          return prev;
+        });
+      }
+    } catch {
+      // network blip — keep current user
+    }
   }, []);
+
+  useEffect(() => {
+    refetchMe().finally(() => setIsLoading(false));
+  }, [refetchMe]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible") refetchMe();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [refetchMe]);
 
   const login = useCallback(async (username: string, password: string) => {
     let res: Response;
