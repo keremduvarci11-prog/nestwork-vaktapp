@@ -46,7 +46,6 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  CalendarCheck,
 } from "lucide-react";
 
 interface OnboardingItem {
@@ -113,144 +112,6 @@ async function downloadAuthed(url: string, suggestedName: string) {
     console.error("Download failed:", e);
     alert("Kunne ikke laste ned filen. Prøv igjen.");
   }
-}
-
-function AvailabilityCalendar({ userId }: { userId: string }) {
-  const [viewMonth, setViewMonth] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d;
-  });
-
-  const month = `${viewMonth.getFullYear()}-${String(viewMonth.getMonth() + 1).padStart(2, "0")}`;
-  const monthLabel = viewMonth.toLocaleDateString("nb-NO", { month: "long", year: "numeric" });
-
-  const { data, isLoading } = useQuery<{ availability: { date: string; status: string }[]; shiftDates: string[] }>({
-    queryKey: ["/api/admin/availability/user", userId, month],
-    queryFn: async () => {
-      const res = await fetch(`/api/admin/availability/user/${userId}?month=${month}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Kunne ikke hente tilgjengelighet");
-      return res.json();
-    },
-  });
-
-  const { data: blocked } = useQuery<{ date: string; reason: string | null }[]>({
-    queryKey: ["/api/blocked-dates", month],
-    queryFn: async () => {
-      const res = await fetch(`/api/blocked-dates?month=${month}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Kunne ikke hente blokkerte dager");
-      return res.json();
-    },
-  });
-
-  const statusByDate = new Map<string, string>();
-  (data?.availability || []).forEach((a) => statusByDate.set(a.date, a.status));
-  const shiftSet = new Set(data?.shiftDates || []);
-  const blockedSet = new Set((blocked || []).map((b) => b.date));
-
-  const year = viewMonth.getFullYear();
-  const monthIdx = viewMonth.getMonth();
-  const firstOfMonth = new Date(year, monthIdx, 1);
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-  const startWeekday = (firstOfMonth.getDay() + 6) % 7;
-
-  const cells: (string | null)[] = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    const iso = `${year}-${String(monthIdx + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    cells.push(iso);
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const navigateMonth = (delta: number) => {
-    const next = new Date(viewMonth);
-    next.setMonth(next.getMonth() + delta);
-    setViewMonth(next);
-  };
-
-  return (
-    <div data-testid={`availability-calendar-${userId}`}>
-      <div className="flex items-center justify-between mb-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => navigateMonth(-1)}
-          data-testid="button-cal-prev"
-          aria-label="Forrige måned"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <span className="text-xs font-semibold capitalize" data-testid="text-cal-month">
-          {monthLabel}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => navigateMonth(1)}
-          data-testid="button-cal-next"
-          aria-label="Neste måned"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-7 gap-0.5 mb-1">
-        {["M", "T", "O", "T", "F", "L", "S"].map((d, i) => (
-          <div key={i} className="text-center text-[9px] text-muted-foreground py-0.5">
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="h-40 bg-muted/30 rounded animate-pulse" />
-      ) : (
-        <div className="grid grid-cols-7 gap-0.5">
-          {cells.map((iso, idx) => {
-            if (!iso) return <div key={`b-${idx}`} className="aspect-square" />;
-            const dayNum = Number(iso.split("-")[2]);
-            const isBlocked = blockedSet.has(iso);
-            const hasShift = shiftSet.has(iso);
-            const status = statusByDate.get(iso);
-            let cls = "bg-muted/40 text-muted-foreground";
-            let label: React.ReactNode = dayNum;
-            if (isBlocked) {
-              cls = "bg-zinc-300 dark:bg-zinc-700 text-zinc-500 line-through";
-            } else if (hasShift) cls = "bg-orange-500 text-white";
-            else if (status === "available") cls = "bg-green-500 text-white";
-            else if (status === "unavailable") cls = "bg-red-500 text-white";
-            return (
-              <div
-                key={iso}
-                className={`aspect-square rounded text-[10px] font-medium flex items-center justify-center ${cls}`}
-                data-testid={`cal-day-${iso}`}
-                title={isBlocked ? "Stengt" : undefined}
-              >
-                {label}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2 mt-2 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded bg-green-500" /> Ledig
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded bg-red-500" /> Ikke ledig
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded bg-orange-500" /> Tildelt vakt
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded bg-muted/40 border border-border" /> Ingen status
-        </span>
-      </div>
-    </div>
-  );
 }
 
 function EmployeeDetailDialog({
@@ -537,16 +398,6 @@ function EmployeeDetailDialog({
               <p className="text-[10px] text-muted-foreground mt-1.5">
                 Estimat oppdateres automatisk hver gang en vakt blir godkjent.
               </p>
-            </section>
-
-            <Separator />
-
-            {/* Tilgjengelighet kalender */}
-            <section>
-              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                <CalendarCheck className="w-3.5 h-3.5" /> Tilgjengelighet
-              </h3>
-              <AvailabilityCalendar userId={emp.userId} />
             </section>
 
             <Separator />
