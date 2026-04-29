@@ -42,9 +42,17 @@ function AppContent() {
   });
 
   useEffect(() => {
-    if (user) {
-      initPush().then(() => subscribeToPush());
-    }
+    if (!user) return;
+    (async () => {
+      try {
+        await initPush();
+        await subscribeToPush();
+      } catch (err) {
+        // Never let push wiring crash the app shell — Google Play
+        // treats any unhandled exception as a native crash.
+        console.error("[Push] init/subscribe failed:", err);
+      }
+    })();
   }, [user]);
 
   useEffect(() => {
