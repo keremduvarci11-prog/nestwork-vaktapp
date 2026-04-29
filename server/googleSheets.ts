@@ -87,9 +87,18 @@ const HEADER_ROW = [
   "Pause",
   "Region",
   "Status",
+  "Timelønn",
+  "Ansatt lønn",
+  "Sum faktura",
   "Godkjent tidspunkt",
   "Sorteringsdato",
 ];
+
+const FAKTURA_PAAFSLAG = 150;
+const SHEET_RANGE = "A:O";
+const SORT_COL_INDEX = 14;
+const TOTAL_COL_COUNT = 15;
+const headersUpdated = new Set<string>();
 
 async function verifySpreadsheetExists(id: string): Promise<boolean> {
   try {
@@ -198,7 +207,7 @@ async function ensureSheetExists(sheetName: string): Promise<void> {
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `'${safeName}'!A:K`,
+      range: `'${safeName}'!${SHEET_RANGE}`,
       valueInputOption: "RAW",
       requestBody: {
         values: [HEADER_ROW],
@@ -206,6 +215,7 @@ async function ensureSheetExists(sheetName: string): Promise<void> {
     });
 
     existingSheets.add(safeName);
+    headersUpdated.add(safeName);
     console.log(`[Google Sheets] Created sheet for: ${safeName}`);
   } catch (error: any) {
     if (error?.message?.includes("already exists")) {
@@ -213,6 +223,35 @@ async function ensureSheetExists(sheetName: string): Promise<void> {
     } else {
       throw error;
     }
+  }
+}
+
+async function ensureHeaderRow(sheetName: string): Promise<void> {
+  const safeName = sanitizeSheetName(sheetName);
+  if (headersUpdated.has(safeName)) return;
+  try {
+    const ssId = await getOrCreateSpreadsheet();
+    const sheets = await getUncachableGoogleSheetClient();
+    const current = await sheets.spreadsheets.values.get({
+      spreadsheetId: ssId,
+      range: `'${safeName}'!1:1`,
+    });
+    const row = current.data.values?.[0] || [];
+    const isMatch =
+      row.length === HEADER_ROW.length &&
+      HEADER_ROW.every((h, i) => row[i] === h);
+    if (!isMatch) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: ssId,
+        range: `'${safeName}'!A1:O1`,
+        valueInputOption: "RAW",
+        requestBody: { values: [HEADER_ROW] },
+      });
+      console.log(`[Google Sheets] Header row updated for: ${safeName}`);
+    }
+    headersUpdated.add(safeName);
+  } catch (err) {
+    console.error(`[Google Sheets] Could not ensure header row for ${safeName}:`, err);
   }
 }
 
@@ -227,7 +266,7 @@ async function sortSheetByDate(sheetName: string): Promise<void> {
   try {
     const result = await sheets.spreadsheets.values.get({
       spreadsheetId: ssId,
-      range: `'${safeName}'!A:L`,
+      range: `'${safeName}'!${SHEET_RANGE}`,
     });
     const rowCount = result.data.values?.length || 1;
     if (rowCount <= 2) return;
@@ -243,11 +282,11 @@ async function sortSheetByDate(sheetName: string): Promise<void> {
                 startRowIndex: 1,
                 endRowIndex: rowCount,
                 startColumnIndex: 0,
-                endColumnIndex: 12,
+                endColumnIndex: TOTAL_COL_COUNT,
               },
               sortSpecs: [
                 {
-                  dimensionIndex: 11,
+                  dimensionIndex: SORT_COL_INDEX,
                   sortOrder: "ASCENDING",
                 },
               ],
@@ -273,11 +312,13 @@ export async function appendVaktToSheet(vaktData: {
   timer: number;
   trekkPause?: boolean;
   status: string;
+  timelonn?: number | string | null;
 }) {
   try {
     const sheetId = await getOrCreateSpreadsheet();
     const sheetName = sanitizeSheetName(vaktData.barnehageNavn);
     await ensureSheetExists(sheetName);
+    await ensureHeaderRow(sheetName);
 
     const sheets = await getUncachableGoogleSheetClient();
 
@@ -307,9 +348,18 @@ export async function appendVaktToSheet(vaktData: {
       ? vaktData.dato
       : formattedDato.split(".").reverse().join("-");
 
+    const timelonnNum =
+      vaktData.timelonn != null && vaktData.timelonn !== ""
+        ? Number(vaktData.timelonn)
+        : 0;
+    const timerNum = Number(vaktData.timer) || 0;
+    const ansattLonn = Math.round(timelonnNum * timerNum * 100) / 100;
+    const sumFaktura =
+      Math.round((timelonnNum + FAKTURA_PAAFSLAG) * timerNum * 100) / 100;
+
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `'${sheetName}'!A:L`,
+      range: `'${sheetName}'!${SHEET_RANGE}`,
       valueInputOption: "RAW",
       requestBody: {
         values: [
@@ -324,6 +374,9 @@ export async function appendVaktToSheet(vaktData: {
             vaktData.trekkPause ? "Ja" : "Nei",
             vaktData.region,
             vaktData.status,
+            timelonnNum,
+            ansattLonn,
+            sumFaktura,
             godkjentTid,
             sortableDato,
           ],
@@ -355,7 +408,7 @@ export async function removeVaktFromSheet(barnehageNavn: string, dato: string, a
 
     const result = await sheets.spreadsheets.values.get({
       spreadsheetId: saved,
-      range: `'${sheetName}'!A:L`,
+      range: `'${sheetName}'!${SHEET_RANGE}`,
     });
 
     const rows = result.data.values;

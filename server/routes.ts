@@ -586,6 +586,7 @@ export async function registerRoutes(
             timer: Math.round(timer * 100) / 100,
             trekkPause: updated.trekkPause || false,
             status: "godkjent",
+            timelonn: ansatt?.timelonn ?? null,
           });
         }
       } catch (err) {
@@ -712,6 +713,7 @@ export async function registerRoutes(
           timer: Math.round(timer * 100) / 100,
           trekkPause: updated.trekkPause || false,
           status: "godkjent",
+          timelonn: ansatt?.timelonn ?? null,
         });
         await notifyAdmins(
           "Tildelt vakt godtatt",
@@ -818,6 +820,7 @@ export async function registerRoutes(
           timer: Math.round(timer * 100) / 100,
           trekkPause: updated.trekkPause || false,
           status: "godkjent",
+          timelonn: ansatt?.timelonn ?? null,
         });
       } catch (err) {
         console.error("[Google Sheets] Error:", err);
