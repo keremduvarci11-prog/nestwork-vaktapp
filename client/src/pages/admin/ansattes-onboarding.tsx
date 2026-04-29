@@ -68,7 +68,24 @@ interface EmployeeOnboarding {
   progress: number;
   completedCount: number;
   totalCount: number;
+  monthKey?: string;
+  godkjentTimerThisMonth?: number;
+  godkjentVakterThisMonth?: number;
+  bruttoThisMonth?: number;
   items: OnboardingItem[];
+}
+
+const MONTH_NAMES_NB_FULL = ["januar", "februar", "mars", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "desember"];
+
+function formatNokAdmin(n: number) {
+  return n.toLocaleString("nb-NO", { maximumFractionDigits: 2 });
+}
+
+function monthKeyToLabel(key?: string) {
+  if (!key) return "";
+  const [y, m] = key.split("-").map(Number);
+  if (!y || !m) return "";
+  return `${MONTH_NAMES_NB_FULL[m - 1]} ${y}`;
 }
 
 async function downloadAuthed(url: string, suggestedName: string) {
@@ -353,6 +370,31 @@ function EmployeeDetailDialog({
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
                 Brukes på lønn-siden og i fakturasum til barnehagene.
+              </p>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-md border p-2.5 bg-muted/30">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Brutto i {monthKeyToLabel(emp?.monthKey)}
+                  </p>
+                  <p className="text-sm font-bold mt-0.5" data-testid="text-detail-brutto">
+                    {formatNokAdmin(emp?.bruttoThisMonth ?? 0)} kr
+                  </p>
+                </div>
+                <div className="rounded-md border p-2.5 bg-muted/30">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Godkjente timer
+                  </p>
+                  <p className="text-sm font-bold mt-0.5" data-testid="text-detail-godkjent-timer">
+                    {(emp?.godkjentTimerThisMonth ?? 0).toFixed(2).replace(".", ",")} t
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {emp?.godkjentVakterThisMonth ?? 0} vakt{(emp?.godkjentVakterThisMonth ?? 0) === 1 ? "" : "er"}
+                  </p>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                Estimat oppdateres automatisk hver gang en vakt blir godkjent.
               </p>
             </section>
 

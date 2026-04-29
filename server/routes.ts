@@ -1143,12 +1143,45 @@ export async function registerRoutes(
   app.get("/api/admin/onboarding-overview", requireAdmin, async (_req, res) => {
     const allUsers = await storage.getAllUsers();
     const employees = allUsers.filter((u) => u.role !== "admin");
+
+    // Pre-fetch all vakter to compute monthly brutto per employee
+    const allVakter = await storage.getVakter();
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed
+    const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
+
+    const calcHours = (start: string, end: string, trekkPause?: boolean | null) => {
+      if (!start || !end) return 0;
+      const [sh, sm] = start.split(":").map(Number);
+      const [eh, em] = end.split(":").map(Number);
+      let h = (eh * 60 + em - sh * 60 - sm) / 60;
+      if (trekkPause) h -= 0.5;
+      return Math.max(0, h);
+    };
+
+    const monthAggByUser = new Map<string, { hours: number; count: number }>();
+    for (const v of allVakter) {
+      if (!v.ansattId || !v.dato) continue;
+      if (v.status !== "godkjent") continue;
+      const d = new Date(v.dato + "T00:00:00");
+      if (d.getFullYear() !== currentYear || d.getMonth() !== currentMonth) continue;
+      const h = calcHours(v.startTid || "", v.sluttTid || "", v.trekkPause);
+      const cur = monthAggByUser.get(v.ansattId) || { hours: 0, count: 0 };
+      cur.hours += h;
+      cur.count += 1;
+      monthAggByUser.set(v.ansattId, cur);
+    }
+
     const overview = await Promise.all(
       employees.map(async (u) => {
         const items = await storage.getOnboarding(u.id);
         const totalCount = items.length;
         const completedCount = items.filter((i) => i.completed).length;
         const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        const agg = monthAggByUser.get(u.id) || { hours: 0, count: 0 };
+        const tl = parseFloat(u.timelonn || "0") || 0;
+        const bruttoThisMonth = Math.round(agg.hours * tl * 100) / 100;
         const { password: _, ...safeUser } = u;
         return {
           userId: u.id,
@@ -1165,6 +1198,10 @@ export async function registerRoutes(
           progress,
           completedCount,
           totalCount,
+          monthKey,
+          godkjentTimerThisMonth: Math.round(agg.hours * 100) / 100,
+          godkjentVakterThisMonth: agg.count,
+          bruttoThisMonth,
           items: items.map((i) => ({
             id: i.id,
             item: i.item,
