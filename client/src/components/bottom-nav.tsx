@@ -1,14 +1,13 @@
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { Home, Calendar, User, MessageSquare, LayoutDashboard, CheckSquare, Plus, Mail, Wallet, CalendarCheck } from "lucide-react";
+import { Home, Calendar, User, MessageSquare, LayoutDashboard, CheckSquare, Plus, Mail, Wallet } from "lucide-react";
 
 const employeeItems = [
   { path: "/", label: "Hjem", icon: Home },
   { path: "/mine-vakter", label: "Vakter", icon: Calendar },
   { path: "/meldinger", label: "Meldinger", icon: MessageSquare, badge: "employee" as const },
   { path: "/lonn-timer", label: "Lønn", icon: Wallet },
-  { path: "/min-tilgjengelighet", label: "Tilgjengelig", icon: CalendarCheck },
   { path: "/profil", label: "Profil", icon: User },
 ];
 
@@ -16,7 +15,6 @@ const adminItems = [
   { path: "/admin", label: "Oversikt", icon: LayoutDashboard },
   { path: "/admin/ny-vakt", label: "Ny vakt", icon: Plus },
   { path: "/admin/godkjenn", label: "Godkjenn", icon: CheckSquare },
-  { path: "/admin/tilgjengelighet", label: "Ledige", icon: CalendarCheck },
   { path: "/admin/meldinger", label: "Meldinger", icon: Mail, badge: "admin" as const },
   { path: "/profil", label: "Profil", icon: User },
 ];

@@ -1,0 +1,55 @@
+Build web assets
+2s
+
+
+
+Show command
+Showing the last 50 lines. Click this button to load the full log
+    '/Users/builder/clone/client/src/components/ui/skeleton.tsx',
+    '/Users/builder/clone/client/src/components/ui/slider.tsx',
+    '/Users/builder/clone/client/src/components/ui/switch.tsx',
+    '/Users/builder/clone/client/src/components/ui/table.tsx',
+    '/Users/builder/clone/client/src/components/ui/tabs.tsx',
+    '/Users/builder/clone/client/src/components/ui/textarea.tsx',
+    '/Users/builder/clone/client/src/components/ui/toast.tsx',
+    '/Users/builder/clone/client/src/components/ui/toaster.tsx',
+    '/Users/builder/clone/client/src/components/ui/toggle-group.tsx',
+    '/Users/builder/clone/client/src/components/ui/toggle.tsx',
+    '/Users/builder/clone/client/src/components/ui/tooltip.tsx',
+    '/Users/builder/clone/client/src/hooks/use-mobile.tsx',
+    '/Users/builder/clone/client/src/lib/auth.tsx',
+    '/Users/builder/clone/client/src/pages/admin/alle-vakter.tsx',
+    '/Users/builder/clone/client/src/pages/admin/ansattes-onboarding.tsx',
+    '/Users/builder/clone/client/src/pages/admin/dashboard.tsx',
+    '/Users/builder/clone/client/src/pages/admin/godkjenn.tsx',
+    '/Users/builder/clone/client/src/pages/admin/meldinger.tsx',
+    '/Users/builder/clone/client/src/pages/admin/ny-vakt.tsx',
+    '/Users/builder/clone/client/src/pages/admin/tilgjengelighet.tsx',
+    '/Users/builder/clone/client/src/pages/employee/historikk.tsx',
+    '/Users/builder/clone/client/src/pages/employee/home.tsx',
+    '/Users/builder/clone/client/src/pages/employee/innstillinger.tsx',
+    '/Users/builder/clone/client/src/pages/employee/inntjening.tsx',
+    '/Users/builder/clone/client/src/pages/employee/lonn-timer.tsx',
+    '/Users/builder/clone/client/src/pages/employee/meldinger.tsx',
+    '/Users/builder/clone/client/src/pages/employee/min-tilgjengelighet.tsx',
+    '/Users/builder/clone/client/src/pages/employee/mine-vakter.tsx',
+    '/Users/builder/clone/client/src/pages/employee/onboarding.tsx',
+    '/Users/builder/clone/client/src/pages/employee/profil.tsx',
+    '/Users/builder/clone/client/src/pages/employee/varsler.tsx',
+    '/Users/builder/clone/client/src/pages/login.tsx',
+    '/Users/builder/clone/client/src/pages/not-found.tsx',
+    '/Users/builder/clone/tailwind.config.ts',
+    '/Users/builder/clone/node_modules/react-dom/cjs/react-dom.production.min.js',
+    '/Users/builder/clone/node_modules/wouter/esm/index.js',
+    '/Users/builder/clone/node_modules/@tanstack/react-query/build/modern/index.js',
+    '/Users/builder/clone/node_modules/lucide-react/dist/esm/lucide-react.js',
+    '/Users/builder/clone/node_modules/@capacitor/push-notifications/dist/esm/index.js',
+    '/Users/builder/clone/node_modules/react/cjs/react.production.min.js',
+    '/Users/builder/clone/node_modules/scheduler/index.js',
+    '/Users/builder/clone/node_modules/wouter/esm/use-browser-location.js',
+    ... 1611 more items
+  ]
+}
+
+Build failed :|
+Step 5 script `Build web assets` exited with status code 1

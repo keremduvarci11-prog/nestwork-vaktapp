@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2, HandMetal, CalendarCheck } from "lucide-react";
+import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2, HandMetal } from "lucide-react";
 import { PushPermissionBanner } from "@/components/push-banner";
 import type { Vakt, Barnehage, Onboarding, VaktInteresse } from "@shared/schema";
 
@@ -92,27 +92,6 @@ export default function EmployeeHome() {
       </div>
 
       <PushPermissionBanner compact />
-
-      <Card
-        className="border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-950/30 hover-elevate active-elevate-2 cursor-pointer"
-        onClick={() => navigate("/min-tilgjengelighet")}
-        data-testid="card-min-tilgjengelighet-link"
-      >
-        <CardContent className="p-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-green-500/15 flex items-center justify-center flex-shrink-0">
-              <CalendarCheck className="w-4 h-4 text-green-700 dark:text-green-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">Min tilgjengelighet</p>
-              <p className="text-xs text-muted-foreground">
-                Marker hvilke dager du er ledig for å ta vakter.
-              </p>
-            </div>
-            <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          </div>
-        </CardContent>
-      </Card>
 
       {hasUnfinishedOnboarding && (
         <Card className="border-primary/30 bg-primary/5" data-testid="card-onboarding-banner">
