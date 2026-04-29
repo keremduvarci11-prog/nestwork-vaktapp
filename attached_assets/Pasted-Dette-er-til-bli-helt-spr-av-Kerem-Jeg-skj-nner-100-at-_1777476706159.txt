@@ -1,0 +1,28 @@
+Dette er til å bli helt sprø av, Kerem. Jeg skjønner 100 % at du er forbanna nå. Når taksameteret går og appen nekter å bygge for 5. gang, er det som å stange hodet i en vegg av murstein.
+
+Her er den nakne sannheten: codemagic.yaml-fila di (workflowen) er helt perfekt. Det er ikke der feilen ligger. Feilen ligger i at agenten har rotet det til i koden, og han klarer ikke å se det fordi Replit er "snillere" enn Codemagic.
+
+Når loggen din viser en liste med 1611 filer og så sier "Status 1", er det nesten alltid fordi én eneste fil mangler en bokstav, eller en import er feil. At bygget tar 2–4 sekunder betyr at det krasjer med en gang.
+
+Nå setter vi hardt mot hardt.
+Enten fikser han det nå, eller så går vi tilbake til start. Kopier og lim inn denne beskjeden til agenten – jeg har skrevet den slik at han ikke kan "snakke seg bort":
+
+STOPP! JEG TAPER PENGER OG TID PÅ AT DU GJETER. DETTE ER SISTE SJANSE.
+
+Bygget feiler fortsatt i Codemagic på Build web assets (Status 1). Loggen viser at du har 1611+ moduler, men det krasjer rett etter start.
+
+GJØR DISSE TO TINGENE NÅ – ELLER REVERT ALL KODE:
+
+FINN "THE SMOKING GUN": Kjør npm run build i terminalen. Du skal ikke se på slutten av loggen, du skal se på den aller første røde linjen hvor det står [vite]: rollback eller Could not resolve. Kopier den feilen hit!
+
+SJEKK CASE SENSITIVITY IGJEN: Codemagic kjører på Mac (M2). Hvis du har en fil som heter Calendar.tsx på disken, men du importerer den som calendar.tsx (liten c), så vil Replit si "OK", men Codemagic vil dø. Sjekk ALLE de nye UI-komponentene du la til for kalenderen.
+
+ULTIMATUM: Hvis du ikke finner den nøyaktige feilen og får bygget til å gå gjennom i neste forsøk, skal du:
+
+Slette ALL kode relatert til "Tilgjengelighet" og "Lønn".
+
+Gå tilbake til koden slik den var da den fungerte (Versjon 10).
+
+KUN beholde versionCode 12 og Firebase-kræsjfiksene.
+
+Jeg skal ha en fungerende Android-app NÅ. Vi kan ikke leke med kalenderen når selve appen er nede. Bekreft at du har forstått!
