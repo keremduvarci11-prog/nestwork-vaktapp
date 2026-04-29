@@ -43,10 +43,24 @@ export default function MineVakter() {
 
   const bhMap = new Map(barnehager?.map((b) => [b.id, b]) || []);
   const today = new Date().toISOString().split("T")[0];
-  const kommendeVakter = vakter?.filter((v) => v.dato >= today && (v.status === "godkjent" || v.status === "venter" || v.status === "tildelt")) || [];
+  const sortByNearest = (a: Vakt, b: Vakt) => {
+    const dateCmp = (a.dato || "").localeCompare(b.dato || "");
+    if (dateCmp !== 0) return dateCmp;
+    return (a.startTid || "").localeCompare(b.startTid || "");
+  };
+  const kommendeVakter =
+    vakter?.filter(
+      (v) =>
+        v.dato >= today &&
+        (v.status === "godkjent" || v.status === "venter" || v.status === "tildelt"),
+    ) || [];
 
-  const tildelte = kommendeVakter.filter((v) => v.status === "tildelt");
-  const andre = kommendeVakter.filter((v) => v.status !== "tildelt");
+  const tildelte = kommendeVakter
+    .filter((v) => v.status === "tildelt")
+    .sort(sortByNearest);
+  const andre = kommendeVakter
+    .filter((v) => v.status !== "tildelt")
+    .sort(sortByNearest);
 
   const formatDate = (d: string) => {
     const date = new Date(d + "T00:00:00");
