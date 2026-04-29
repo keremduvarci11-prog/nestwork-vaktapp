@@ -23,6 +23,8 @@ import GodkjennVakter from "@/pages/admin/godkjenn";
 import AdminMeldinger from "@/pages/admin/meldinger";
 import AlleVakter from "@/pages/admin/alle-vakter";
 import AnsattesOnboarding from "@/pages/admin/ansattes-onboarding";
+import AdminTilgjengelighet from "@/pages/admin/tilgjengelighet";
+import MinTilgjengelighet from "@/pages/employee/min-tilgjengelighet";
 import Innstillinger from "@/pages/employee/innstillinger";
 import NotFound from "@/pages/not-found";
 import { Loader2, Bell } from "lucide-react";
@@ -126,6 +128,7 @@ function AppContent() {
               <Route path="/admin/alle-vakter" component={AlleVakter} />
               <Route path="/admin/ansatte" component={AnsattesOnboarding} />
               <Route path="/admin/ansattes-onboarding" component={AnsattesOnboarding} />
+              <Route path="/admin/tilgjengelighet" component={AdminTilgjengelighet} />
               <Route path="/varsler" component={Varsler} />
               <Route path="/profil" component={Profil} />
               <Route path="/innstillinger" component={Innstillinger} />
@@ -142,6 +145,7 @@ function AppContent() {
               <Route path="/meldinger" component={Meldinger} />
               <Route path="/varsler" component={Varsler} />
               <Route path="/onboarding" component={OnboardingPage} />
+              <Route path="/min-tilgjengelighet" component={MinTilgjengelighet} />
             </>
           )}
           <Route component={NotFound} />

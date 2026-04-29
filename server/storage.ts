@@ -1,7 +1,7 @@
 import { db } from "./db";
-import { eq, and, desc, inArray, or } from "drizzle-orm";
+import { eq, and, desc, inArray, or, gte, lte } from "drizzle-orm";
 import {
-  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser,
+  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability,
   type User, type InsertUser,
   type Barnehage, type InsertBarnehage,
   type Vakt, type InsertVakt,
@@ -11,6 +11,7 @@ import {
   type Onboarding, type InsertOnboarding,
   type Varsel, type InsertVarsel,
   type VaktInteresse, type InsertVaktInteresse,
+  type Availability,
   type PushSubscription, type InsertPushSubscription,
 } from "@shared/schema";
 
@@ -78,6 +79,11 @@ export interface IStorage {
   createVaktInteresse(data: InsertVaktInteresse): Promise<VaktInteresse>;
   deleteVaktInteresser(vaktId: string): Promise<void>;
   getVaktInteresserByAnsatt(ansattId: string): Promise<VaktInteresse[]>;
+
+  getAvailabilityByUser(userId: string, fromDate?: string, toDate?: string): Promise<Availability[]>;
+  getAvailabilityByDate(date: string): Promise<Availability[]>;
+  setAvailability(userId: string, date: string, status: string): Promise<Availability>;
+  deleteAvailability(userId: string, date: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -347,6 +353,37 @@ export class DatabaseStorage implements IStorage {
 
   async getVaktInteresserByAnsatt(ansattId: string): Promise<VaktInteresse[]> {
     return db.select().from(vaktInteresser).where(eq(vaktInteresser.ansattId, ansattId));
+  }
+
+  async getAvailabilityByUser(userId: string, fromDate?: string, toDate?: string): Promise<Availability[]> {
+    const conditions = [eq(availability.userId, userId)];
+    if (fromDate) conditions.push(gte(availability.date, fromDate));
+    if (toDate) conditions.push(lte(availability.date, toDate));
+    return db.select().from(availability).where(and(...conditions));
+  }
+
+  async getAvailabilityByDate(date: string): Promise<Availability[]> {
+    return db.select().from(availability).where(eq(availability.date, date));
+  }
+
+  async setAvailability(userId: string, date: string, status: string): Promise<Availability> {
+    const [row] = await db
+      .insert(availability)
+      .values({ userId, date, status })
+      .onConflictDoUpdate({
+        target: [availability.userId, availability.date],
+        set: { status },
+      })
+      .returning();
+    return row;
+  }
+
+  async deleteAvailability(userId: string, date: string): Promise<boolean> {
+    const [deleted] = await db
+      .delete(availability)
+      .where(and(eq(availability.userId, userId), eq(availability.date, date)))
+      .returning();
+    return !!deleted;
   }
 }
 

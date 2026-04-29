@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, date, time, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, date, time, decimal, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -117,6 +117,16 @@ export const vaktInteresser = pgTable("vakt_interesser", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const availability = pgTable("availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  date: date("date").notNull(),
+  status: text("status").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  userDateUnique: uniqueIndex("availability_user_date_unique").on(table.userId, table.date),
+}));
+
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
@@ -137,6 +147,7 @@ export const insertFavorittSchema = createInsertSchema(favoritter).omit({ id: tr
 export const insertOnboardingSchema = createInsertSchema(onboarding).omit({ id: true });
 export const insertVarselSchema = createInsertSchema(varsler).omit({ id: true, createdAt: true });
 export const insertVaktInteresseSchema = createInsertSchema(vaktInteresser).omit({ id: true, createdAt: true });
+export const insertAvailabilitySchema = createInsertSchema(availability).omit({ id: true, createdAt: true });
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -157,5 +168,7 @@ export type InsertVarsel = z.infer<typeof insertVarselSchema>;
 export type Varsel = typeof varsler.$inferSelect;
 export type InsertVaktInteresse = z.infer<typeof insertVaktInteresseSchema>;
 export type VaktInteresse = typeof vaktInteresser.$inferSelect;
+export type InsertAvailability = z.infer<typeof insertAvailabilitySchema>;
+export type Availability = typeof availability.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;

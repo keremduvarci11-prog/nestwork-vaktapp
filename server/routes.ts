@@ -1311,5 +1311,132 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // ===== Tilgjengelighet (Availability) =====
+  const isValidDate = (s: unknown): s is string => {
+    if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    const [y, m, d] = s.split("-").map(Number);
+    if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return (
+      dt.getUTCFullYear() === y &&
+      dt.getUTCMonth() === m - 1 &&
+      dt.getUTCDate() === d
+    );
+  };
+  const isValidMonth = (s: unknown): s is string => {
+    if (typeof s !== "string" || !/^\d{4}-\d{2}$/.test(s)) return false;
+    const [, m] = s.split("-").map(Number);
+    return m >= 1 && m <= 12;
+  };
+  const isValidStatus = (s: unknown): s is "available" | "unavailable" =>
+    s === "available" || s === "unavailable";
+
+  // Ansatt: hent egen tilgjengelighet (valgfritt month=YYYY-MM)
+  app.get("/api/availability/me", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req)!;
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    if (month !== undefined && !isValidMonth(month)) {
+      return res.status(400).json({ message: "Ugyldig måned" });
+    }
+    let from: string | undefined;
+    let to: string | undefined;
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(y, m, 0).getDate();
+      from = `${month}-01`;
+      to = `${month}-${String(last).padStart(2, "0")}`;
+    }
+    const rows = await storage.getAvailabilityByUser(userId, from, to);
+    res.json(rows);
+  });
+
+  // Ansatt: sett egen status for en dag
+  app.put("/api/availability/me", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req)!;
+    const { date, status } = req.body || {};
+    if (!isValidDate(date) || !isValidStatus(status)) {
+      return res.status(400).json({ message: "Ugyldig dato eller status" });
+    }
+    const row = await storage.setAvailability(userId, date, status);
+    res.json(row);
+  });
+
+  // Ansatt: fjern status for en dag (-> "Nøytral/Grå")
+  app.delete("/api/availability/me/:date", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req)!;
+    const { date } = req.params;
+    if (!isValidDate(date)) {
+      return res.status(400).json({ message: "Ugyldig dato" });
+    }
+    await storage.deleteAvailability(userId, date);
+    res.json({ success: true });
+  });
+
+  // Admin: alle ansatte med 'available' for en dato (med vakter-overlay)
+  app.get("/api/admin/availability/by-date/:date", requireAdmin, async (req, res) => {
+    const { date } = req.params;
+    if (!isValidDate(date)) {
+      return res.status(400).json({ message: "Ugyldig dato" });
+    }
+    const [rows, allUsers, allVakter] = await Promise.all([
+      storage.getAvailabilityByDate(date),
+      storage.getAllUsers(),
+      storage.getVakter(),
+    ]);
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const vaktByUserOnDate = new Set(
+      allVakter
+        .filter((v) => v.dato === date && v.ansattId)
+        .map((v) => v.ansattId as string),
+    );
+    const result = rows
+      .filter((r) => r.status === "available")
+      .map((r) => {
+        const u = userMap.get(r.userId);
+        if (!u) return null;
+        const hasShift = vaktByUserOnDate.has(r.userId);
+        return {
+          userId: r.userId,
+          name: u.name,
+          stilling: u.stilling,
+          region: u.region,
+          profileImage: u.profileImage,
+          status: hasShift ? "assigned" : "available",
+        };
+      })
+      .filter(Boolean);
+    res.json(result);
+  });
+
+  // Admin: en spesifikk ansatts tilgjengelighet for en måned (med vakt-overlay)
+  app.get("/api/admin/availability/user/:userId", requireAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    if (month !== undefined && !isValidMonth(month)) {
+      return res.status(400).json({ message: "Ugyldig måned" });
+    }
+    let from: string | undefined;
+    let to: string | undefined;
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(y, m, 0).getDate();
+      from = `${month}-01`;
+      to = `${month}-${String(last).padStart(2, "0")}`;
+    }
+    const [avail, vakterAll] = await Promise.all([
+      storage.getAvailabilityByUser(userId, from, to),
+      storage.getVakterByAnsatt(userId),
+    ]);
+    const vaktDates = new Set(
+      vakterAll
+        .filter((v) => (!from || v.dato >= from) && (!to || v.dato <= to))
+        .map((v) => v.dato),
+    );
+    res.json({
+      availability: avail.map((a) => ({ date: a.date, status: a.status })),
+      shiftDates: Array.from(vaktDates),
+    });
+  });
+
   return httpServer;
 }
