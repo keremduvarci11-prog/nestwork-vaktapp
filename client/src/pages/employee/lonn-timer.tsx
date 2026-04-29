@@ -74,16 +74,18 @@ export default function LonnTimer() {
 
   const timelonn = parseFloat(user?.timelonn || "0");
 
+  const MIN_MONTH_KEY = "2026-05";
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
-    set.add(todayKey);
+    if (todayKey >= MIN_MONTH_KEY) set.add(todayKey);
     (vakter || []).forEach((v) => {
       if (!v.dato) return;
       if (v.status !== "godkjent") return;
       const d = new Date(v.dato + "T00:00:00");
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      set.add(key);
+      if (key >= MIN_MONTH_KEY) set.add(key);
     });
+    if (set.size === 0) set.add(MIN_MONTH_KEY);
     return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [vakter, todayKey]);
 
@@ -309,9 +311,6 @@ export default function LonnTimer() {
                   <p className="text-sm text-muted-foreground">Brutto lønn {monthLabel}</p>
                   <p className="text-2xl font-bold" data-testid="text-total-earnings">
                     {formatNok(totals.grossPay)} kr
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    + {formatNok(totals.feriepenger)} kr feriepenger (12%)
                   </p>
                 </div>
               </div>
