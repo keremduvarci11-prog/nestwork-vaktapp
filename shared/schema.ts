@@ -127,6 +127,12 @@ export const availability = pgTable("availability", {
   userDateUnique: uniqueIndex("availability_user_date_unique").on(table.userId, table.date),
 }));
 
+export const blockedDates = pgTable("blocked_dates", {
+  date: date("date").primaryKey(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
@@ -148,6 +154,7 @@ export const insertOnboardingSchema = createInsertSchema(onboarding).omit({ id: 
 export const insertVarselSchema = createInsertSchema(varsler).omit({ id: true, createdAt: true });
 export const insertVaktInteresseSchema = createInsertSchema(vaktInteresser).omit({ id: true, createdAt: true });
 export const insertAvailabilitySchema = createInsertSchema(availability).omit({ id: true, createdAt: true });
+export const insertBlockedDateSchema = createInsertSchema(blockedDates).omit({ createdAt: true });
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

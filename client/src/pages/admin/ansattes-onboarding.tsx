@@ -134,9 +134,19 @@ function AvailabilityCalendar({ userId }: { userId: string }) {
     },
   });
 
+  const { data: blocked } = useQuery<{ date: string; reason: string | null }[]>({
+    queryKey: ["/api/blocked-dates", month],
+    queryFn: async () => {
+      const res = await fetch(`/api/blocked-dates?month=${month}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Kunne ikke hente blokkerte dager");
+      return res.json();
+    },
+  });
+
   const statusByDate = new Map<string, string>();
   (data?.availability || []).forEach((a) => statusByDate.set(a.date, a.status));
   const shiftSet = new Set(data?.shiftDates || []);
+  const blockedSet = new Set((blocked || []).map((b) => b.date));
 
   const year = viewMonth.getFullYear();
   const monthIdx = viewMonth.getMonth();
@@ -201,10 +211,14 @@ function AvailabilityCalendar({ userId }: { userId: string }) {
           {cells.map((iso, idx) => {
             if (!iso) return <div key={`b-${idx}`} className="aspect-square" />;
             const dayNum = Number(iso.split("-")[2]);
+            const isBlocked = blockedSet.has(iso);
             const hasShift = shiftSet.has(iso);
             const status = statusByDate.get(iso);
             let cls = "bg-muted/40 text-muted-foreground";
-            if (hasShift) cls = "bg-orange-500 text-white";
+            let label: React.ReactNode = dayNum;
+            if (isBlocked) {
+              cls = "bg-zinc-300 dark:bg-zinc-700 text-zinc-500 line-through";
+            } else if (hasShift) cls = "bg-orange-500 text-white";
             else if (status === "available") cls = "bg-green-500 text-white";
             else if (status === "unavailable") cls = "bg-red-500 text-white";
             return (
@@ -212,8 +226,9 @@ function AvailabilityCalendar({ userId }: { userId: string }) {
                 key={iso}
                 className={`aspect-square rounded text-[10px] font-medium flex items-center justify-center ${cls}`}
                 data-testid={`cal-day-${iso}`}
+                title={isBlocked ? "Stengt" : undefined}
               >
-                {dayNum}
+                {label}
               </div>
             );
           })}

@@ -1,12 +1,23 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar as CalendarComp } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronLeft, ChevronRight, CalendarDays, MapPin, AlertCircle, Briefcase } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  MapPin,
+  AlertCircle,
+  Briefcase,
+  Lock,
+  Unlock,
+} from "lucide-react";
 import { nb } from "date-fns/locale";
 
 interface AvailableEmp {
@@ -16,6 +27,10 @@ interface AvailableEmp {
   region: string;
   profileImage: string | null;
   status: "available" | "assigned";
+}
+interface ByDateResponse {
+  blocked: boolean;
+  employees: AvailableEmp[];
 }
 
 const toIso = (d: Date) => {
@@ -31,6 +46,7 @@ const fromIso = (s: string) => {
 };
 
 export default function AdminTilgjengelighet() {
+  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string>(() => toIso(new Date()));
   const [calOpen, setCalOpen] = useState(false);
 
@@ -47,11 +63,13 @@ export default function AdminTilgjengelighet() {
     setSelectedDate(toIso(d));
   };
 
-  const { data: list, isLoading } = useQuery<AvailableEmp[]>({
+  const { data, isLoading } = useQuery<ByDateResponse>({
     queryKey: ["/api/admin/availability/by-date", selectedDate],
   });
 
-  const sorted = (list || []).slice().sort((a, b) => {
+  const isBlocked = !!data?.blocked;
+  const employees = data?.employees || [];
+  const sorted = employees.slice().sort((a, b) => {
     if (a.status !== b.status) return a.status === "available" ? -1 : 1;
     return a.name.localeCompare(b.name, "nb");
   });
@@ -59,12 +77,36 @@ export default function AdminTilgjengelighet() {
   const ledigeCount = sorted.filter((e) => e.status === "available").length;
   const tildeltCount = sorted.filter((e) => e.status === "assigned").length;
 
+  const blockMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/admin/blocked-dates", { date: selectedDate }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/availability/by-date"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/blocked-dates"] });
+      toast({ title: "Dato blokkert", description: longLabel });
+    },
+    onError: (err: any) => {
+      toast({ title: "Kunne ikke blokkere", description: err?.message || "", variant: "destructive" });
+    },
+  });
+
+  const unblockMutation = useMutation({
+    mutationFn: async () => apiRequest("DELETE", `/api/admin/blocked-dates/${selectedDate}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/availability/by-date"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/blocked-dates"] });
+      toast({ title: "Blokkering fjernet", description: longLabel });
+    },
+    onError: (err: any) => {
+      toast({ title: "Kunne ikke fjerne blokkering", description: err?.message || "", variant: "destructive" });
+    },
+  });
+
   return (
     <div className="space-y-5" data-testid="page-admin-tilgjengelighet">
       <div>
         <h1 className="text-xl font-bold">Tilgjengelighet</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Se hvilke ansatte som er ledige på en valgt dato.
+          Se ledige ansatte eller blokker en dag (helligdager / stengt).
         </p>
       </div>
 
@@ -121,7 +163,34 @@ export default function AdminTilgjengelighet() {
             </Button>
           </div>
 
-          {!isLoading && sorted.length > 0 && (
+          {/* Block / unblock kontroll */}
+          <div className="flex items-center justify-center mt-2">
+            {isBlocked ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => unblockMutation.mutate()}
+                disabled={unblockMutation.isPending}
+                data-testid="button-unblock-date"
+              >
+                <Unlock className="w-3.5 h-3.5 mr-1.5" />
+                Fjern blokkering
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => blockMutation.mutate()}
+                disabled={blockMutation.isPending}
+                data-testid="button-block-date"
+              >
+                <Lock className="w-3.5 h-3.5 mr-1.5" />
+                Blokker dato
+              </Button>
+            )}
+          </div>
+
+          {!isBlocked && !isLoading && sorted.length > 0 && (
             <div className="flex items-center justify-center gap-3 mt-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-500" />
@@ -138,8 +207,18 @@ export default function AdminTilgjengelighet() {
         </CardContent>
       </Card>
 
-      {/* Liste */}
-      {isLoading ? (
+      {/* Innhold */}
+      {isBlocked ? (
+        <Card data-testid="card-blocked-banner">
+          <CardContent className="py-10 text-center">
+            <Lock className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+            <p className="font-medium">Dagen er blokkert</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Ansatte kan ikke sette tilgjengelighet på blokkerte dager.
+            </p>
+          </CardContent>
+        </Card>
+      ) : isLoading ? (
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-16 w-full rounded-md" />

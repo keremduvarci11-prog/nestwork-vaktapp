@@ -1357,7 +1357,28 @@ export async function registerRoutes(
     if (!isValidDate(date) || !isValidStatus(status)) {
       return res.status(400).json({ message: "Ugyldig dato eller status" });
     }
-    const row = await storage.setAvailability(userId, date, status);
+    // Ikke tillat fortidsdager
+    const todayIso = (() => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    })();
+    if (date < todayIso) {
+      return res.status(400).json({ message: "Du kan ikke endre fortidsdager" });
+    }
+    // Ikke tillat helger (lør=6, søn=0)
+    const [yy, mm, dd] = date.split("-").map(Number);
+    const wd = new Date(Date.UTC(yy, mm - 1, dd)).getUTCDay();
+    if (wd === 0 || wd === 6) {
+      return res.status(400).json({ message: "Du kan ikke sette tilgjengelighet på helger" });
+    }
+    // Atomisk: skriv kun hvis ikke blokkert (ingen TOCTOU-rase)
+    const row = await storage.setAvailabilityIfNotBlocked(userId, date, status);
+    if (!row) {
+      return res.status(400).json({ message: "Denne dagen er blokkert av admin" });
+    }
     res.json(row);
   });
 
@@ -1372,16 +1393,17 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  // Admin: alle ansatte med 'available' for en dato (med vakter-overlay)
+  // Admin: alle ansatte med 'available' for en dato (med vakter-overlay + blokkert-flagg)
   app.get("/api/admin/availability/by-date/:date", requireAdmin, async (req, res) => {
     const { date } = req.params;
     if (!isValidDate(date)) {
       return res.status(400).json({ message: "Ugyldig dato" });
     }
-    const [rows, allUsers, allVakter] = await Promise.all([
+    const [rows, allUsers, allVakter, blocked] = await Promise.all([
       storage.getAvailabilityByDate(date),
       storage.getAllUsers(),
       storage.getVakter(),
+      storage.isBlockedDate(date),
     ]);
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
     const vaktByUserOnDate = new Set(
@@ -1389,7 +1411,7 @@ export async function registerRoutes(
         .filter((v) => v.dato === date && v.ansattId)
         .map((v) => v.ansattId as string),
     );
-    const result = rows
+    const employees = rows
       .filter((r) => r.status === "available")
       .map((r) => {
         const u = userMap.get(r.userId);
@@ -1405,7 +1427,46 @@ export async function registerRoutes(
         };
       })
       .filter(Boolean);
-    res.json(result);
+    res.json({ blocked, employees });
+  });
+
+  // Alle innloggede: hent blokkerte datoer (valgfritt month=YYYY-MM)
+  app.get("/api/blocked-dates", requireAuth, async (req, res) => {
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    if (month !== undefined && !isValidMonth(month)) {
+      return res.status(400).json({ message: "Ugyldig måned" });
+    }
+    let from: string | undefined;
+    let to: string | undefined;
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(y, m, 0).getDate();
+      from = `${month}-01`;
+      to = `${month}-${String(last).padStart(2, "0")}`;
+    }
+    const rows = await storage.getBlockedDates(from, to);
+    res.json(rows);
+  });
+
+  // Admin: blokker en dato
+  app.post("/api/admin/blocked-dates", requireAdmin, async (req, res) => {
+    const { date, reason } = req.body || {};
+    if (!isValidDate(date)) {
+      return res.status(400).json({ message: "Ugyldig dato" });
+    }
+    const reasonStr = typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 200) : null;
+    const row = await storage.addBlockedDate(date, reasonStr);
+    res.json(row);
+  });
+
+  // Admin: fjern blokkering
+  app.delete("/api/admin/blocked-dates/:date", requireAdmin, async (req, res) => {
+    const { date } = req.params;
+    if (!isValidDate(date)) {
+      return res.status(400).json({ message: "Ugyldig dato" });
+    }
+    await storage.removeBlockedDate(date);
+    res.json({ success: true });
   });
 
   // Admin: en spesifikk ansatts tilgjengelighet for en måned (med vakt-overlay)

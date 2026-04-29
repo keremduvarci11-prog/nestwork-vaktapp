@@ -14,6 +14,16 @@ interface AvailRow {
   date: string;
   status: "available" | "unavailable";
 }
+interface VaktRow {
+  id: string;
+  ansattId: string | null;
+  dato: string;
+  status?: string;
+}
+interface BlockedRow {
+  date: string;
+  reason: string | null;
+}
 
 const toIso = (d: Date) => {
   const y = d.getFullYear();
@@ -47,11 +57,36 @@ export default function MinTilgjengelighet() {
     enabled: !!user,
   });
 
+  const { data: blocked } = useQuery<BlockedRow[]>({
+    queryKey: ["/api/blocked-dates", month],
+    queryFn: async () => {
+      const res = await fetch(`/api/blocked-dates?month=${month}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Kunne ikke hente blokkerte dager");
+      return res.json();
+    },
+  });
+
+  const { data: vakter } = useQuery<VaktRow[]>({
+    queryKey: ["/api/vakter/mine", user?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/vakter/mine/${user!.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Kunne ikke hente vakter");
+      return res.json();
+    },
+    enabled: !!user?.id,
+  });
+
   const statusByDate = useMemo(() => {
     const m = new Map<string, "available" | "unavailable">();
     (rows || []).forEach((r) => m.set(r.date, r.status));
     return m;
   }, [rows]);
+
+  const blockedSet = useMemo(() => new Set((blocked || []).map((b) => b.date)), [blocked]);
+  const shiftSet = useMemo(
+    () => new Set((vakter || []).filter((v) => v.ansattId === user?.id).map((v) => v.dato)),
+    [vakter, user?.id],
+  );
 
   const setMutation = useMutation({
     mutationFn: async ({ date, status }: { date: string; status: "available" | "unavailable" }) =>
@@ -90,7 +125,6 @@ export default function MinTilgjengelighet() {
   const monthIdx = viewMonth.getMonth();
   const firstOfMonth = new Date(year, monthIdx, 1);
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-  // JS getDay(): 0=Sun, 1=Mon ... 6=Sat. We want Mon=0...Sun=6
   const startWeekday = (firstOfMonth.getDay() + 6) % 7;
 
   const cells: (string | null)[] = [];
@@ -112,9 +146,9 @@ export default function MinTilgjengelighet() {
   return (
     <div className="space-y-5" data-testid="page-min-tilgjengelighet">
       <div>
-        <h1 className="text-xl font-bold">Min tilgjengelighet</h1>
+        <h1 className="text-xl font-bold">Tilgjengelighet</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Trykk på en dag for å markere når du er ledig.
+          Trykk på en hverdag for å markere når du er ledig.
         </p>
       </div>
 
@@ -124,17 +158,18 @@ export default function MinTilgjengelighet() {
           <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
             <Info className="w-3.5 h-3.5" /> Trykk på samme dag for å bytte status:
           </p>
-          <div className="flex flex-wrap items-center gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded bg-green-500" /> Ledig
             </span>
-            <span className="text-muted-foreground">→</span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded bg-red-500" /> Ikke ledig
             </span>
-            <span className="text-muted-foreground">→</span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-muted border border-border" /> Nøytral
+              <span className="w-3 h-3 rounded bg-orange-500" /> Tildelt vakt
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded bg-zinc-300 dark:bg-zinc-600" /> Stengt / fortid
             </span>
           </div>
         </CardContent>
@@ -188,25 +223,46 @@ export default function MinTilgjengelighet() {
                 const dayNum = Number(date.split("-")[2]);
                 const status = statusByDate.get(date);
                 const isToday = date === todayIso;
+                const isPast = date < todayIso;
+                const [yy, mm, dd] = date.split("-").map(Number);
+                const wd = new Date(Date.UTC(yy, mm - 1, dd)).getUTCDay();
+                const isWeekend = wd === 0 || wd === 6;
+                const isBlocked = blockedSet.has(date);
+                const hasShift = shiftSet.has(date);
+
+                const disabled = isPast || isWeekend || isBlocked || hasShift;
 
                 let bg = "bg-muted hover:bg-muted/80 text-foreground";
-                if (status === "available") {
+                let label: React.ReactNode = dayNum;
+                let title: string | undefined;
+
+                if (isBlocked) {
+                  bg = "bg-zinc-300 dark:bg-zinc-700 text-zinc-500 line-through";
+                  title = "Stengt";
+                } else if (hasShift) {
+                  bg = "bg-orange-500 text-white";
+                  title = "Tildelt vakt";
+                } else if (status === "available") {
                   bg = "bg-green-500 hover:bg-green-600 text-white";
                 } else if (status === "unavailable") {
                   bg = "bg-red-500 hover:bg-red-600 text-white";
+                } else if (isPast || isWeekend) {
+                  bg = "bg-muted/40 text-muted-foreground";
+                  title = isPast ? "Fortid" : "Helg";
                 }
 
                 return (
                   <button
                     key={date}
-                    onClick={() => handleDayClick(date)}
-                    disabled={setMutation.isPending || deleteMutation.isPending}
+                    onClick={() => !disabled && handleDayClick(date)}
+                    disabled={disabled || setMutation.isPending || deleteMutation.isPending}
                     data-testid={`day-${date}`}
+                    title={title}
                     className={`aspect-square rounded-md text-sm font-medium transition-colors ${bg} ${
                       isToday ? "ring-2 ring-primary ring-offset-1" : ""
-                    } disabled:opacity-50`}
+                    } ${disabled ? "cursor-not-allowed" : ""} disabled:opacity-100`}
                   >
-                    {dayNum}
+                    {label}
                   </button>
                 );
               })}

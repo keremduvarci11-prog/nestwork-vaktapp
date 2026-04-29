@@ -1,7 +1,7 @@
 import { db } from "./db";
-import { eq, and, desc, inArray, or, gte, lte } from "drizzle-orm";
+import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
-  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability,
+  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates,
   type User, type InsertUser,
   type Barnehage, type InsertBarnehage,
   type Vakt, type InsertVakt,
@@ -83,7 +83,13 @@ export interface IStorage {
   getAvailabilityByUser(userId: string, fromDate?: string, toDate?: string): Promise<Availability[]>;
   getAvailabilityByDate(date: string): Promise<Availability[]>;
   setAvailability(userId: string, date: string, status: string): Promise<Availability>;
+  setAvailabilityIfNotBlocked(userId: string, date: string, status: string): Promise<Availability | null>;
   deleteAvailability(userId: string, date: string): Promise<boolean>;
+
+  getBlockedDates(fromDate?: string, toDate?: string): Promise<{ date: string; reason: string | null }[]>;
+  isBlockedDate(date: string): Promise<boolean>;
+  addBlockedDate(date: string, reason?: string | null): Promise<{ date: string; reason: string | null }>;
+  removeBlockedDate(date: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -378,11 +384,58 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
+  async setAvailabilityIfNotBlocked(
+    userId: string,
+    date: string,
+    status: string,
+  ): Promise<Availability | null> {
+    // Atomisk: vi har en sjekk + skriv i samme SQL slik at admin ikke kan blokkere
+    // datoen mellom sjekk og skriv.
+    const result: any = await db.execute(sql`
+      INSERT INTO availability (user_id, date, status)
+      SELECT ${userId}, ${date}::date, ${status}
+      WHERE NOT EXISTS (SELECT 1 FROM blocked_dates WHERE date = ${date}::date)
+      ON CONFLICT (user_id, date) DO UPDATE SET status = EXCLUDED.status
+      RETURNING id, user_id AS "userId", date::text AS date, status, created_at AS "createdAt"
+    `);
+    const rows = (result.rows ?? result) as Availability[];
+    return rows[0] ?? null;
+  }
+
   async deleteAvailability(userId: string, date: string): Promise<boolean> {
     const [deleted] = await db
       .delete(availability)
       .where(and(eq(availability.userId, userId), eq(availability.date, date)))
       .returning();
+    return !!deleted;
+  }
+
+  async getBlockedDates(fromDate?: string, toDate?: string): Promise<{ date: string; reason: string | null }[]> {
+    const conditions = [] as any[];
+    if (fromDate) conditions.push(gte(blockedDates.date, fromDate));
+    if (toDate) conditions.push(lte(blockedDates.date, toDate));
+    const rows = conditions.length
+      ? await db.select().from(blockedDates).where(and(...conditions))
+      : await db.select().from(blockedDates);
+    return rows.map((r) => ({ date: r.date, reason: r.reason ?? null }));
+  }
+
+  async isBlockedDate(date: string): Promise<boolean> {
+    const [row] = await db.select().from(blockedDates).where(eq(blockedDates.date, date));
+    return !!row;
+  }
+
+  async addBlockedDate(date: string, reason?: string | null): Promise<{ date: string; reason: string | null }> {
+    const [row] = await db
+      .insert(blockedDates)
+      .values({ date, reason: reason ?? null })
+      .onConflictDoUpdate({ target: blockedDates.date, set: { reason: reason ?? null } })
+      .returning();
+    return { date: row.date, reason: row.reason ?? null };
+  }
+
+  async removeBlockedDate(date: string): Promise<boolean> {
+    const [deleted] = await db.delete(blockedDates).where(eq(blockedDates.date, date)).returning();
     return !!deleted;
   }
 }

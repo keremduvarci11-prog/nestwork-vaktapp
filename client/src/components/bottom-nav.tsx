@@ -8,6 +8,7 @@ const employeeItems = [
   { path: "/mine-vakter", label: "Vakter", icon: Calendar },
   { path: "/meldinger", label: "Meldinger", icon: MessageSquare, badge: "employee" as const },
   { path: "/lonn-timer", label: "Lønn", icon: Wallet },
+  { path: "/min-tilgjengelighet", label: "Tilgjengelig", icon: CalendarCheck },
   { path: "/profil", label: "Profil", icon: User },
 ];
 
