@@ -1,13 +1,14 @@
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { Home, Calendar, User, MessageSquare, LayoutDashboard, CheckSquare, Plus, Mail, Wallet } from "lucide-react";
+import { Home, Calendar, User, MessageSquare, LayoutDashboard, CheckSquare, Plus, Mail, Wallet, CalendarCheck } from "lucide-react";
 
 const employeeItems = [
   { path: "/", label: "Hjem", icon: Home },
   { path: "/mine-vakter", label: "Vakter", icon: Calendar },
   { path: "/meldinger", label: "Meldinger", icon: MessageSquare, badge: "employee" as const },
   { path: "/lonn-timer", label: "Lønn", icon: Wallet },
+  { path: "/min-tilgjengelighet", label: "Ledig", icon: CalendarCheck },
   { path: "/profil", label: "Profil", icon: User },
 ];
 
@@ -44,17 +45,17 @@ export function BottomNav({ role }: { role: string }) {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 border-t z-50 bg-background" data-testid="bottom-nav" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}>
-      <div className="flex items-center justify-around h-[50px] max-w-lg mx-auto px-2">
+      <div className="flex items-stretch justify-around h-[50px] max-w-lg mx-auto px-1 gap-0.5">
         {items.map((item) => {
           const isActive = item.path === "/"
             ? location === "/"
             : location.startsWith(item.path);
           const badgeCount = getBadgeCount(item.badge);
           return (
-            <Link key={item.path} href={item.path}>
+            <Link key={item.path} href={item.path} className="flex-1 min-w-0">
               <button
                 data-testid={`nav-${item.label.toLowerCase()}`}
-                className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md transition-colors min-w-[3.5rem] ${
+                className={`w-full h-full flex flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-md transition-colors ${
                   isActive ? "text-primary" : "text-muted-foreground"
                 }`}
               >

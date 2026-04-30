@@ -74,7 +74,11 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - Dark mode with three options: Lys/Mørk/Automatisk (localStorage "nestwork-theme"), ThemeProvider wraps app, defaults to light
 - syncProdData.ts: auto-syncs production DB with real data + creates onboarding items on startup
 - Onboarding auto-backfill: missing items are created on first fetch per employee
-- Employee bottom nav: Hjem, Vakter, Meldinger, Lønn, Profil (Onboarding moved to Profil-side)
+- Employee bottom nav: Hjem, Vakter, Meldinger, Lønn, Ledig, Profil (6 buttons, flex-1 layout for narrow screens)
+- Tilgjengelighet: employees mark days available (green) / unavailable (red) on /min-tilgjengelighet (mon-first calendar). Past dates, weekends, blocked dates and days with assigned shifts are non-clickable. Click cycles empty→green→red→empty.
+- Admin /admin/tilgjengelighet: calendar where admin can block/unblock individual dates (holidays, kindergarten closed) with optional reason. Blocked dates render grey/strikethrough/× for everyone and take precedence over assigned shifts.
+- Admin EmployeeDetailDialog (ansattes-onboarding) shows a per-employee mini-calendar with availability, blocked days and assigned shifts.
+- Schema: `availability` (user_id, date, status) and `blocked_dates` (date PK, reason). Server uses atomic `setAvailabilityIfNotBlocked` to prevent race conditions.
 - Admin "Ansattes onboarding" page: search employees, view progress, download documents
 - Lønn & Timer page (/lonn-timer): month dropdown, totals (timer, brutto, 12% feriepenger), per-vakt cards with "Send inn timer for godkjenning" button (active when shift has ended), client-side PDF lønnsslipp via jsPDF (Nestwork Group AS, orgnr 936 293 239)
 - vakter.timerInnsendt + timerInnsendtAt fields track ansatt timer-innsending; atomic conditional update prevents double-submit

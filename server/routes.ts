@@ -1484,9 +1484,10 @@ export async function registerRoutes(
       from = `${month}-01`;
       to = `${month}-${String(last).padStart(2, "0")}`;
     }
-    const [avail, vakterAll] = await Promise.all([
+    const [avail, vakterAll, blocked] = await Promise.all([
       storage.getAvailabilityByUser(userId, from, to),
       storage.getVakterByAnsatt(userId),
+      storage.getBlockedDates(from, to),
     ]);
     const vaktDates = new Set(
       vakterAll
@@ -1496,6 +1497,7 @@ export async function registerRoutes(
     res.json({
       availability: avail.map((a) => ({ date: a.date, status: a.status })),
       shiftDates: Array.from(vaktDates),
+      blockedDates: blocked.map((b) => b.date),
     });
   });
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -78,6 +78,130 @@ interface EmployeeOnboarding {
 }
 
 const MONTH_NAMES_NB_FULL = ["januar", "februar", "mars", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "desember"];
+const MONTH_NAMES_NB_SHORT = ["Januar", "Februar", "Mars", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Desember"];
+const WEEKDAYS_SHORT = ["M", "T", "O", "T", "F", "L", "S"];
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+interface UserAvailabilityResponse {
+  availability: Array<{ date: string; status: "available" | "unavailable" }>;
+  shiftDates: string[];
+  blockedDates: string[];
+}
+
+function EmployeeAvailabilityCalendar({ userId }: { userId: string }) {
+  const [cursor, setCursor] = useState<{ y: number; m: number }>(() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() + 1 };
+  });
+  const monthKey = `${cursor.y}-${pad2(cursor.m)}`;
+
+  const { data, isLoading } = useQuery<UserAvailabilityResponse>({
+    queryKey: ["/api/admin/availability/user", userId, monthKey],
+    queryFn: async () => {
+      const r = await fetch(`/api/admin/availability/user/${userId}?month=${monthKey}`, { credentials: "include" });
+      if (!r.ok) throw new Error("Kunne ikke hente data");
+      return r.json();
+    },
+  });
+
+  const availMap = useMemo(() => {
+    const m = new Map<string, "available" | "unavailable">();
+    (data?.availability || []).forEach((a) => m.set(a.date, a.status));
+    return m;
+  }, [data]);
+  const shiftSet = useMemo(() => new Set(data?.shiftDates || []), [data]);
+  const blockedSet = useMemo(() => new Set(data?.blockedDates || []), [data]);
+
+  const cells = useMemo(() => {
+    const first = new Date(cursor.y, cursor.m - 1, 1);
+    const lastDay = new Date(cursor.y, cursor.m, 0).getDate();
+    const startOffset = (first.getDay() + 6) % 7;
+    const arr: Array<{ key: string; date: string | null; day: number | null }> = [];
+    for (let i = 0; i < startOffset; i++) arr.push({ key: `e-${i}`, date: null, day: null });
+    for (let d = 1; d <= lastDay; d++) {
+      const iso = `${cursor.y}-${pad2(cursor.m)}-${pad2(d)}`;
+      arr.push({ key: iso, date: iso, day: d });
+    }
+    return arr;
+  }, [cursor]);
+
+  const goPrev = () => setCursor((c) => (c.m === 1 ? { y: c.y - 1, m: 12 } : { y: c.y, m: c.m - 1 }));
+  const goNext = () => setCursor((c) => (c.m === 12 ? { y: c.y + 1, m: 1 } : { y: c.y, m: c.m + 1 }));
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Button size="icon" variant="ghost" onClick={goPrev} className="h-7 w-7" data-testid="button-cal-prev">
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <div className="text-xs font-semibold" data-testid="text-cal-month">
+          {MONTH_NAMES_NB_SHORT[cursor.m - 1]} {cursor.y}
+        </div>
+        <Button size="icon" variant="ghost" onClick={goNext} className="h-7 w-7" data-testid="button-cal-next">
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-0.5">
+        {WEEKDAYS_SHORT.map((d, i) => (
+          <div key={i} className="text-[9px] text-center text-muted-foreground py-0.5">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-32 w-full" />
+      ) : (
+        <div className="grid grid-cols-7 gap-0.5">
+          {cells.map((cell) => {
+            if (!cell.date) return <div key={cell.key} className="aspect-square" />;
+            const iso = cell.date;
+            const dt = new Date(cursor.y, cursor.m - 1, cell.day!);
+            const wd = dt.getDay();
+            const isWeekend = wd === 0 || wd === 6;
+            const isBlocked = blockedSet.has(iso);
+            const hasShift = shiftSet.has(iso);
+            const status = availMap.get(iso);
+
+            let cls = "aspect-square rounded-sm flex items-center justify-center text-[10px] font-medium relative ";
+            if (isBlocked) {
+              cls += "bg-muted text-muted-foreground line-through";
+            } else if (hasShift) {
+              cls += "bg-orange-500 text-white";
+            } else if (isWeekend) {
+              cls += "bg-muted/40 text-muted-foreground/60";
+            } else if (status === "available") {
+              cls += "bg-green-600 text-white";
+            } else if (status === "unavailable") {
+              cls += "bg-red-500 text-white";
+            } else {
+              cls += "bg-card border border-border text-foreground";
+            }
+            return (
+              <div key={cell.key} className={cls} data-testid={`cal-day-${iso}`} title={iso}>
+                {cell.day}
+                {isBlocked && !hasShift && (
+                  <span className="absolute top-0 right-0.5 text-[8px]">×</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-muted-foreground pt-1">
+        <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-600" /> Ledig</div>
+        <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-500" /> Ikke ledig</div>
+        <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-orange-500" /> Tildelt vakt</div>
+        <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-muted" /> Stengt</div>
+      </div>
+    </div>
+  );
+}
 
 function formatNokAdmin(n: number) {
   return n.toLocaleString("nb-NO", { maximumFractionDigits: 2 });
@@ -328,6 +452,16 @@ function EmployeeDetailDialog({
                   )}
                 </div>
               </div>
+            </section>
+
+            <Separator />
+
+            {/* Tilgjengelighet */}
+            <section>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                Tilgjengelighet
+              </h3>
+              <EmployeeAvailabilityCalendar userId={emp.userId} />
             </section>
 
             <Separator />
