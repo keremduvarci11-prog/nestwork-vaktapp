@@ -251,6 +251,26 @@ export async function registerRoutes(
 
   app.patch("/api/users/:id", requireAuth, async (req, res) => {
     const { password: pw, ...safeData } = req.body;
+    const requesterId = getUserIdFromRequest(req);
+    const requester = requesterId ? await storage.getUser(requesterId) : null;
+    const isAdmin = requester?.role === "admin";
+    const isSelf = requesterId === req.params.id;
+
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ message: "Ingen tilgang" });
+    }
+
+    const adminOnlyFields = ["timelonn", "role", "externalId", "username", "status"] as const;
+    if (!isAdmin) {
+      for (const f of adminOnlyFields) {
+        if (f in safeData) {
+          return res.status(403).json({
+            message: `Bare admin kan endre ${f}`,
+          });
+        }
+      }
+    }
+
     const updated = await storage.updateUser(req.params.id, safeData);
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
@@ -586,6 +606,7 @@ export async function registerRoutes(
             timer: Math.round(timer * 100) / 100,
             trekkPause: updated.trekkPause || false,
             status: "godkjent",
+            timelonn: ansatt?.timelonn ?? null,
           });
         }
       } catch (err) {
@@ -712,6 +733,7 @@ export async function registerRoutes(
           timer: Math.round(timer * 100) / 100,
           trekkPause: updated.trekkPause || false,
           status: "godkjent",
+          timelonn: ansatt?.timelonn ?? null,
         });
         await notifyAdmins(
           "Tildelt vakt godtatt",
@@ -721,6 +743,48 @@ export async function registerRoutes(
         );
       } catch (err) {
         console.error("Google Sheets/Notify error:", err);
+      }
+    })();
+  });
+
+  app.post("/api/vakter/:id/innsend-timer", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req);
+    const vakt = await storage.getVakt(req.params.id);
+    if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
+    if (vakt.ansattId !== userId) {
+      return res.status(403).json({ message: "Du kan kun sende inn timer for dine egne vakter" });
+    }
+    if (vakt.status !== "godkjent") {
+      return res.status(400).json({ message: "Kun godkjente vakter kan sendes inn" });
+    }
+    if (vakt.timerInnsendt) {
+      return res.status(400).json({ message: "Timer er allerede sendt inn for denne vakten" });
+    }
+
+    const now = new Date();
+    const vaktEnd = new Date(`${vakt.dato}T${vakt.sluttTid}`);
+    if (now < vaktEnd) {
+      return res.status(400).json({ message: "Du kan ikke sende inn timer for en vakt som ikke er ferdig" });
+    }
+
+    const updated = await storage.markVaktTimerInnsendt(req.params.id);
+    if (!updated) {
+      return res.status(409).json({ message: "Timer er allerede sendt inn for denne vakten" });
+    }
+    res.json(updated);
+
+    (async () => {
+      try {
+        const ansatt = await storage.getUser(userId!);
+        const bh = await storage.getBarnehage(updated.barnehageId);
+        await notifyAdmins(
+          "Timer innsendt for godkjenning",
+          `${ansatt?.name || "En ansatt"} har sendt inn timer for vakt ${updated.dato} hos ${bh?.name || "ukjent"}.`,
+          "vakt",
+          "/admin/godkjenn"
+        );
+      } catch (err) {
+        console.error("[Notify] Feil ved innsend-varsling:", err);
       }
     })();
   });
@@ -776,6 +840,7 @@ export async function registerRoutes(
           timer: Math.round(timer * 100) / 100,
           trekkPause: updated.trekkPause || false,
           status: "godkjent",
+          timelonn: ansatt?.timelonn ?? null,
         });
       } catch (err) {
         console.error("[Google Sheets] Error:", err);
@@ -1078,23 +1143,65 @@ export async function registerRoutes(
   app.get("/api/admin/onboarding-overview", requireAdmin, async (_req, res) => {
     const allUsers = await storage.getAllUsers();
     const employees = allUsers.filter((u) => u.role !== "admin");
+
+    // Pre-fetch all vakter to compute monthly brutto per employee
+    const allVakter = await storage.getVakter();
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed
+    const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
+
+    const calcHours = (start: string, end: string, trekkPause?: boolean | null) => {
+      if (!start || !end) return 0;
+      const [sh, sm] = start.split(":").map(Number);
+      const [eh, em] = end.split(":").map(Number);
+      let h = (eh * 60 + em - sh * 60 - sm) / 60;
+      if (trekkPause) h -= 0.5;
+      return Math.max(0, h);
+    };
+
+    const monthAggByUser = new Map<string, { hours: number; count: number }>();
+    for (const v of allVakter) {
+      if (!v.ansattId || !v.dato) continue;
+      if (v.status !== "godkjent") continue;
+      const d = new Date(v.dato + "T00:00:00");
+      if (d.getFullYear() !== currentYear || d.getMonth() !== currentMonth) continue;
+      const h = calcHours(v.startTid || "", v.sluttTid || "", v.trekkPause);
+      const cur = monthAggByUser.get(v.ansattId) || { hours: 0, count: 0 };
+      cur.hours += h;
+      cur.count += 1;
+      monthAggByUser.set(v.ansattId, cur);
+    }
+
     const overview = await Promise.all(
       employees.map(async (u) => {
         const items = await storage.getOnboarding(u.id);
         const totalCount = items.length;
         const completedCount = items.filter((i) => i.completed).length;
         const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        const agg = monthAggByUser.get(u.id) || { hours: 0, count: 0 };
+        const tl = parseFloat(u.timelonn || "0") || 0;
+        const bruttoThisMonth = Math.round(agg.hours * tl * 100) / 100;
         const { password: _, ...safeUser } = u;
         return {
           userId: u.id,
           name: u.name,
           region: u.region,
+          username: u.username,
+          email: u.email,
+          phone: u.phone,
+          stilling: u.stilling,
+          timelonn: u.timelonn,
           profileImage: resolveProfileImageForList(u.profileImage, u.id),
           cvFile: u.cvFile,
           politiattestFile: u.politiattestFile,
           progress,
           completedCount,
           totalCount,
+          monthKey,
+          godkjentTimerThisMonth: Math.round(agg.hours * 100) / 100,
+          godkjentVakterThisMonth: agg.count,
+          bruttoThisMonth,
           items: items.map((i) => ({
             id: i.id,
             item: i.item,
@@ -1202,6 +1309,196 @@ export async function registerRoutes(
       await storage.deletePushSubscription(endpoint);
     }
     res.json({ success: true });
+  });
+
+  // ===== Tilgjengelighet (Availability) =====
+  const isValidDate = (s: unknown): s is string => {
+    if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    const [y, m, d] = s.split("-").map(Number);
+    if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return (
+      dt.getUTCFullYear() === y &&
+      dt.getUTCMonth() === m - 1 &&
+      dt.getUTCDate() === d
+    );
+  };
+  const isValidMonth = (s: unknown): s is string => {
+    if (typeof s !== "string" || !/^\d{4}-\d{2}$/.test(s)) return false;
+    const [, m] = s.split("-").map(Number);
+    return m >= 1 && m <= 12;
+  };
+  const isValidStatus = (s: unknown): s is "available" | "unavailable" =>
+    s === "available" || s === "unavailable";
+
+  // Ansatt: hent egen tilgjengelighet (valgfritt month=YYYY-MM)
+  app.get("/api/availability/me", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req)!;
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    if (month !== undefined && !isValidMonth(month)) {
+      return res.status(400).json({ message: "Ugyldig måned" });
+    }
+    let from: string | undefined;
+    let to: string | undefined;
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(y, m, 0).getDate();
+      from = `${month}-01`;
+      to = `${month}-${String(last).padStart(2, "0")}`;
+    }
+    const rows = await storage.getAvailabilityByUser(userId, from, to);
+    res.json(rows);
+  });
+
+  // Ansatt: sett egen status for en dag
+  app.put("/api/availability/me", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req)!;
+    const { date, status } = req.body || {};
+    if (!isValidDate(date) || !isValidStatus(status)) {
+      return res.status(400).json({ message: "Ugyldig dato eller status" });
+    }
+    // Ikke tillat fortidsdager
+    const todayIso = (() => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    })();
+    if (date < todayIso) {
+      return res.status(400).json({ message: "Du kan ikke endre fortidsdager" });
+    }
+    // Ikke tillat helger (lør=6, søn=0)
+    const [yy, mm, dd] = date.split("-").map(Number);
+    const wd = new Date(Date.UTC(yy, mm - 1, dd)).getUTCDay();
+    if (wd === 0 || wd === 6) {
+      return res.status(400).json({ message: "Du kan ikke sette tilgjengelighet på helger" });
+    }
+    // Atomisk: skriv kun hvis ikke blokkert (ingen TOCTOU-rase)
+    const row = await storage.setAvailabilityIfNotBlocked(userId, date, status);
+    if (!row) {
+      return res.status(400).json({ message: "Denne dagen er blokkert av admin" });
+    }
+    res.json(row);
+  });
+
+  // Ansatt: fjern status for en dag (-> "Nøytral/Grå")
+  app.delete("/api/availability/me/:date", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req)!;
+    const { date } = req.params;
+    if (!isValidDate(date)) {
+      return res.status(400).json({ message: "Ugyldig dato" });
+    }
+    await storage.deleteAvailability(userId, date);
+    res.json({ success: true });
+  });
+
+  // Admin: alle ansatte med 'available' for en dato (med vakter-overlay + blokkert-flagg)
+  app.get("/api/admin/availability/by-date/:date", requireAdmin, async (req, res) => {
+    const { date } = req.params;
+    if (!isValidDate(date)) {
+      return res.status(400).json({ message: "Ugyldig dato" });
+    }
+    const [rows, allUsers, allVakter, blocked] = await Promise.all([
+      storage.getAvailabilityByDate(date),
+      storage.getAllUsers(),
+      storage.getVakter(),
+      storage.isBlockedDate(date),
+    ]);
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const vaktByUserOnDate = new Set(
+      allVakter
+        .filter((v) => v.dato === date && v.ansattId)
+        .map((v) => v.ansattId as string),
+    );
+    const employees = rows
+      .filter((r) => r.status === "available")
+      .map((r) => {
+        const u = userMap.get(r.userId);
+        if (!u) return null;
+        const hasShift = vaktByUserOnDate.has(r.userId);
+        return {
+          userId: r.userId,
+          name: u.name,
+          stilling: u.stilling,
+          region: u.region,
+          profileImage: u.profileImage,
+          status: hasShift ? "assigned" : "available",
+        };
+      })
+      .filter(Boolean);
+    res.json({ blocked, employees });
+  });
+
+  // Alle innloggede: hent blokkerte datoer (valgfritt month=YYYY-MM)
+  app.get("/api/blocked-dates", requireAuth, async (req, res) => {
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    if (month !== undefined && !isValidMonth(month)) {
+      return res.status(400).json({ message: "Ugyldig måned" });
+    }
+    let from: string | undefined;
+    let to: string | undefined;
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(y, m, 0).getDate();
+      from = `${month}-01`;
+      to = `${month}-${String(last).padStart(2, "0")}`;
+    }
+    const rows = await storage.getBlockedDates(from, to);
+    res.json(rows);
+  });
+
+  // Admin: blokker en dato
+  app.post("/api/admin/blocked-dates", requireAdmin, async (req, res) => {
+    const { date, reason } = req.body || {};
+    if (!isValidDate(date)) {
+      return res.status(400).json({ message: "Ugyldig dato" });
+    }
+    const reasonStr = typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 200) : null;
+    const row = await storage.addBlockedDate(date, reasonStr);
+    res.json(row);
+  });
+
+  // Admin: fjern blokkering
+  app.delete("/api/admin/blocked-dates/:date", requireAdmin, async (req, res) => {
+    const { date } = req.params;
+    if (!isValidDate(date)) {
+      return res.status(400).json({ message: "Ugyldig dato" });
+    }
+    await storage.removeBlockedDate(date);
+    res.json({ success: true });
+  });
+
+  // Admin: en spesifikk ansatts tilgjengelighet for en måned (med vakt-overlay)
+  app.get("/api/admin/availability/user/:userId", requireAdmin, async (req, res) => {
+    const { userId } = req.params;
+    const month = typeof req.query.month === "string" ? req.query.month : undefined;
+    if (month !== undefined && !isValidMonth(month)) {
+      return res.status(400).json({ message: "Ugyldig måned" });
+    }
+    let from: string | undefined;
+    let to: string | undefined;
+    if (month) {
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(y, m, 0).getDate();
+      from = `${month}-01`;
+      to = `${month}-${String(last).padStart(2, "0")}`;
+    }
+    const [avail, vakterAll, blocked] = await Promise.all([
+      storage.getAvailabilityByUser(userId, from, to),
+      storage.getVakterByAnsatt(userId),
+      storage.getBlockedDates(from, to),
+    ]);
+    const vaktDates = new Set(
+      vakterAll
+        .filter((v) => (!from || v.dato >= from) && (!to || v.dato <= to))
+        .map((v) => v.dato),
+    );
+    res.json({
+      availability: avail.map((a) => ({ date: a.date, status: a.status })),
+      shiftDates: Array.from(vaktDates),
+      blockedDates: blocked.map((b) => b.date),
+    });
   });
 
   return httpServer;
