@@ -243,7 +243,10 @@ export default function AlleVakter() {
   const filteredVakter = vakter?.filter((v) => {
     if (filter === "alle") return true;
     return v.status === filter;
-  }).sort((a, b) => (a.dato > b.dato ? -1 : 1)) || [];
+  }).sort((a, b) => {
+    if (a.dato !== b.dato) return a.dato < b.dato ? -1 : 1;
+    return (a.startTid || "").localeCompare(b.startTid || "");
+  }) || [];
 
   const formatDate = (d: string) => {
     const date = new Date(d + "T00:00:00");
