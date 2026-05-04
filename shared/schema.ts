@@ -133,6 +133,15 @@ export const blockedDates = pgTable("blocked_dates", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const personalreglerGodkjenning = pgTable("personalregler_godkjenning", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  versionId: integer("version_id").notNull(),
+  acceptedAt: timestamp("accepted_at").defaultNow(),
+}, (table) => ({
+  userVersionUnique: uniqueIndex("personalregler_user_version_unique").on(table.userId, table.versionId),
+}));
+
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
@@ -155,8 +164,11 @@ export const insertVarselSchema = createInsertSchema(varsler).omit({ id: true, c
 export const insertVaktInteresseSchema = createInsertSchema(vaktInteresser).omit({ id: true, createdAt: true });
 export const insertAvailabilitySchema = createInsertSchema(availability).omit({ id: true, createdAt: true });
 export const insertBlockedDateSchema = createInsertSchema(blockedDates).omit({ createdAt: true });
+export const insertPersonalreglerGodkjenningSchema = createInsertSchema(personalreglerGodkjenning).omit({ id: true, acceptedAt: true });
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
 
+export type InsertPersonalreglerGodkjenning = z.infer<typeof insertPersonalreglerGodkjenningSchema>;
+export type PersonalreglerGodkjenning = typeof personalreglerGodkjenning.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertBarnehage = z.infer<typeof insertBarnehageSchema>;

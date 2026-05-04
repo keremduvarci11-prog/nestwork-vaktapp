@@ -1,0 +1,63 @@
+Instruks til utvikler (Replit)
+Mål: Implementere en obligatorisk "Personalregler"-modul for ansatte.
+
+Funksjonalitet:
+
+Onboarding/Popup: Alle ansatte må trigges med en popup eller fullskjerm-modul ved første innlogging (eller når version_id på reglene oppdateres). Brukeren skal ikke kunne lukke denne uten å fullføre.
+
+Interaksjon: Hvert av de 4 hovedpunktene må ha en individuell checkbox/bryter som må markeres som "Lest og forstått".
+
+Logikk for Sluttbekreftelse: "Fullfør"-knappen nederst skal være disabled (grået ut) helt til alle 4 punktene er huket av.
+
+Arkivering: Etter fullføring skal dato og klokkeslett for godkjenning lagres på brukerprofilen. Siden skal alltid være tilgjengelig via Profil -> Innstillinger -> Personalregler.
+
+Innhold til grensesnittet:
+Personalregler for Nestwork 📄
+1. Fravær og oppmøte 📞
+
+Sykdom: Blir du syk, må du ringe (ikke SMS) både styrer i barnehagen og din leder i Nestwork senest dagen før vaktstart kl. 15:00. Dette er for at vi skal rekke å finne en erstatter.
+
+Forsentkomming: Ser du at du blir mer enn 2-3 minutter for sen? Ring barnehagen med en gang og gi beskjed.
+
+Pålitelighet: Vi trenger ansatte vi kan stole på. Høyt fravær eller at man ofte kommer for sent, kan føre til at vi ikke kan tilby flere vakter.
+
+[ ] Jeg har lest og forstått
+
+2. Din rolle i barnehagen 🧸
+
+Vær aktiv: Du er der for barna. Sett deg ned på gulvet, vær med i leken og ta initiativ. Ikke vent på å bli fortalt hva du skal gjøre.
+
+Mobil og AirPods: Dette er helt forbudt i arbeidstiden (både inne og ute). Mobilen skal ligge i veska/jakka og kan kun brukes i pausen din på pauserommet.
+
+Profesjonalitet: Du er Nestworks ansikt utad. Hils på foreldre og kollegaer med et smil, og vær nysgjerrig på hvordan barnehagen driver sin dag.
+
+[ ] Jeg har lest og forstått
+
+3. Sikkerhet og taushetsplikt 🔒
+
+Taushetsplikt: Alt du ser og hører om barn, foreldre og ansatte i barnehagen er hemmelig. Du har ikke lov til å snakke om dette med andre, heller ikke etter at du har sluttet i jobben.
+
+Bilder og sosiale medier: Det er strengt forbudt å ta bilder eller video av barna. Ingenting fra barnehagen skal deles på Snapchat, Instagram eller andre steder.
+
+Tilsyn: Gå aldri fra barna du har ansvaret for. Må du på do eller hente noe? Avklar det med en fast ansatt først.
+
+[ ] Jeg har lest og forstått
+
+4. Praktiske regler 🧤
+
+Klær etter vær: Vi er ute hver dag, uansett om det regner eller snør. Du må alltid ha med deg klær som gjør at du kan være ute i flere timer uten å fryse eller bli våt.
+
+Røyking og snus: Det er ikke lov å røyke eller snuse inne på barnehagens område eller slik at barna ser det.
+
+Spør om hjelp: Er du usikker på noe? Spør! Det er bedre å spørre en gang for mye enn å gjøre feil. Vi er her for å lære.
+
+Rydding: Hjelp alltid til med å rydde leker, tørke bord etter mat og holde orden på avdelingen.
+
+[ ] Jeg har lest og forstått
+
+Sluttbekreftelse
+Tekst over knapp:
+"Ved å trykke på knappen under bekrefter jeg at jeg har lest og forstått alle reglene over. Jeg er klar over at disse reglene er viktige for sikkerheten til barna og for mitt arbeidsforhold i Nestwork. Jeg forplikter meg til å følge disse i hver vakt jeg tar."
+
+Knapp (Primary Action):
+✅ Jeg godtar reglene og fullfører
