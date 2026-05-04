@@ -33,19 +33,9 @@ export default function PersonalreglerPage() {
         <h1 className="text-xl font-bold">Personalregler</h1>
       </div>
 
-      {status?.accepted ? (
-        <div className="text-center py-8 space-y-3">
-          <CheckCircle2 className="w-12 h-12 mx-auto text-green-600" />
-          <p className="font-medium">Du har godtatt personalreglene</p>
-          <p className="text-sm text-muted-foreground">
-            Godkjent: {status.acceptedAt ? new Date(status.acceptedAt).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
-          </p>
-        </div>
-      ) : null}
-
       <PersonalreglerContent isFullscreen={false} onComplete={() => {
         queryClient.invalidateQueries({ queryKey: ["/api/personalregler/status"] });
-      }} alreadyAccepted={status?.accepted} />
+      }} alreadyAccepted={status?.accepted} acceptedAt={status?.acceptedAt} />
     </div>
   );
 }
@@ -54,10 +44,12 @@ function PersonalreglerContent({
   isFullscreen,
   onComplete,
   alreadyAccepted,
+  acceptedAt,
 }: {
   isFullscreen: boolean;
   onComplete: () => void;
   alreadyAccepted?: boolean;
+  acceptedAt?: string | null;
 }) {
   const { toast } = useToast();
   const [checked, setChecked] = useState([false, false, false, false]);
@@ -83,8 +75,6 @@ function PersonalreglerContent({
       return next;
     });
   };
-
-  if (alreadyAccepted && !isFullscreen) return null;
 
   const containerClass = isFullscreen
     ? "fixed inset-0 z-[100] bg-background overflow-y-auto"
@@ -115,14 +105,16 @@ function PersonalreglerContent({
                 <strong className="text-foreground">Pålitelighet:</strong> Vi trenger ansatte vi kan stole på. Høyt fravær eller at man ofte kommer for sent, kan føre til at vi ikke kan tilby flere vakter.
               </p>
             </div>
-            <label className="flex items-center gap-3 pt-1 cursor-pointer" data-testid="checkbox-regel-1">
-              <Checkbox
-                checked={checked[0]}
-                onCheckedChange={() => toggle(0)}
-                data-testid="input-checkbox-1"
-              />
-              <span className="text-sm font-medium">Jeg har lest og forstått</span>
-            </label>
+            {!alreadyAccepted && (
+              <label className="flex items-center gap-3 pt-1 cursor-pointer" data-testid="checkbox-regel-1">
+                <Checkbox
+                  checked={checked[0]}
+                  onCheckedChange={() => toggle(0)}
+                  data-testid="input-checkbox-1"
+                />
+                <span className="text-sm font-medium">Jeg har lest og forstått</span>
+              </label>
+            )}
           </section>
 
           <section className="rounded-lg border p-4 space-y-3" data-testid="section-regel-2">
@@ -140,14 +132,16 @@ function PersonalreglerContent({
                 <strong className="text-foreground">Profesjonalitet:</strong> Du er Nestworks ansikt utad. Hils på foreldre og kollegaer med et smil, og vær nysgjerrig på hvordan barnehagen driver sin dag.
               </p>
             </div>
-            <label className="flex items-center gap-3 pt-1 cursor-pointer" data-testid="checkbox-regel-2">
-              <Checkbox
-                checked={checked[1]}
-                onCheckedChange={() => toggle(1)}
-                data-testid="input-checkbox-2"
-              />
-              <span className="text-sm font-medium">Jeg har lest og forstått</span>
-            </label>
+            {!alreadyAccepted && (
+              <label className="flex items-center gap-3 pt-1 cursor-pointer" data-testid="checkbox-regel-2">
+                <Checkbox
+                  checked={checked[1]}
+                  onCheckedChange={() => toggle(1)}
+                  data-testid="input-checkbox-2"
+                />
+                <span className="text-sm font-medium">Jeg har lest og forstått</span>
+              </label>
+            )}
           </section>
 
           <section className="rounded-lg border p-4 space-y-3" data-testid="section-regel-3">
@@ -165,14 +159,16 @@ function PersonalreglerContent({
                 <strong className="text-foreground">Tilsyn:</strong> Gå aldri fra barna du har ansvaret for. Må du på do eller hente noe? Avklar det med en fast ansatt først.
               </p>
             </div>
-            <label className="flex items-center gap-3 pt-1 cursor-pointer" data-testid="checkbox-regel-3">
-              <Checkbox
-                checked={checked[2]}
-                onCheckedChange={() => toggle(2)}
-                data-testid="input-checkbox-3"
-              />
-              <span className="text-sm font-medium">Jeg har lest og forstått</span>
-            </label>
+            {!alreadyAccepted && (
+              <label className="flex items-center gap-3 pt-1 cursor-pointer" data-testid="checkbox-regel-3">
+                <Checkbox
+                  checked={checked[2]}
+                  onCheckedChange={() => toggle(2)}
+                  data-testid="input-checkbox-3"
+                />
+                <span className="text-sm font-medium">Jeg har lest og forstått</span>
+              </label>
+            )}
           </section>
 
           <section className="rounded-lg border p-4 space-y-3" data-testid="section-regel-4">
@@ -193,33 +189,47 @@ function PersonalreglerContent({
                 <strong className="text-foreground">Rydding:</strong> Hjelp alltid til med å rydde leker, tørke bord etter mat og holde orden på avdelingen.
               </p>
             </div>
-            <label className="flex items-center gap-3 pt-1 cursor-pointer" data-testid="checkbox-regel-4">
-              <Checkbox
-                checked={checked[3]}
-                onCheckedChange={() => toggle(3)}
-                data-testid="input-checkbox-4"
-              />
-              <span className="text-sm font-medium">Jeg har lest og forstått</span>
-            </label>
+            {!alreadyAccepted && (
+              <label className="flex items-center gap-3 pt-1 cursor-pointer" data-testid="checkbox-regel-4">
+                <Checkbox
+                  checked={checked[3]}
+                  onCheckedChange={() => toggle(3)}
+                  data-testid="input-checkbox-4"
+                />
+                <span className="text-sm font-medium">Jeg har lest og forstått</span>
+              </label>
+            )}
           </section>
 
-          <div className="space-y-3 pt-2 pb-4">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Ved å trykke på knappen under bekrefter jeg at jeg har lest og forstått alle reglene over. Jeg er klar over at disse reglene er viktige for sikkerheten til barna og for mitt arbeidsforhold i Nestwork. Jeg forplikter meg til å følge disse i hver vakt jeg tar.
-            </p>
-            <Button
-              className="w-full"
-              size="lg"
-              disabled={!allChecked || acceptMutation.isPending}
-              onClick={() => acceptMutation.mutate()}
-              data-testid="button-godta-regler"
-            >
-              {acceptMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
-              Jeg godtar reglene og fullfører
-            </Button>
-          </div>
+          {alreadyAccepted ? (
+            <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 p-4 text-center space-y-2" data-testid="personalregler-accepted-banner">
+              <CheckCircle2 className="w-8 h-8 mx-auto text-green-600" />
+              <p className="font-medium text-green-800 dark:text-green-200">Du har godtatt disse reglene</p>
+              {acceptedAt && (
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  Godkjent: {new Date(acceptedAt).toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" })} kl. {new Date(acceptedAt).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3 pt-2 pb-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Ved å trykke på knappen under bekrefter jeg at jeg har lest og forstått alle reglene over. Jeg er klar over at disse reglene er viktige for sikkerheten til barna og for mitt arbeidsforhold i Nestwork. Jeg forplikter meg til å følge disse i hver vakt jeg tar.
+              </p>
+              <Button
+                className="w-full"
+                size="lg"
+                disabled={!allChecked || acceptMutation.isPending}
+                onClick={() => acceptMutation.mutate()}
+                data-testid="button-godta-regler"
+              >
+                {acceptMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Jeg godtar reglene og fullfører
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

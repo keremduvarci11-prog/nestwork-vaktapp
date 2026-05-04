@@ -389,38 +389,44 @@ export default function LonnTimer() {
                           </div>
                         </div>
 
-                        {isCurrentMonth && (
-                          <div className="mt-2 pt-2 border-t">
-                            {v.timerInnsendt ? (
-                              <div
-                                className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400"
-                                data-testid={`status-innsendt-${v.id}`}
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>Timer innsendt – venter på godkjenning</span>
-                              </div>
-                            ) : submittable ? (
-                              <Button
-                                size="sm"
-                                className="w-full h-8"
-                                onClick={() => submitTimer.mutate(v.id)}
-                                disabled={isPending}
-                                data-testid={`button-innsend-${v.id}`}
-                              >
-                                <Send className="w-3.5 h-3.5 mr-1.5" />
-                                {isPending ? "Sender..." : "Send inn timer for godkjenning"}
-                              </Button>
-                            ) : (
-                              <div
-                                className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                                data-testid={`status-venter-${v.id}`}
-                              >
-                                <Hourglass className="w-3.5 h-3.5" />
-                                <span>Kan sendes inn etter vakten er ferdig</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        <div className="mt-2 pt-2 border-t">
+                          {v.timerGodkjent ? (
+                            <div
+                              className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400"
+                              data-testid={`status-godkjent-timer-${v.id}`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Timer godkjent av admin</span>
+                            </div>
+                          ) : v.timerInnsendt ? (
+                            <div
+                              className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400"
+                              data-testid={`status-innsendt-${v.id}`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Timer innsendt – venter på godkjenning</span>
+                            </div>
+                          ) : submittable ? (
+                            <Button
+                              size="sm"
+                              className="w-full h-8"
+                              onClick={() => submitTimer.mutate(v.id)}
+                              disabled={isPending}
+                              data-testid={`button-innsend-${v.id}`}
+                            >
+                              <Send className="w-3.5 h-3.5 mr-1.5" />
+                              {isPending ? "Sender..." : "Send inn timer for godkjenning"}
+                            </Button>
+                          ) : (
+                            <div
+                              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                              data-testid={`status-venter-${v.id}`}
+                            >
+                              <Hourglass className="w-3.5 h-3.5" />
+                              <span>Kan sendes inn etter vakten er ferdig</span>
+                            </div>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   );

@@ -16,6 +16,14 @@ export async function runMigrations() {
       ON personalregler_godkjenning (user_id, version_id);
     `);
     console.log("[Migration] personalregler_godkjenning OK");
+
+    await client.query(`
+      ALTER TABLE vakter ADD COLUMN IF NOT EXISTS timer_godkjent BOOLEAN DEFAULT false;
+    `);
+    await client.query(`
+      ALTER TABLE vakter ADD COLUMN IF NOT EXISTS timer_godkjent_at TIMESTAMP;
+    `);
+    console.log("[Migration] timer_godkjent columns OK");
   } catch (err: any) {
     console.error("[Migration] Feil:", err.message);
   } finally {

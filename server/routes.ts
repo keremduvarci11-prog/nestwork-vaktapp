@@ -762,9 +762,9 @@ export async function registerRoutes(
     }
 
     const now = new Date();
-    const vaktEnd = new Date(`${vakt.dato}T${vakt.sluttTid}`);
-    if (now < vaktEnd) {
-      return res.status(400).json({ message: "Du kan ikke sende inn timer for en vakt som ikke er ferdig" });
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    if (vakt.dato > todayStr) {
+      return res.status(400).json({ message: "Du kan ikke sende inn timer for en fremtidig vakt" });
     }
 
     const updated = await storage.markVaktTimerInnsendt(req.params.id);
@@ -787,6 +787,22 @@ export async function registerRoutes(
         console.error("[Notify] Feil ved innsend-varsling:", err);
       }
     })();
+  });
+
+  app.post("/api/vakter/:id/godkjenn-timer", requireAdmin, async (req, res) => {
+    const vakt = await storage.getVakt(req.params.id);
+    if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
+    if (!vakt.timerInnsendt) {
+      return res.status(400).json({ message: "Timer er ikke sendt inn for denne vakten" });
+    }
+    if (vakt.timerGodkjent) {
+      return res.status(400).json({ message: "Timer er allerede godkjent" });
+    }
+    const updated = await storage.markVaktTimerGodkjent(req.params.id);
+    if (!updated) {
+      return res.status(409).json({ message: "Timer er allerede godkjent" });
+    }
+    res.json(updated);
   });
 
   app.post("/api/vakter/:id/godkjenn", requireAdmin, async (req, res) => {

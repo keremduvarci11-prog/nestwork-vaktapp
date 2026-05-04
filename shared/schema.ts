@@ -58,6 +58,8 @@ export const vakter = pgTable("vakter", {
   trekkPause: boolean("trekk_pause").default(false),
   timerInnsendt: boolean("timer_innsendt").default(false),
   timerInnsendtAt: timestamp("timer_innsendt_at"),
+  timerGodkjent: boolean("timer_godkjent").default(false),
+  timerGodkjentAt: timestamp("timer_godkjent_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

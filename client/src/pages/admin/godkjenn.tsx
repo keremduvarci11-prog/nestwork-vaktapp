@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -5,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Check, X, Calendar, Clock, Building2, User, AlertCircle, Users } from "lucide-react";
+import { Check, X, Calendar, Clock, Building2, User, AlertCircle, Users, Send, CheckCircle2 } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType, VaktInteresse } from "@shared/schema";
 
 export default function GodkjennVakter() {
   const { toast } = useToast();
+  const [tab, setTab] = useState<"interesse" | "timer">("interesse");
 
   const { data: vakter, isLoading } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter"],
@@ -38,6 +40,10 @@ export default function GodkjennVakter() {
     (v) => v.status === "ledig" && (interesserByVakt.get(v.id)?.length || 0) > 0
   ) || [];
 
+  const vakterMedTimerInnsendt = vakter?.filter(
+    (v) => v.timerInnsendt && !v.timerGodkjent
+  ) || [];
+
   const godkjenn = useMutation({
     mutationFn: ({ vaktId, ansattId }: { vaktId: string; ansattId: string }) =>
       apiRequest("POST", `/api/vakter/${vaktId}/godkjenn`, { ansattId }),
@@ -57,100 +63,215 @@ export default function GodkjennVakter() {
     },
   });
 
+  const godkjennTimer = useMutation({
+    mutationFn: (vaktId: string) =>
+      apiRequest("POST", `/api/vakter/${vaktId}/godkjenn-timer`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
+      toast({ title: "Timer godkjent!" });
+    },
+    onError: () => {
+      toast({ title: "Feil", description: "Kunne ikke godkjenne timer", variant: "destructive" });
+    },
+  });
+
   const formatDate = (d: string) => {
     const date = new Date(d + "T00:00:00");
     return date.toLocaleDateString("nb-NO", { weekday: "short", day: "numeric", month: "short" });
   };
 
+  const totalPending = vakterMedInteresse.length + vakterMedTimerInnsendt.length;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold">Godkjenn vakter</h1>
-        <p className="text-sm text-muted-foreground mt-1">{vakterMedInteresse.length} vakter med interesserte ansatte</p>
+        <h1 className="text-xl font-bold">Godkjenn</h1>
+        <p className="text-sm text-muted-foreground mt-1">{totalPending} venter på godkjenning</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          variant={tab === "interesse" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setTab("interesse")}
+          data-testid="tab-interesse"
+          className="w-full"
+        >
+          <Users className="w-3.5 h-3.5 mr-1.5" />
+          Interesse ({vakterMedInteresse.length})
+        </Button>
+        <Button
+          variant={tab === "timer" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setTab("timer")}
+          data-testid="tab-timer"
+          className="w-full"
+        >
+          <Send className="w-3.5 h-3.5 mr-1.5" />
+          Timer ({vakterMedTimerInnsendt.length})
+        </Button>
       </div>
 
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2].map((i) => <Skeleton key={i} className="h-40 w-full rounded-md" />)}
         </div>
-      ) : vakterMedInteresse.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-            <p className="font-medium">Ingen vakter venter</p>
-            <p className="text-sm text-muted-foreground mt-1">Ingen ansatte har meldt interesse enda.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {vakterMedInteresse.map((vakt) => {
-            const bh = bhMap.get(vakt.barnehageId);
-            const interesser = interesserByVakt.get(vakt.id) || [];
-            return (
-              <Card key={vakt.id} data-testid={`card-pending-${vakt.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div>
-                      <h3 className="font-semibold text-sm">{bh?.name || "Ukjent"}</h3>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                        {vakt.vikarkode}
+      ) : tab === "interesse" ? (
+        vakterMedInteresse.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+              <p className="font-medium">Ingen vakter venter</p>
+              <p className="text-sm text-muted-foreground mt-1">Ingen ansatte har meldt interesse enda.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {vakterMedInteresse.map((vakt) => {
+              const bh = bhMap.get(vakt.barnehageId);
+              const interesser = interesserByVakt.get(vakt.id) || [];
+              return (
+                <Card key={vakt.id} data-testid={`card-pending-${vakt.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div>
+                        <h3 className="font-semibold text-sm">{bh?.name || "Ukjent"}</h3>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                          {vakt.vikarkode}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <Users className="w-3.5 h-3.5" />
+                        {interesser.length} interessert{interesser.length !== 1 ? "e" : ""}
                       </span>
                     </div>
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      <Users className="w-3.5 h-3.5" />
-                      {interesser.length} interessert{interesser.length !== 1 ? "e" : ""}
-                    </span>
-                  </div>
 
-                  <div className="space-y-2 mb-4 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>{formatDate(vakt.dato)}</span>
+                    <div className="space-y-2 mb-4 text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{formatDate(vakt.dato)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>{vakt.region}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Building2 className="w-3.5 h-3.5" />
-                      <span>{vakt.region}</span>
-                    </div>
-                  </div>
 
-                  <div className="border-t pt-3 space-y-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Interesserte ansatte</p>
-                    {interesser.map((interesse) => {
-                      const emp = userMap.get(interesse.ansattId);
-                      return (
-                        <div key={interesse.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Avatar className="w-7 h-7 flex-shrink-0">
-                              {emp?.profileImage && <AvatarImage src={emp.profileImage} alt={emp?.name} />}
-                              <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
-                                {emp?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-sm font-medium truncate">{emp?.name || "Ukjent"}</span>
-                            <span className="text-xs text-muted-foreground">({emp?.stilling})</span>
+                    <div className="border-t pt-3 space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Interesserte ansatte</p>
+                      {interesser.map((interesse) => {
+                        const emp = userMap.get(interesse.ansattId);
+                        return (
+                          <div key={interesse.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Avatar className="w-7 h-7 flex-shrink-0">
+                                {emp?.profileImage && <AvatarImage src={emp.profileImage} alt={emp?.name} />}
+                                <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
+                                  {emp?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm font-medium truncate">{emp?.name || "Ukjent"}</span>
+                              <span className="text-xs text-muted-foreground">({emp?.stilling})</span>
+                            </div>
+                            <Button
+                              data-testid={`button-godkjenn-${vakt.id}-${interesse.ansattId}`}
+                              size="sm"
+                              onClick={() => godkjenn.mutate({ vaktId: vakt.id, ansattId: interesse.ansattId })}
+                              disabled={godkjenn.isPending}
+                            >
+                              <Check className="w-3.5 h-3.5 mr-1" />
+                              Velg
+                            </Button>
                           </div>
-                          <Button
-                            data-testid={`button-godkjenn-${vakt.id}-${interesse.ansattId}`}
-                            size="sm"
-                            onClick={() => godkjenn.mutate({ vaktId: vakt.id, ansattId: interesse.ansattId })}
-                            disabled={godkjenn.isPending}
-                          >
-                            <Check className="w-3.5 h-3.5 mr-1" />
-                            Velg
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )
+      ) : (
+        vakterMedTimerInnsendt.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+              <p className="font-medium">Ingen timer venter</p>
+              <p className="text-sm text-muted-foreground mt-1">Ingen ansatte har sendt inn timer for godkjenning.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {vakterMedTimerInnsendt.map((vakt) => {
+              const bh = bhMap.get(vakt.barnehageId);
+              const emp = vakt.ansattId ? userMap.get(vakt.ansattId) : null;
+              const isPending = godkjennTimer.isPending && godkjennTimer.variables === vakt.id;
+              return (
+                <Card key={vakt.id} data-testid={`card-timer-${vakt.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div>
+                        <h3 className="font-semibold text-sm">{bh?.name || "Ukjent"}</h3>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                          Timer innsendt
+                        </span>
+                      </div>
+                      {vakt.timerInnsendtAt && (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(vakt.timerInnsendtAt).toLocaleDateString("nb-NO", { day: "numeric", month: "short" })}
+                        </span>
+                      )}
+                    </div>
+
+                    {emp && (
+                      <div className="flex items-center gap-2 mb-3">
+                        <Avatar className="w-7 h-7 flex-shrink-0">
+                          {emp.profileImage && <AvatarImage src={emp.profileImage} alt={emp.name} />}
+                          <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
+                            {emp.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium">{emp.name}</span>
+                        <span className="text-xs text-muted-foreground">({emp.stilling})</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 mb-4 text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{formatDate(vakt.dato)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>{vakt.region}</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      className="w-full"
+                      size="sm"
+                      onClick={() => godkjennTimer.mutate(vakt.id)}
+                      disabled={isPending}
+                      data-testid={`button-godkjenn-timer-${vakt.id}`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                      {isPending ? "Godkjenner..." : "Godkjenn timer"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )
       )}
     </div>
   );

@@ -37,6 +37,7 @@ export interface IStorage {
   createVakt(v: InsertVakt): Promise<Vakt>;
   updateVakt(id: string, data: Partial<InsertVakt>): Promise<Vakt | undefined>;
   markVaktTimerInnsendt(id: string): Promise<Vakt | undefined>;
+  markVaktTimerGodkjent(id: string): Promise<Vakt | undefined>;
   deleteVakt(id: string): Promise<boolean>;
 
   getMeldinger(): Promise<Melding[]>;
@@ -186,6 +187,15 @@ export class DatabaseStorage implements IStorage {
       .update(vakter)
       .set({ timerInnsendt: true, timerInnsendtAt: new Date() })
       .where(and(eq(vakter.id, id), eq(vakter.timerInnsendt, false)))
+      .returning();
+    return updated;
+  }
+
+  async markVaktTimerGodkjent(id: string): Promise<Vakt | undefined> {
+    const [updated] = await db
+      .update(vakter)
+      .set({ timerGodkjent: true, timerGodkjentAt: new Date() })
+      .where(and(eq(vakter.id, id), eq(vakter.timerInnsendt, true), eq(vakter.timerGodkjent, false)))
       .returning();
     return updated;
   }
