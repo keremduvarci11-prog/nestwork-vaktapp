@@ -1,38 +1,26 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar as CalendarComp } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ArrowLeft, ChevronLeft, ChevronRight, Lock, Unlock, Loader2 } from "lucide-react";
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  MapPin,
+  AlertCircle,
+  Briefcase,
+  Lock,
+  Unlock,
+} from "lucide-react";
+import { nb } from "date-fns/locale";
 
-const MONTH_NAMES_NB = [
-  "Januar", "Februar", "Mars", "April", "Mai", "Juni",
-  "Juli", "August", "September", "Oktober", "November", "Desember",
-];
-const WEEKDAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
-
-function pad(n: number) {
-  return String(n).padStart(2, "0");
-}
-
-interface BlockedRow {
-  date: string;
-  reason: string | null;
-}
-
-interface AvailableEmployee {
+interface AvailableEmp {
   userId: string;
   name: string;
   stilling: string;
@@ -40,306 +28,270 @@ interface AvailableEmployee {
   profileImage: string | null;
   status: "available" | "assigned";
 }
-
 interface ByDateResponse {
   blocked: boolean;
-  employees: AvailableEmployee[];
+  employees: AvailableEmp[];
 }
 
+const toIso = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const fromIso = (s: string) => {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
 export default function AdminTilgjengelighet() {
-  const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [cursor, setCursor] = useState<{ y: number; m: number }>(() => {
-    const d = new Date();
-    return { y: d.getFullYear(), m: d.getMonth() + 1 };
-  });
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [reason, setReason] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(() => toIso(new Date()));
+  const [calOpen, setCalOpen] = useState(false);
 
-  const monthKey = `${cursor.y}-${pad(cursor.m)}`;
-
-  const { data: blockedRows = [] } = useQuery<BlockedRow[]>({
-    queryKey: ["/api/blocked-dates", monthKey],
-    queryFn: async () => {
-      const r = await fetch(`/api/blocked-dates?month=${monthKey}`, { credentials: "include" });
-      if (!r.ok) throw new Error("Kunne ikke hente blokkerte dager");
-      return r.json();
-    },
+  const dateObj = fromIso(selectedDate);
+  const longLabel = dateObj.toLocaleDateString("nb-NO", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
   });
 
-  const { data: dayData, isLoading: dayLoading } = useQuery<ByDateResponse>({
+  const shiftDay = (delta: number) => {
+    const d = fromIso(selectedDate);
+    d.setDate(d.getDate() + delta);
+    setSelectedDate(toIso(d));
+  };
+
+  const { data, isLoading } = useQuery<ByDateResponse>({
     queryKey: ["/api/admin/availability/by-date", selectedDate],
-    queryFn: async () => {
-      const r = await fetch(`/api/admin/availability/by-date/${selectedDate}`, { credentials: "include" });
-      if (!r.ok) throw new Error("Kunne ikke hente data for dato");
-      return r.json();
-    },
-    enabled: !!selectedDate,
   });
 
-  const blockMut = useMutation({
-    mutationFn: async ({ date, reason }: { date: string; reason: string }) =>
-      apiRequest("POST", "/api/admin/blocked-dates", { date, reason: reason || undefined }),
+  const isBlocked = !!data?.blocked;
+  const employees = data?.employees || [];
+  const sorted = employees.slice().sort((a, b) => {
+    if (a.status !== b.status) return a.status === "available" ? -1 : 1;
+    return a.name.localeCompare(b.name, "nb");
+  });
+
+  const ledigeCount = sorted.filter((e) => e.status === "available").length;
+  const tildeltCount = sorted.filter((e) => e.status === "assigned").length;
+
+  const blockMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/admin/blocked-dates", { date: selectedDate }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/availability/by-date"] });
       queryClient.invalidateQueries({ queryKey: ["/api/blocked-dates"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/availability/by-date", selectedDate] });
-      toast({ title: "Dato blokkert", description: selectedDate || "" });
-      setReason("");
+      toast({ title: "Dato blokkert", description: longLabel });
     },
     onError: (err: any) => {
-      toast({ title: "Kunne ikke blokkere", description: err?.message || "Ukjent feil", variant: "destructive" });
+      toast({ title: "Kunne ikke blokkere", description: err?.message || "", variant: "destructive" });
     },
   });
 
-  const unblockMut = useMutation({
-    mutationFn: async (date: string) =>
-      apiRequest("DELETE", `/api/admin/blocked-dates/${date}`),
+  const unblockMutation = useMutation({
+    mutationFn: async () => apiRequest("DELETE", `/api/admin/blocked-dates/${selectedDate}`),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/availability/by-date"] });
       queryClient.invalidateQueries({ queryKey: ["/api/blocked-dates"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/availability/by-date", selectedDate] });
-      toast({ title: "Blokkering fjernet", description: selectedDate || "" });
+      toast({ title: "Blokkering fjernet", description: longLabel });
     },
     onError: (err: any) => {
-      toast({ title: "Kunne ikke fjerne blokkering", description: err?.message || "Ukjent feil", variant: "destructive" });
+      toast({ title: "Kunne ikke fjerne blokkering", description: err?.message || "", variant: "destructive" });
     },
   });
-
-  const blockedMap = useMemo(() => {
-    const m = new Map<string, string | null>();
-    blockedRows.forEach((b) => m.set(b.date, b.reason));
-    return m;
-  }, [blockedRows]);
-
-  const cells = useMemo(() => {
-    const first = new Date(cursor.y, cursor.m - 1, 1);
-    const lastDay = new Date(cursor.y, cursor.m, 0).getDate();
-    const startOffset = (first.getDay() + 6) % 7;
-    const arr: Array<{ key: string; date: string | null; day: number | null }> = [];
-    for (let i = 0; i < startOffset; i++) arr.push({ key: `e-${i}`, date: null, day: null });
-    for (let d = 1; d <= lastDay; d++) {
-      const iso = `${cursor.y}-${pad(cursor.m)}-${pad(d)}`;
-      arr.push({ key: iso, date: iso, day: d });
-    }
-    return arr;
-  }, [cursor]);
-
-  const goPrev = () => {
-    setCursor((c) => (c.m === 1 ? { y: c.y - 1, m: 12 } : { y: c.y, m: c.m - 1 }));
-  };
-  const goNext = () => {
-    setCursor((c) => (c.m === 12 ? { y: c.y + 1, m: 1 } : { y: c.y, m: c.m + 1 }));
-  };
 
   return (
-    <div className="space-y-4 pt-2">
-      <div className="flex items-center gap-3">
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={() => navigate("/profil")}
-          data-testid="button-back"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="text-xl font-bold" data-testid="heading-admin-tilgjengelighet">Tilgjengelighet</h1>
+    <div className="space-y-5" data-testid="page-admin-tilgjengelighet">
+      <div>
+        <h1 className="text-xl font-bold">Tilgjengelighet</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Se ledige ansatte eller blokker en dag (helligdager / stengt).
+        </p>
       </div>
 
+      {/* Date header med piler */}
       <Card>
         <CardContent className="p-3">
-          <div className="flex items-center justify-between mb-3">
-            <Button size="icon" variant="ghost" onClick={goPrev} data-testid="button-prev-month">
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => shiftDay(-1)}
+              data-testid="button-prev-day"
+              aria-label="Forrige dag"
+            >
               <ChevronLeft className="w-5 h-5" />
             </Button>
-            <div className="text-sm font-semibold" data-testid="text-month-label">
-              {MONTH_NAMES_NB[cursor.m - 1]} {cursor.y}
-            </div>
-            <Button size="icon" variant="ghost" onClick={goNext} data-testid="button-next-month">
+
+            <Popover open={calOpen} onOpenChange={setCalOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  data-testid="button-open-calendar"
+                  className="flex-1 flex items-center justify-center gap-2 py-2 rounded-md hover-elevate active-elevate-2"
+                >
+                  <CalendarDays className="w-4 h-4 text-primary" />
+                  <span className="font-semibold capitalize" data-testid="text-selected-date">
+                    {longLabel}
+                  </span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="center">
+                <CalendarComp
+                  mode="single"
+                  locale={nb}
+                  selected={dateObj}
+                  onSelect={(d) => {
+                    if (d) {
+                      setSelectedDate(toIso(d));
+                      setCalOpen(false);
+                    }
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => shiftDay(1)}
+              data-testid="button-next-day"
+              aria-label="Neste dag"
+            >
               <ChevronRight className="w-5 h-5" />
             </Button>
           </div>
 
-          <div className="grid grid-cols-7 gap-1 mb-1">
-            {WEEKDAYS.map((d) => (
-              <div key={d} className="text-[10px] text-center text-muted-foreground font-medium py-1">
-                {d}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {cells.map((cell) => {
-              if (!cell.date) return <div key={cell.key} className="aspect-square" />;
-              const iso = cell.date;
-              const dt = new Date(cursor.y, cursor.m - 1, cell.day!);
-              const wd = dt.getDay();
-              const isWeekend = wd === 0 || wd === 6;
-              const isBlocked = blockedMap.has(iso);
-
-              let cls = "aspect-square rounded-md flex items-center justify-center text-xs font-medium relative cursor-pointer ";
-              if (isBlocked) {
-                cls += "bg-muted text-muted-foreground line-through hover-elevate";
-              } else if (isWeekend) {
-                cls += "bg-muted/40 text-muted-foreground/70 hover-elevate";
-              } else {
-                cls += "bg-card border border-border text-foreground hover-elevate";
-              }
-
-              return (
-                <button
-                  key={cell.key}
-                  type="button"
-                  className={cls}
-                  onClick={() => {
-                    setSelectedDate(iso);
-                    setReason(blockedMap.get(iso) || "");
-                  }}
-                  data-testid={`day-${iso}`}
-                  title={isBlocked ? `${iso} – Stengt${blockedMap.get(iso) ? ` (${blockedMap.get(iso)})` : ""}` : iso}
-                >
-                  {cell.day}
-                  {isBlocked && (
-                    <span className="absolute top-0.5 right-1 text-[9px]">×</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Dialog open={!!selectedDate} onOpenChange={(o) => { if (!o) setSelectedDate(null); }}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="dialog-day-detail">
-          <DialogHeader>
-            <DialogTitle data-testid="text-dialog-date">
-              {selectedDate ? formatNoDate(selectedDate) : ""}
-            </DialogTitle>
-            <DialogDescription>
-              {dayData?.blocked
-                ? "Denne dagen er blokkert (stengt) for alle ansatte."
-                : "Ansatte som har markert seg som ledig denne dagen."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 mt-2">
-            {!dayData && dayLoading ? (
-              <div className="flex items-center justify-center py-8 text-muted-foreground">
-                <Loader2 className="w-5 h-5 animate-spin mr-2" /> Laster …
-              </div>
-            ) : dayData?.blocked ? (
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-                <div className="flex items-center gap-2 font-medium text-destructive">
-                  <Lock className="w-4 h-4" /> Stengt
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Ansatte kan ikke sette tilgjengelighet på denne datoen.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 w-full"
-                  onClick={() => selectedDate && unblockMut.mutate(selectedDate)}
-                  disabled={unblockMut.isPending}
-                  data-testid="button-unblock"
-                >
-                  {unblockMut.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <Unlock className="w-4 h-4 mr-2" />
-                  )}
-                  Fjern blokkering
-                </Button>
-              </div>
+          {/* Block / unblock kontroll */}
+          <div className="flex items-center justify-center mt-2">
+            {isBlocked ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => unblockMutation.mutate()}
+                disabled={unblockMutation.isPending}
+                data-testid="button-unblock-date"
+              >
+                <Unlock className="w-3.5 h-3.5 mr-1.5" />
+                Fjern blokkering
+              </Button>
             ) : (
-              <>
-                <div className="rounded-md border p-3 space-y-2">
-                  <div className="text-xs text-muted-foreground">Blokker dato (helligdag, stengt barnehage osv.)</div>
-                  <Input
-                    placeholder="Valgfri grunn (f.eks. 1. mai)"
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    data-testid="input-block-reason"
-                  />
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    onClick={() => selectedDate && blockMut.mutate({ date: selectedDate, reason })}
-                    disabled={blockMut.isPending}
-                    data-testid="button-block"
-                  >
-                    {blockMut.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    ) : (
-                      <Lock className="w-4 h-4 mr-2" />
-                    )}
-                    Blokker dato
-                  </Button>
-                </div>
-
-                <div>
-                  <div className="text-xs font-semibold mb-2">
-                    Ledige ansatte ({dayData?.employees?.length ?? 0})
-                  </div>
-                  {dayLoading ? (
-                    <div className="text-sm text-muted-foreground">Laster …</div>
-                  ) : (dayData?.employees?.length ?? 0) === 0 ? (
-                    <div className="text-sm text-muted-foreground" data-testid="text-no-available">
-                      Ingen ansatte har markert seg som ledig.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {dayData!.employees.map((e) => {
-                        const initials = e.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase();
-                        return (
-                          <div
-                            key={e.userId}
-                            className={`flex items-center gap-3 p-2 rounded-md border ${
-                              e.status === "assigned" ? "border-orange-300 bg-orange-50 dark:bg-orange-950/20" : ""
-                            }`}
-                            data-testid={`employee-row-${e.userId}`}
-                          >
-                            <Avatar className="w-8 h-8">
-                              {e.profileImage && <AvatarImage src={e.profileImage} alt={e.name} />}
-                              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
-                                {initials}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{e.name}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {e.stilling} · {e.region}
-                              </div>
-                            </div>
-                            {e.status === "assigned" && (
-                              <span className="text-[10px] font-medium text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded-full bg-orange-200 dark:bg-orange-900/40">
-                                Tildelt vakt
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => blockMutation.mutate()}
+                disabled={blockMutation.isPending}
+                data-testid="button-block-date"
+              >
+                <Lock className="w-3.5 h-3.5 mr-1.5" />
+                Blokker dato
+              </Button>
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setSelectedDate(null)} data-testid="button-close">
-              Lukk
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {!isBlocked && !isLoading && sorted.length > 0 && (
+            <div className="flex items-center justify-center gap-3 mt-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                {ledigeCount} ledige
+              </span>
+              {tildeltCount > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-orange-500" />
+                  {tildeltCount} tildelt vakt
+                </span>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Innhold */}
+      {isBlocked ? (
+        <Card data-testid="card-blocked-banner">
+          <CardContent className="py-10 text-center">
+            <Lock className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+            <p className="font-medium">Dagen er blokkert</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Ansatte kan ikke sette tilgjengelighet på blokkerte dager.
+            </p>
+          </CardContent>
+        </Card>
+      ) : isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-md" />
+          ))}
+        </div>
+      ) : sorted.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+            <p className="font-medium">Ingen markert som ledige</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Ingen ansatte har satt seg som tilgjengelige på denne datoen.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {sorted.map((emp) => {
+            const initials = emp.name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")
+              .toUpperCase();
+            const isAssigned = emp.status === "assigned";
+            return (
+              <Card key={emp.userId} data-testid={`card-emp-${emp.userId}`}>
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-10 h-10">
+                      {emp.profileImage && <AvatarImage src={emp.profileImage} alt={emp.name} />}
+                      <AvatarFallback className="bg-primary text-primary-foreground text-sm font-bold">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate" data-testid={`text-name-${emp.userId}`}>
+                        {emp.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                        <span className="truncate">{emp.stilling || "Ansatt"}</span>
+                        <span className="inline-flex items-center gap-0.5">
+                          <MapPin className="w-3 h-3" />
+                          {emp.region}
+                        </span>
+                      </p>
+                    </div>
+                    <span
+                      data-testid={`status-${emp.userId}`}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+                        isAssigned
+                          ? "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+                          : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                      }`}
+                    >
+                      {isAssigned ? (
+                        <>
+                          <Briefcase className="w-3 h-3" />
+                          Tildelt vakt
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                          Ledig
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
-}
-
-function formatNoDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return `${pad(d)}.${pad(m)}.${y}`;
 }

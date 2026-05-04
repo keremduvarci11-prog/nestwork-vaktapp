@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, Calendar, Clock, TrendingUp, List, CalendarCheck } from "lucide-react";
+import { Users, Calendar, Clock, TrendingUp, List } from "lucide-react";
 import { Link } from "wouter";
 import type { Vakt, Barnehage, User } from "@shared/schema";
 import { PushPermissionBanner } from "@/components/push-banner";
@@ -114,20 +114,12 @@ export default function AdminDashboard() {
             </Card>
           </div>
 
-          <div className="flex gap-2">
-            <Link href="/admin/alle-vakter" className="flex-1">
-              <Button variant="outline" className="w-full" data-testid="button-alle-vakter">
-                <List className="w-4 h-4 mr-2" />
-                Alle vakter
-              </Button>
-            </Link>
-            <Link href="/admin/tilgjengelighet" className="flex-1">
-              <Button variant="outline" className="w-full" data-testid="button-tilgjengelighet">
-                <CalendarCheck className="w-4 h-4 mr-2" />
-                Tilgjengelighet
-              </Button>
-            </Link>
-          </div>
+          <Link href="/admin/alle-vakter">
+            <Button variant="outline" className="w-full" data-testid="button-alle-vakter">
+              <List className="w-4 h-4 mr-2" />
+              Administrer alle vakter
+            </Button>
+          </Link>
 
           {activeVakter.length > 0 && (
             <div>
