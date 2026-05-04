@@ -1501,5 +1501,26 @@ export async function registerRoutes(
     });
   });
 
+  const PERSONALREGLER_VERSION = 1;
+
+  app.get("/api/personalregler/status", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req)!;
+    const row = await storage.getPersonalreglerGodkjenning(userId, PERSONALREGLER_VERSION);
+    res.json({
+      accepted: !!row,
+      acceptedAt: row?.acceptedAt?.toISOString() || null,
+      currentVersion: PERSONALREGLER_VERSION,
+    });
+  });
+
+  app.post("/api/personalregler/accept", requireAuth, async (req, res) => {
+    const userId = getUserIdFromRequest(req)!;
+    const row = await storage.createPersonalreglerGodkjenning(userId, PERSONALREGLER_VERSION);
+    res.json({
+      accepted: true,
+      acceptedAt: row.acceptedAt?.toISOString() || null,
+    });
+  });
+
   return httpServer;
 }

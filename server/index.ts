@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { seedDatabase } from "./seed";
 import { startCronJobs } from "./cronJobs";
 import { syncProductionData } from "./syncProdData";
+import { runMigrations } from "./migrations";
 
 process.on('uncaughtException', (err) => {
   console.error('[FATAL] Uncaught exception:', err.message);
@@ -96,6 +97,8 @@ app.use((req, res, next) => {
 
 (async () => {
   try {
+    console.log('[Startup] Step 0: runMigrations...');
+    await runMigrations();
     console.log('[Startup] Step 1: seedDatabase...');
     await seedDatabase();
     console.log('[Startup] Step 2: syncProductionData...');

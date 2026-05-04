@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Camera, Save, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Camera, Save, Eye, EyeOff, FileText, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { ImageCropper } from "@/components/image-cropper";
 
@@ -291,6 +291,24 @@ export default function Innstillinger() {
           </Button>
         </CardContent>
       </Card>
+
+      {user?.role !== "admin" && (
+        <Card
+          className="hover-elevate cursor-pointer"
+          onClick={() => navigate("/personalregler")}
+          data-testid="link-personalregler"
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Personalregler</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {cropImageSrc && (
         <ImageCropper

@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
-  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates,
+  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning,
   type User, type InsertUser,
   type Barnehage, type InsertBarnehage,
   type Vakt, type InsertVakt,
@@ -13,6 +13,7 @@ import {
   type VaktInteresse, type InsertVaktInteresse,
   type Availability,
   type PushSubscription, type InsertPushSubscription,
+  type PersonalreglerGodkjenning,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -90,6 +91,9 @@ export interface IStorage {
   isBlockedDate(date: string): Promise<boolean>;
   addBlockedDate(date: string, reason?: string | null): Promise<{ date: string; reason: string | null }>;
   removeBlockedDate(date: string): Promise<boolean>;
+
+  getPersonalreglerGodkjenning(userId: string, versionId: number): Promise<PersonalreglerGodkjenning | undefined>;
+  createPersonalreglerGodkjenning(userId: string, versionId: number): Promise<PersonalreglerGodkjenning>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -437,6 +441,26 @@ export class DatabaseStorage implements IStorage {
   async removeBlockedDate(date: string): Promise<boolean> {
     const [deleted] = await db.delete(blockedDates).where(eq(blockedDates.date, date)).returning();
     return !!deleted;
+  }
+
+  async getPersonalreglerGodkjenning(userId: string, versionId: number): Promise<PersonalreglerGodkjenning | undefined> {
+    const [row] = await db
+      .select()
+      .from(personalreglerGodkjenning)
+      .where(and(eq(personalreglerGodkjenning.userId, userId), eq(personalreglerGodkjenning.versionId, versionId)));
+    return row;
+  }
+
+  async createPersonalreglerGodkjenning(userId: string, versionId: number): Promise<PersonalreglerGodkjenning> {
+    const [row] = await db
+      .insert(personalreglerGodkjenning)
+      .values({ userId, versionId })
+      .onConflictDoUpdate({
+        target: [personalreglerGodkjenning.userId, personalreglerGodkjenning.versionId],
+        set: { acceptedAt: sql`now()` },
+      })
+      .returning();
+    return row;
   }
 }
 

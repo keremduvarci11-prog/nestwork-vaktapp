@@ -26,6 +26,7 @@ import AnsattesOnboarding from "@/pages/admin/ansattes-onboarding";
 import AdminTilgjengelighet from "@/pages/admin/tilgjengelighet";
 import MinTilgjengelighet from "@/pages/employee/min-tilgjengelighet";
 import Innstillinger from "@/pages/employee/innstillinger";
+import PersonalreglerPage, { PersonalreglerFullscreen } from "@/pages/employee/personalregler";
 import NotFound from "@/pages/not-found";
 import { Loader2, Bell } from "lucide-react";
 import { NestworkLogo } from "@/components/nestwork-logo";
@@ -41,6 +42,11 @@ function AppContent() {
     queryKey: ["/api/varsler/unread-count"],
     enabled: !!user,
     refetchInterval: 15000,
+  });
+
+  const { data: personalreglerStatus, isLoading: personalreglerLoading } = useQuery<{ accepted: boolean }>({
+    queryKey: ["/api/personalregler/status"],
+    enabled: !!user && user.role !== "admin",
   });
 
   useEffect(() => {
@@ -82,6 +88,16 @@ function AppContent() {
 
   const isAdmin = user.role === "admin";
   const varselCount = unreadVarsler?.count || 0;
+
+  if (!isAdmin && !personalreglerLoading && personalreglerStatus && !personalreglerStatus.accepted) {
+    return (
+      <PersonalreglerFullscreen
+        onComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/personalregler/status"] });
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -143,6 +159,7 @@ function AppContent() {
               <Route path="/min-tilgjengelighet" component={MinTilgjengelighet} />
               <Route path="/profil" component={Profil} />
               <Route path="/innstillinger" component={Innstillinger} />
+              <Route path="/personalregler" component={PersonalreglerPage} />
               <Route path="/meldinger" component={Meldinger} />
               <Route path="/varsler" component={Varsler} />
               <Route path="/onboarding" component={OnboardingPage} />

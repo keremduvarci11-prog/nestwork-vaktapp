@@ -83,6 +83,7 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - Lønn & Timer page (/lonn-timer): month dropdown, totals (timer, brutto, 12% feriepenger), per-vakt cards with "Send inn timer for godkjenning" button (active when shift has ended), client-side PDF lønnsslipp via jsPDF (Nestwork Group AS, orgnr 936 293 239)
 - vakter.timerInnsendt + timerInnsendtAt fields track ansatt timer-innsending; atomic conditional update prevents double-submit
 - Cron 15-min reminder: every 5 min sweep notifies ansatt 15-20 min after vakt-slutt to send inn timer (re-fetches vakt before push to avoid race with submit endpoint)
+- Personalregler: obligatory staff rules module. Employees see fullscreen overlay on login (blocks app) with 4 rule sections, each requiring checkbox acknowledgement. "Fullfør" button disabled until all 4 checked. Acceptance stored in `personalregler_godkjenning` table (userId, versionId, acceptedAt). Always accessible via Profil → Innstillinger → Personalregler. Admins are not affected. Version bump in PERSONALREGLER_VERSION (routes.ts) forces re-acceptance. Table auto-created via server/migrations.ts on startup.
 
 ## Capacitor (Native Mobile)
 - Capacitor configured with `appId: no.nestwork.vaktapp`, `appName: Nestwork`
