@@ -17,6 +17,7 @@ const adminItems = [
   { path: "/admin/ny-vakt", label: "Ny vakt", icon: Plus },
   { path: "/admin/godkjenn", label: "Godkjenn", icon: CheckSquare },
   { path: "/admin/meldinger", label: "Meldinger", icon: Mail, badge: "admin" as const },
+  { path: "/admin/tilgjengelighet", label: "Tilgjengelighet", icon: CalendarCheck },
   { path: "/profil", label: "Profil", icon: User },
 ];
 
