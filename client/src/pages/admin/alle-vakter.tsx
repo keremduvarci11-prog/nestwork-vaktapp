@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -194,23 +194,29 @@ function EditVaktForm({
   );
 }
 
-function todayIso(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+function osloNow(): { todayIso: string; nowMinutes: number } {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(new Date());
+  const p = (t: string) => parts.find((x) => x.type === t)?.value ?? "0";
+  const todayIso = `${p("year")}-${p("month")}-${p("day")}`;
+  const nowMinutes = Number(p("hour")) * 60 + Number(p("minute"));
+  return { todayIso, nowMinutes };
 }
 
 function isVaktCompleted(vakt: Vakt): boolean {
-  const today = todayIso();
-  if (vakt.dato < today) return true;
-  if (vakt.dato === today && vakt.sluttTid) {
-    const now = new Date();
+  const { todayIso, nowMinutes } = osloNow();
+  if (vakt.dato < todayIso) return true;
+  if (vakt.dato === todayIso && vakt.sluttTid) {
     const [eh, em] = vakt.sluttTid.split(":").map(Number);
-    const endMinutes = eh * 60 + em;
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    return nowMinutes > endMinutes;
+    return nowMinutes > eh * 60 + em;
   }
   return false;
 }
@@ -223,6 +229,12 @@ export default function AlleVakter() {
   const [tildelingId, setTildelingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("alle");
   const [tab, setTab] = useState<"aktive" | "fullforte">("aktive");
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const { data: vakter, isLoading } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter"],
@@ -273,7 +285,7 @@ export default function AlleVakter() {
       }
     });
     return { activeVakter: active, completedVakter: completed };
-  }, [vakter]);
+  }, [vakter, tick]);
 
   const sourceList = tab === "aktive" ? activeVakter : completedVakter;
 
