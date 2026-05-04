@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,34 @@ import { Users, Calendar, Clock, TrendingUp, List } from "lucide-react";
 import { Link } from "wouter";
 import type { Vakt, Barnehage, User } from "@shared/schema";
 import { PushPermissionBanner } from "@/components/push-banner";
+
+function osloNow(): { todayIso: string; nowMinutes: number } {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(new Date());
+  const p = (t: string) => parts.find((x) => x.type === t)?.value ?? "0";
+  const todayIso = `${p("year")}-${p("month")}-${p("day")}`;
+  const nowMinutes = Number(p("hour")) * 60 + Number(p("minute"));
+  return { todayIso, nowMinutes };
+}
+
+function isVaktActive(vakt: Vakt): boolean {
+  const { todayIso, nowMinutes } = osloNow();
+  if (vakt.dato > todayIso) return true;
+  if (vakt.dato < todayIso) return false;
+  if (vakt.sluttTid) {
+    const [eh, em] = vakt.sluttTid.split(":").map(Number);
+    return nowMinutes <= eh * 60 + em;
+  }
+  return true;
+}
 
 export default function AdminDashboard() {
   const { data: vakter, isLoading: vLoading } = useQuery<Vakt[]>({
@@ -20,7 +48,13 @@ export default function AdminDashboard() {
     queryKey: ["/api/barnehager"],
   });
 
-  const today = new Date().toISOString().split("T")[0];
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { todayIso: today } = osloNow();
   const now = new Date();
   const dayOfWeek = now.getDay();
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -32,17 +66,17 @@ export default function AdminDashboard() {
   const weekEnd = thisWeekEnd.toISOString().split("T")[0];
 
   const activeVakter = useMemo(() => {
-    const list = vakter?.filter((v) => v.dato >= today && (v.status === "godkjent" || v.status === "venter" || v.status === "tildelt")) || [];
+    const list = vakter?.filter((v) => isVaktActive(v) && (v.status === "godkjent" || v.status === "venter" || v.status === "tildelt")) || [];
     return list.slice().sort((a, b) => {
       if (a.dato !== b.dato) return a.dato < b.dato ? -1 : 1;
       const at = a.startTid || "00:00";
       const bt = b.startTid || "00:00";
       return at < bt ? -1 : at > bt ? 1 : 0;
     });
-  }, [vakter, today]);
-  const ledigeVakter = vakter?.filter((v) => v.dato >= today && v.status === "ledig") || [];
+  }, [vakter, tick]);
+  const ledigeVakter = useMemo(() => vakter?.filter((v) => isVaktActive(v) && v.status === "ledig") || [], [vakter, tick]);
   const venterVakter = vakter?.filter((v) => v.status === "venter") || [];
-  const tildelteVakter = vakter?.filter((v) => v.dato >= today && v.status === "tildelt") || [];
+  const tildelteVakter = useMemo(() => vakter?.filter((v) => isVaktActive(v) && v.status === "tildelt") || [], [vakter, tick]);
   const weekVakter = vakter?.filter((v) => v.dato >= weekStart && v.dato <= weekEnd && v.status === "godkjent") || [];
 
   const calcHours = (start: string, end: string, trekkPause?: boolean | null) => {
