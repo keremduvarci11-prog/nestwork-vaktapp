@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus, Coffee } from "lucide-react";
+import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus, Coffee, CheckCircle2 } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
 
@@ -194,6 +194,27 @@ function EditVaktForm({
   );
 }
 
+function todayIso(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function isVaktCompleted(vakt: Vakt): boolean {
+  const today = todayIso();
+  if (vakt.dato < today) return true;
+  if (vakt.dato === today && vakt.sluttTid) {
+    const now = new Date();
+    const [eh, em] = vakt.sluttTid.split(":").map(Number);
+    const endMinutes = eh * 60 + em;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    return nowMinutes > endMinutes;
+  }
+  return false;
+}
+
 export default function AlleVakter() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -201,6 +222,7 @@ export default function AlleVakter() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [tildelingId, setTildelingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("alle");
+  const [tab, setTab] = useState<"aktive" | "fullforte">("aktive");
 
   const { data: vakter, isLoading } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter"],
@@ -240,13 +262,32 @@ export default function AlleVakter() {
   const bhMap = new Map(barnehager?.map((b) => [b.id, b]) || []);
   const userMap = new Map(users?.map((u) => [u.id, u]) || []);
 
-  const filteredVakter = vakter?.filter((v) => {
+  const { activeVakter, completedVakter } = useMemo(() => {
+    const active: Vakt[] = [];
+    const completed: Vakt[] = [];
+    (vakter || []).forEach((v) => {
+      if (isVaktCompleted(v)) {
+        completed.push(v);
+      } else {
+        active.push(v);
+      }
+    });
+    return { activeVakter: active, completedVakter: completed };
+  }, [vakter]);
+
+  const sourceList = tab === "aktive" ? activeVakter : completedVakter;
+
+  const filteredVakter = sourceList.filter((v) => {
     if (filter === "alle") return true;
     return v.status === filter;
   }).sort((a, b) => {
+    if (tab === "fullforte") {
+      if (a.dato !== b.dato) return a.dato > b.dato ? -1 : 1;
+      return (b.startTid || "").localeCompare(a.startTid || "");
+    }
     if (a.dato !== b.dato) return a.dato < b.dato ? -1 : 1;
     return (a.startTid || "").localeCompare(b.startTid || "");
-  }) || [];
+  });
 
   const formatDate = (d: string) => {
     const date = new Date(d + "T00:00:00");
@@ -265,7 +306,30 @@ export default function AlleVakter() {
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          variant={tab === "aktive" ? "default" : "outline"}
+          size="sm"
+          onClick={() => { setTab("aktive"); setFilter("alle"); }}
+          data-testid="tab-aktive"
+          className="w-full"
+        >
+          <Calendar className="w-3.5 h-3.5 mr-1.5" />
+          Aktive ({activeVakter.length})
+        </Button>
+        <Button
+          variant={tab === "fullforte" ? "default" : "outline"}
+          size="sm"
+          onClick={() => { setTab("fullforte"); setFilter("alle"); }}
+          data-testid="tab-fullforte"
+          className="w-full"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+          Fullførte ({completedVakter.length})
+        </Button>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
         {["alle", "ledig", "tildelt", "venter", "godkjent"].map((f) => (
           <Button
             key={f}
@@ -287,7 +351,14 @@ export default function AlleVakter() {
         <Card>
           <CardContent className="py-12 text-center">
             <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-            <p className="font-medium">Ingen vakter funnet</p>
+            <p className="font-medium">
+              {tab === "aktive" ? "Ingen aktive vakter" : "Ingen fullførte vakter"}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {tab === "aktive"
+                ? "Det finnes ingen aktive/fremtidige vakter med valgt filter."
+                : "Det finnes ingen fullførte vakter med valgt filter."}
+            </p>
           </CardContent>
         </Card>
       ) : (
