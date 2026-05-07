@@ -14,6 +14,22 @@ import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 
 const JWT_SECRET = process.env.SESSION_SECRET || "nestwork-secret-key";
 
+function getOsloTodayString(): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Oslo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (t: string) => parts.find(p => p.type === t)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function isPastDateOslo(dato: string | null | undefined): boolean {
+  if (!dato) return false;
+  return dato < getOsloTodayString();
+}
+
 function getUserIdFromRequest(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -506,11 +522,29 @@ export async function registerRoutes(
   app.post("/api/vakter", requireAdmin, async (req, res) => {
     const parsed = insertVaktSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
-    const created = await storage.createVakt(parsed.data);
+
+    let payload = parsed.data;
+    const autoGodkjenn =
+      payload.status === "tildelt" &&
+      !!payload.ansattId &&
+      isPastDateOslo(payload.dato);
+    if (autoGodkjenn) {
+      payload = { ...payload, status: "godkjent" };
+    }
+
+    const created = await storage.createVakt(payload);
 
     try {
       const bh = await storage.getBarnehage(created.barnehageId);
-      if (created.status === "tildelt" && created.ansattId) {
+      if (autoGodkjenn && created.ansattId) {
+        await notifyUser(
+          created.ansattId,
+          "Vakt registrert",
+          `Nestwork Admin har registrert en vakt ${created.dato} hos ${bh?.name || "ukjent"} (${created.startTid?.slice(0, 5)} - ${created.sluttTid?.slice(0, 5)}).`,
+          "vakt",
+          "/mine-vakter"
+        );
+      } else if (created.status === "tildelt" && created.ansattId) {
         await notifyUser(
           created.ansattId,
           "Du har fatt en ny vakt",
@@ -527,6 +561,32 @@ export async function registerRoutes(
           "/"
         );
       }
+
+      if (autoGodkjenn && created.ansattId) {
+        let timer = 0;
+        if (created.startTid && created.sluttTid) {
+          const [sh, sm] = created.startTid.split(":").map(Number);
+          const [eh, em] = created.sluttTid.split(":").map(Number);
+          timer = (eh * 60 + em - sh * 60 - sm) / 60;
+          if (created.trekkPause) timer -= 0.5;
+          timer = Math.max(0, timer);
+        }
+        const ansatt = await storage.getUser(created.ansattId);
+        await appendVaktToSheet({
+          dato: created.dato || "",
+          barnehageNavn: bh?.name || created.barnehageId || "",
+          region: created.region || "",
+          ansattNavn: ansatt?.name || "",
+          ansattId: ansatt?.externalId || null,
+          vikarkode: created.vikarkode || "",
+          startTid: created.startTid || "",
+          sluttTid: created.sluttTid || "",
+          timer: Math.round(timer * 100) / 100,
+          trekkPause: created.trekkPause || false,
+          status: "godkjent",
+          timelonn: ansatt?.timelonn ?? null,
+        });
+      }
     } catch (err) {
       console.error("[Notify] Feil ved varsling:", err);
     }
@@ -536,7 +596,18 @@ export async function registerRoutes(
 
   app.patch("/api/vakter/:id", requireAdmin, async (req, res) => {
     const before = await storage.getVakt(req.params.id);
-    const updated = await storage.updateVakt(req.params.id, req.body);
+    const patch = { ...req.body };
+    const effectiveDato = patch.dato ?? before?.dato;
+    const effectiveAnsattId = patch.ansattId ?? before?.ansattId;
+    const effectiveStatus = patch.status ?? before?.status;
+    if (
+      effectiveStatus === "tildelt" &&
+      effectiveAnsattId &&
+      isPastDateOslo(effectiveDato)
+    ) {
+      patch.status = "godkjent";
+    }
+    const updated = await storage.updateVakt(req.params.id, patch);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
 
@@ -668,8 +739,10 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Mangler ansattId" });
     }
     const before = await storage.getVakt(req.params.id);
+    const autoGodkjenn = isPastDateOslo(before?.dato);
+    const newStatus = autoGodkjenn ? "godkjent" : "tildelt";
     const updated = await storage.updateVakt(req.params.id, {
-      status: "tildelt",
+      status: newStatus,
       ansattId,
     });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
@@ -679,18 +752,54 @@ export async function registerRoutes(
     (async () => {
       try {
         const bh = await storage.getBarnehage(updated.barnehageId);
-        await notifyUser(
-          ansattId,
-          "Du har fatt en ny vakt",
-          `Nestwork Admin har tildelt deg en vakt ${updated.dato} hos ${bh?.name || "ukjent"}. Husk a godkjenne.`,
-          "tildeling",
-          "/mine-vakter"
-        );
+        if (autoGodkjenn) {
+          await notifyUser(
+            ansattId,
+            "Vakt registrert",
+            `Nestwork Admin har registrert en vakt ${updated.dato} hos ${bh?.name || "ukjent"} (${updated.startTid?.slice(0, 5)} - ${updated.sluttTid?.slice(0, 5)}).`,
+            "vakt",
+            "/mine-vakter"
+          );
+        } else {
+          await notifyUser(
+            ansattId,
+            "Du har fatt en ny vakt",
+            `Nestwork Admin har tildelt deg en vakt ${updated.dato} hos ${bh?.name || "ukjent"}. Husk a godkjenne.`,
+            "tildeling",
+            "/mine-vakter"
+          );
+        }
 
         if (before?.ansattId && before.ansattId !== ansattId && before.status === "godkjent") {
           const oldAnsatt = await storage.getUser(before.ansattId);
           const oldBh = await storage.getBarnehage(before.barnehageId);
           await removeVaktFromSheet(oldBh?.name || before.barnehageId, before.dato || "", oldAnsatt?.name || "");
+        }
+
+        if (autoGodkjenn) {
+          let timer = 0;
+          if (updated.startTid && updated.sluttTid) {
+            const [sh, sm] = updated.startTid.split(":").map(Number);
+            const [eh, em] = updated.sluttTid.split(":").map(Number);
+            timer = (eh * 60 + em - sh * 60 - sm) / 60;
+            if (updated.trekkPause) timer -= 0.5;
+            timer = Math.max(0, timer);
+          }
+          const ansatt = await storage.getUser(ansattId);
+          await appendVaktToSheet({
+            dato: updated.dato || "",
+            barnehageNavn: bh?.name || updated.barnehageId || "",
+            region: updated.region || "",
+            ansattNavn: ansatt?.name || "",
+            ansattId: ansatt?.externalId || null,
+            vikarkode: updated.vikarkode || "",
+            startTid: updated.startTid || "",
+            sluttTid: updated.sluttTid || "",
+            timer: Math.round(timer * 100) / 100,
+            trekkPause: updated.trekkPause || false,
+            status: "godkjent",
+            timelonn: ansatt?.timelonn ?? null,
+          });
         }
       } catch (err) {
         console.error("[Notify/Sheets] Feil ved tildeling:", err);
