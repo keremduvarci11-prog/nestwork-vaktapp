@@ -28,6 +28,7 @@ export interface IStorage {
   getAllBarnehager(): Promise<Barnehage[]>;
   getBarnehage(id: string): Promise<Barnehage | undefined>;
   createBarnehage(b: InsertBarnehage): Promise<Barnehage>;
+  updateBarnehage(id: string, data: Partial<InsertBarnehage>): Promise<Barnehage | undefined>;
 
   getVakter(): Promise<Vakt[]>;
   getVakterByRegion(region: string): Promise<Vakt[]>;
@@ -149,6 +150,11 @@ export class DatabaseStorage implements IStorage {
   async createBarnehage(b: InsertBarnehage): Promise<Barnehage> {
     const [created] = await db.insert(barnehager).values(b).returning();
     return created;
+  }
+
+  async updateBarnehage(id: string, data: Partial<InsertBarnehage>): Promise<Barnehage | undefined> {
+    const [updated] = await db.update(barnehager).set(data).where(eq(barnehager.id, id)).returning();
+    return updated;
   }
 
   async getVakter(): Promise<Vakt[]> {

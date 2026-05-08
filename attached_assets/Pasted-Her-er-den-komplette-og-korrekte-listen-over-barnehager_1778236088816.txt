@@ -1,0 +1,59 @@
+Her er den komplette og korrekte listen over barnehager som skal legges inn i databasen.
+
+Viktig beskjed: Du skal ikke gjøre endringer på noe annet i koden, databasestrukturen eller systemet enn det du blir bedt om i denne spesifikke forespørselen.
+
+Oppgaver:
+
+Oppdater databasen med informasjonen under (Navn, kontaktperson, telefonnummer og adresse).
+
+Sørg for at telefonnummeret vises i de ansattes vakt-visning som en klikkbar 'tel:'-lenke, slik at de kan ringe direkte fra appen.
+
+Data som skal legges inn:
+
+A001: Skorvane Fus – Kristin Tellefsen: 61 59 61 00 (Skeismyra 14, 5217 Hagavik)
+
+A002: Hjellemarka Fus – Birte Strømsø: 56 12 30 50 (Storestraumen 275, 5212 Søfteland)
+
+A003: Rakkungan Barnehagedrift – Monica Tanche Bergh Ahlstrøm: 38 02 11 30 (Kirsebærveien 10A, 4635 Kristiansand)
+
+A004: Rakkerungan Gårdbarnehage – Monica Tanche Bergh Ahlstrøm: 45 41 90 12 (Støleveien 21, 4639 Kristiansand)
+
+A005: Jegersberg Barnehage – Monica Tanche Bergh Ahlstrøm: 38 19 89 45 (Gillsveien 45, 4633 Kristiansand)
+
+A006: Søre Neset Fus – Edle Nøkleby: 41 58 86 70 (Reset 32, 5200 Os)
+
+A007: Håkonshella Fus – Gro Seberg: 94 02 69 79 (Håkonshellaveien 125, 5174)
+
+A008: Prestagardskogen Fus – 52 70 44 74 (Vestlivegen 40, 5414 Stord)
+
+A009: Tyse Fus – 53 01 90 01 (Tysemarkjo 47, 5414 Stord)
+
+A010: Jettegryto Barnehage – Line Ragnhildstveit: 56 58 10 50 (Brakabygda 49, 5640 Eikelandsosen)
+
+A011: Valvatna Fus – Hildegunn Grundvold: 53 41 01 80 (Åsaheio 1, 5412 Stord)
+
+A012: Buggeland Barnehage – Kjersti Fiskå: 51 66 84 40 (Buggelandbakken 145, 4324 Sandnes)
+
+A013: Espira Kuventræ – Ine-Henriette Lynum: 93 25 86 58 (Industrivegen 99, 5210 Osøyro)
+
+A014: Læringsverkstedet Tyholmen – Hanne Randby: 45 28 83 82 (Rådhusgaten 6, 4836 Arendal)
+
+A015: Læringsverkstedet Gimlekollen – Gyro: 37 07 15 68 (Bergtoras vei 8, 4633 Kristiansand S)
+
+A016: Nedre Høvik Fus – Hanne Kviserud: 31 29 21 20 (Høvikskogen 2, 3477 Båtstø)
+
+A017: Skeisbotnen Barnehage – Ruth Therese Lundekvam Nyheim: 55 70 50 10 (Skeisbotnen 58, 5217 Hagavik)
+
+A018: Havhesten Fus – Line Karlsen: 96 62 57 63 (Kolltveitvegen 140, 5360 Kolltveit)
+
+A019: Skårungen Barnehave – Sahar Sabouri: 45 97 58 08 (Løkenåsveien 41, 1473 Lørenskog)
+
+A020: Sæverhagen Fus – Kari Vraspalli: 53 01 91 11 (Sævarhagen 47, 5416 Stord)
+
+A021: Hegglandsdalen Barnehage – Grethe: 56 30 98 50 (Hegglandsdalsvegen 539, 5211 Os)
+
+A022: Olderdalen Fus – Anne Marit: 53 49 30 08 (Myrateigen 2, 5412 Stord)
+
+A023: Espira Ulvenvatnet – Amalie: 69 00 63 86 (Industrivegen 111, 5210 OS)
+
+A024: Naustvågen Barnehage – Mona: 53 41 30 56 (Kjøtteinsvegen 188, 5411 Stord)

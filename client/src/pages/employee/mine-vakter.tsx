@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, Building2, CheckCircle2, Timer, AlertCircle, UserCheck, CalendarPlus } from "lucide-react";
+import { Calendar, Clock, Building2, CheckCircle2, Timer, AlertCircle, UserCheck, CalendarPlus, Phone } from "lucide-react";
 import type { Vakt, Barnehage } from "@shared/schema";
 
 const statusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle2 }> = {
@@ -171,6 +171,16 @@ export default function MineVakter() {
                       <Building2 className="w-3.5 h-3.5" />
                       <span className="truncate">{bh?.address}</span>
                     </div>
+                    {bh?.contactPhone && (
+                      <a
+                        href={`tel:${bh.contactPhone.replace(/\s+/g, "")}`}
+                        className="flex items-center gap-1.5 col-span-2 text-primary hover:underline"
+                        data-testid={`link-phone-${vakt.id}`}
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span className="truncate">{bh.contactPhone}</span>
+                      </a>
+                    )}
                   </div>
                   <div className="flex gap-2 mt-3">
                     <Button
@@ -229,6 +239,16 @@ export default function MineVakter() {
                       <Building2 className="w-3.5 h-3.5" />
                       <span className="truncate">{bh?.address}</span>
                     </div>
+                    {bh?.contactPhone && (
+                      <a
+                        href={`tel:${bh.contactPhone.replace(/\s+/g, "")}`}
+                        className="flex items-center gap-1.5 col-span-2 text-primary hover:underline"
+                        data-testid={`link-phone-${vakt.id}`}
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span className="truncate">{bh.contactPhone}</span>
+                      </a>
+                    )}
                   </div>
                   {vakt.status === "godkjent" && (
                     <Button

@@ -454,6 +454,12 @@ export async function registerRoutes(
     res.json(created);
   });
 
+  app.patch("/api/barnehager/:id", requireAdmin, async (req, res) => {
+    const updated = await storage.updateBarnehage(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ message: "Barnehage ikke funnet" });
+    res.json(updated);
+  });
+
   const regionGroups: Record<string, string[]> = {
     "Bergen": ["Bergen", "Os"],
     "Os": ["Os"],

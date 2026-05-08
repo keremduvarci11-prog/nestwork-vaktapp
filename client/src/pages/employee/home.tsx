@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2, HandMetal } from "lucide-react";
+import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2, HandMetal, Phone } from "lucide-react";
 import { PushPermissionBanner } from "@/components/push-banner";
 import type { Vakt, Barnehage, Onboarding, VaktInteresse } from "@shared/schema";
 
@@ -150,6 +150,17 @@ export default function EmployeeHome() {
                       <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
                       <span className="truncate">{bh?.address}</span>
                     </div>
+                    {bh?.contactPhone && (
+                      <a
+                        href={`tel:${bh.contactPhone.replace(/\s+/g, "")}`}
+                        className="flex items-center gap-1.5 text-primary col-span-2 hover:underline"
+                        data-testid={`link-phone-${vakt.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">{bh.contactPhone}</span>
+                      </a>
+                    )}
                   </div>
                   <Button
                     data-testid={`button-godta-vakt-${vakt.id}`}
@@ -210,6 +221,17 @@ export default function EmployeeHome() {
                       <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
                       <span className="truncate">{bh?.address}</span>
                     </div>
+                    {bh?.contactPhone && (
+                      <a
+                        href={`tel:${bh.contactPhone.replace(/\s+/g, "")}`}
+                        className="flex items-center gap-1.5 text-primary col-span-2 hover:underline"
+                        data-testid={`link-phone-${vakt.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">{bh.contactPhone}</span>
+                      </a>
+                    )}
                   </div>
 
                   {vakt.beskrivelse && (
