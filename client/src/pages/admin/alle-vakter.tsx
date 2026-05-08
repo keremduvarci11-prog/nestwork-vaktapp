@@ -124,6 +124,7 @@ function EditVaktForm({
               <SelectItem value="LTV">LTV - Langtidsvikar</SelectItem>
               <SelectItem value="LTV-NAV">LTV-NAV - NAV-tiltak</SelectItem>
               <SelectItem value="RES">RES - Reserve</SelectItem>
+              <SelectItem value="TEST">TEST - Test vakt</SelectItem>
             </SelectContent>
           </Select>
         </div>
