@@ -222,8 +222,16 @@ async function downloadAuthed(url: string, suggestedName: string) {
     const res = await fetch(url, { credentials: "include", headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
-    const ext = url.split(".").pop()?.split("?")[0] || "";
-    const filename = ext ? `${suggestedName}.${ext}` : suggestedName;
+    let filename = suggestedName;
+    const cd = res.headers.get("Content-Disposition") || "";
+    const cdMatch = cd.match(/filename="?([^";]+)"?/i);
+    if (cdMatch) {
+      filename = cdMatch[1];
+    } else {
+      const tail = url.split("?")[0].split("/").pop() || "";
+      const m = tail.match(/\.([a-z0-9]{1,5})$/i);
+      if (m) filename = `${suggestedName}.${m[1]}`;
+    }
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = objectUrl;

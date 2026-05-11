@@ -58,13 +58,7 @@ if (!fs.existsSync(docsDir)) {
 }
 
 const docUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, docsDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".webp"];
@@ -217,7 +211,12 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Du har ikke tilgang" });
     }
     const { password: _, ...safeUser } = user;
-    res.json({ ...safeUser, profileImage: resolveProfileImage(safeUser.profileImage) });
+    res.json({
+      ...safeUser,
+      profileImage: resolveProfileImage(safeUser.profileImage),
+      cvFile: resolveDocFileForList(safeUser.cvFile, safeUser.id, "cv"),
+      politiattestFile: resolveDocFileForList(safeUser.politiattestFile, safeUser.id, "politiattest"),
+    });
   });
 
   function resolveProfileImageForList(img: string | null | undefined, userId: string): string | null {
@@ -241,11 +240,65 @@ export async function registerRoutes(
     res.send(buffer);
   });
 
+  function resolveDocFile(value: string | null | undefined): string | null {
+    if (!value) return null;
+    if (value.startsWith("data:")) return value;
+    if (value.startsWith("/uploads/")) {
+      const filePath = path.join(process.cwd(), value.startsWith("/") ? `.${value}` : value);
+      return fs.existsSync(filePath) ? value : null;
+    }
+    return value;
+  }
+
+  function resolveDocFileForList(value: string | null | undefined, userId: string, kind: "cv" | "politiattest"): string | null {
+    const resolved = resolveDocFile(value);
+    if (!resolved) return null;
+    if (resolved.startsWith("data:")) return `/api/users/${userId}/${kind}-file`;
+    return resolved;
+  }
+
+  async function serveDocFile(req: Request, res: Response, kind: "cv" | "politiattest") {
+    const requesterId = getUserIdFromRequest(req);
+    if (!requesterId) return res.status(401).json({ message: "Ikke innlogget" });
+    const requester = await storage.getUser(requesterId);
+    if (!requester) return res.status(401).json({ message: "Bruker ikke funnet" });
+    if (requester.role !== "admin" && requesterId !== req.params.id) {
+      return res.status(403).json({ message: "Ingen tilgang" });
+    }
+    const user = await storage.getUser(req.params.id);
+    const value = kind === "cv" ? user?.cvFile : user?.politiattestFile;
+    if (!value || !value.startsWith("data:")) {
+      return res.status(404).json({ message: "Fil ikke funnet" });
+    }
+    const match = value.match(/^data:([^;]+)(?:;name=([^;]+))?;base64,(.+)$/);
+    if (!match) return res.status(404).json({ message: "Ugyldig filformat" });
+    const [, mimeType, encodedName, base64Data] = match;
+    const buffer = Buffer.from(base64Data, "base64");
+    const ext = mimeType === "application/pdf" ? "pdf"
+      : mimeType === "application/msword" ? "doc"
+      : mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ? "docx"
+      : mimeType === "image/jpeg" ? "jpg"
+      : mimeType === "image/png" ? "png"
+      : mimeType === "image/webp" ? "webp"
+      : "bin";
+    const fallbackName = `${kind === "cv" ? "CV" : "Politiattest"}-${(user?.name || "fil").replace(/[^\w-]+/g, "_")}.${ext}`;
+    const filename = encodedName ? decodeURIComponent(encodedName) : fallbackName;
+    res.set("Content-Type", mimeType);
+    res.set("Content-Disposition", `attachment; filename="${filename.replace(/"/g, "")}"`);
+    res.set("Cache-Control", "private, no-cache");
+    res.send(buffer);
+  }
+
+  app.get("/api/users/:id/cv-file", (req, res) => serveDocFile(req, res, "cv"));
+  app.get("/api/users/:id/politiattest-file", (req, res) => serveDocFile(req, res, "politiattest"));
+
   app.get("/api/users", requireAuth, async (_req, res) => {
     const all = await storage.getAllUsers();
     const safe = all.map(({ password: _, ...u }) => ({
       ...u,
       profileImage: resolveProfileImageForList(u.profileImage, u.id),
+      cvFile: resolveDocFileForList(u.cvFile, u.id, "cv"),
+      politiattestFile: resolveDocFileForList(u.politiattestFile, u.id, "politiattest"),
     }));
     res.json(safe);
   });
@@ -398,6 +451,23 @@ export async function registerRoutes(
     res.json(safeUser);
   });
 
+  function fileToDataUrl(file: Express.Multer.File): string {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      ".pdf": "application/pdf",
+      ".doc": "application/msword",
+      ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".webp": "image/webp",
+    };
+    const mime = mimeMap[ext] || file.mimetype || "application/octet-stream";
+    const safeName = encodeURIComponent(file.originalname);
+    const base64 = file.buffer.toString("base64");
+    return `data:${mime};name=${safeName};base64,${base64}`;
+  }
+
   app.post("/api/users/:id/upload-cv", requireAuth, docUpload.single("file"), async (req, res) => {
     if (getUserIdFromRequest(req) !== req.params.id) {
       return res.status(403).json({ message: "Ingen tilgang" });
@@ -405,11 +475,11 @@ export async function registerRoutes(
     if (!req.file) {
       return res.status(400).json({ message: "Ingen fil valgt" });
     }
-    const fileUrl = `/uploads/documents/${req.file.filename}`;
-    const updated = await storage.updateUser(req.params.id, { cvFile: fileUrl });
+    const dataUrl = fileToDataUrl(req.file);
+    const updated = await storage.updateUser(req.params.id, { cvFile: dataUrl });
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
-    res.json(safeUser);
+    res.json({ ...safeUser, cvFile: resolveDocFileForList(safeUser.cvFile, safeUser.id, "cv") });
   });
 
   app.post("/api/users/:id/upload-politiattest", requireAuth, docUpload.single("file"), async (req, res) => {
@@ -419,11 +489,11 @@ export async function registerRoutes(
     if (!req.file) {
       return res.status(400).json({ message: "Ingen fil valgt" });
     }
-    const fileUrl = `/uploads/documents/${req.file.filename}`;
-    const updated = await storage.updateUser(req.params.id, { politiattestFile: fileUrl });
+    const dataUrl = fileToDataUrl(req.file);
+    const updated = await storage.updateUser(req.params.id, { politiattestFile: dataUrl });
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
-    res.json(safeUser);
+    res.json({ ...safeUser, politiattestFile: resolveDocFileForList(safeUser.politiattestFile, safeUser.id, "politiattest") });
   });
 
   app.get("/api/barnehager", requireAuth, async (_req, res) => {
@@ -1324,8 +1394,8 @@ export async function registerRoutes(
           stilling: u.stilling,
           timelonn: u.timelonn,
           profileImage: resolveProfileImageForList(u.profileImage, u.id),
-          cvFile: u.cvFile,
-          politiattestFile: u.politiattestFile,
+          cvFile: resolveDocFileForList(u.cvFile, u.id, "cv"),
+          politiattestFile: resolveDocFileForList(u.politiattestFile, u.id, "politiattest"),
           progress,
           completedCount,
           totalCount,
