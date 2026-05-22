@@ -223,20 +223,26 @@ export default function LonnTimer() {
       if (Capacitor.isNativePlatform()) {
         const base64 = await blobToBase64(result.blob);
         const safeName = result.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-        await Filesystem.writeFile({
+        const written = await Filesystem.writeFile({
           path: safeName,
           data: base64,
           directory: Directory.Cache,
         });
-        const fileUri = await Filesystem.getUri({
-          path: safeName,
-          directory: Directory.Cache,
-        });
-        await Share.share({
-          title: result.filename,
-          url: fileUri.uri,
-          dialogTitle: "Lagre lønnsslipp",
-        });
+        const fileUri = written.uri;
+        try {
+          await Share.share({
+            title: result.filename,
+            files: [fileUri],
+            dialogTitle: "Lagre lønnsslipp",
+          });
+        } catch (shareErr: any) {
+          if (shareErr?.message && /cancel/i.test(String(shareErr.message))) return;
+          await Share.share({
+            title: result.filename,
+            url: fileUri,
+            dialogTitle: "Lagre lønnsslipp",
+          });
+        }
       } else {
         const objectUrl = URL.createObjectURL(result.blob);
         const a = document.createElement("a");
@@ -606,7 +612,7 @@ export default function LonnTimer() {
           </DialogHeader>
           {pdfViewer && (
             <iframe
-              src={pdfViewer.url}
+              src={`${pdfViewer.url}#view=FitH&zoom=page-width`}
               title={pdfViewer.name}
               className="flex-1 w-full border-0"
               data-testid="iframe-pdf-viewer"
