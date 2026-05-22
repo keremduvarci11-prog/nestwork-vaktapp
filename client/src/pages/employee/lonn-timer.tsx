@@ -12,7 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import {
   Clock,
   TrendingUp,
@@ -68,6 +77,7 @@ export default function LonnTimer() {
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   const [selectedMonth, setSelectedMonth] = useState<string>(todayKey);
+  const [pdfViewer, setPdfViewer] = useState<{ url: string; name: string } | null>(null);
 
   const { data: vakter, isLoading } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter/mine", user?.id],
@@ -168,24 +178,84 @@ export default function LonnTimer() {
     return { blob, filename };
   };
 
-  const openLonnsslipp = () => {
-    if (!user?.id || !lonnsslippForMonth) return;
-    const url = `/api/users/${user.id}/lonnsslipper/${lonnsslippForMonth.maned}/file?inline=1`;
-    const win = window.open(url, "_blank", "noopener,noreferrer");
-    if (!win) {
-      window.location.href = url;
+  const blobToBase64 = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const i = result.indexOf(",");
+        resolve(i >= 0 ? result.slice(i + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+
+  const openLonnsslipp = async () => {
+    try {
+      const result = await fetchLonnsslippBlob();
+      if (!result) return;
+      const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      setPdfViewer({ url: objectUrl, name: result.filename });
+    } catch (e) {
+      console.error("Open lonnsslipp failed:", e);
+      toast({
+        title: "Kunne ikke åpne",
+        description: "Prøv igjen senere.",
+        variant: "destructive",
+      });
     }
   };
 
-  const downloadLonnsslipp = () => {
+  const closePdfViewer = () => {
+    if (pdfViewer?.url) {
+      URL.revokeObjectURL(pdfViewer.url);
+    }
+    setPdfViewer(null);
+  };
+
+  const downloadLonnsslipp = async () => {
     if (!user?.id || !lonnsslippForMonth) return;
-    const url = `/api/users/${user.id}/lonnsslipper/${lonnsslippForMonth.maned}/file`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = lonnsslippForMonth.filNavn || `lonnsslipp-${selectedMonth}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      const result = await fetchLonnsslippBlob();
+      if (!result) return;
+
+      if (Capacitor.isNativePlatform()) {
+        const base64 = await blobToBase64(result.blob);
+        const safeName = result.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+        await Filesystem.writeFile({
+          path: safeName,
+          data: base64,
+          directory: Directory.Cache,
+        });
+        const fileUri = await Filesystem.getUri({
+          path: safeName,
+          directory: Directory.Cache,
+        });
+        await Share.share({
+          title: result.filename,
+          url: fileUri.uri,
+          dialogTitle: "Lagre lønnsslipp",
+        });
+      } else {
+        const objectUrl = URL.createObjectURL(result.blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = result.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      }
+    } catch (e: any) {
+      if (e?.message && /cancel/i.test(String(e.message))) return;
+      console.error("Download lonnsslipp failed:", e);
+      toast({
+        title: "Kunne ikke laste ned",
+        description: "Prøv igjen senere.",
+        variant: "destructive",
+      });
+    }
   };
 
   const downloadPdf = async () => {
@@ -521,6 +591,29 @@ export default function LonnTimer() {
           )}
         </>
       )}
+
+      <Dialog
+        open={!!pdfViewer}
+        onOpenChange={(open) => {
+          if (!open) closePdfViewer();
+        }}
+      >
+        <DialogContent className="max-w-3xl w-[95vw] h-[85vh] p-0 flex flex-col gap-0">
+          <DialogHeader className="px-4 py-3 border-b">
+            <DialogTitle className="text-base truncate pr-8" data-testid="text-pdf-viewer-title">
+              {pdfViewer?.name || "Lønnsslipp"}
+            </DialogTitle>
+          </DialogHeader>
+          {pdfViewer && (
+            <iframe
+              src={pdfViewer.url}
+              title={pdfViewer.name}
+              className="flex-1 w-full border-0"
+              data-testid="iframe-pdf-viewer"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
