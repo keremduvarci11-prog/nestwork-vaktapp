@@ -22,6 +22,7 @@ import {
   Hourglass,
   CheckCircle2,
   Download,
+  Eye,
 } from "lucide-react";
 import type { Vakt, Barnehage } from "@shared/schema";
 
@@ -89,21 +90,19 @@ export default function LonnTimer() {
 
   const timelonn = parseFloat(user?.timelonn || "0");
 
-  const MIN_MONTH_KEY = "2026-05";
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
-    if (todayKey >= MIN_MONTH_KEY) set.add(todayKey);
+    set.add(todayKey);
     (vakter || []).forEach((v) => {
       if (!v.dato) return;
       if (v.status !== "godkjent") return;
       const d = new Date(v.dato + "T00:00:00");
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (key >= MIN_MONTH_KEY) set.add(key);
+      set.add(key);
     });
     (lonnsslipper || []).forEach((l) => {
-      if (l.maned && l.maned >= MIN_MONTH_KEY) set.add(l.maned);
+      if (l.maned) set.add(l.maned);
     });
-    if (set.size === 0) set.add(MIN_MONTH_KEY);
     return Array.from(set).sort((a, b) => b.localeCompare(a));
   }, [vakter, lonnsslipper, todayKey]);
 
@@ -154,23 +153,54 @@ export default function LonnTimer() {
 
   const lonnsslippForMonth = (lonnsslipper || []).find((l) => l.maned === selectedMonth);
 
-  const downloadLonnsslipp = async () => {
-    if (!user?.id || !lonnsslippForMonth) return;
+  const fetchLonnsslippBlob = async () => {
+    if (!user?.id || !lonnsslippForMonth) return null;
+    const res = await fetch(
+      `/api/users/${user.id}/lonnsslipper/${lonnsslippForMonth.maned}/file`,
+      { credentials: "include" },
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    let filename = lonnsslippForMonth.filNavn || `lonnsslipp-${selectedMonth}.pdf`;
+    const cd = res.headers.get("Content-Disposition") || "";
+    const cdMatch = cd.match(/filename="?([^";]+)"?/i);
+    if (cdMatch) filename = cdMatch[1];
+    return { blob, filename };
+  };
+
+  const openLonnsslipp = async () => {
     try {
-      const res = await fetch(
-        `/api/users/${user.id}/lonnsslipper/${lonnsslippForMonth.maned}/file`,
-        { credentials: "include" },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      let filename = lonnsslippForMonth.filNavn || `lonnsslipp-${selectedMonth}.pdf`;
-      const cd = res.headers.get("Content-Disposition") || "";
-      const cdMatch = cd.match(/filename="?([^";]+)"?/i);
-      if (cdMatch) filename = cdMatch[1];
-      const objectUrl = URL.createObjectURL(blob);
+      const result = await fetchLonnsslippBlob();
+      if (!result) return;
+      const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const win = window.open(objectUrl, "_blank");
+      if (!win) {
+        toast({
+          title: "Kunne ikke åpne",
+          description: "Tillat popup-vinduer for å se lønnsslippen.",
+          variant: "destructive",
+        });
+      }
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (e) {
+      console.error("Open lonnsslipp failed:", e);
+      toast({
+        title: "Kunne ikke åpne",
+        description: "Prøv igjen senere.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const downloadLonnsslipp = async () => {
+    try {
+      const result = await fetchLonnsslippBlob();
+      if (!result) return;
+      const objectUrl = URL.createObjectURL(result.blob);
       const a = document.createElement("a");
       a.href = objectUrl;
-      a.download = filename;
+      a.download = result.filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -342,6 +372,16 @@ export default function LonnTimer() {
         >
           <FileDown className="w-4 h-4" />
         </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={downloadLonnsslipp}
+          disabled={!lonnsslippForMonth}
+          data-testid="button-download-lonnsslipp-icon"
+          title={lonnsslippForMonth ? "Last ned lønnsslipp" : "Ingen lønnsslipp for denne måneden"}
+        >
+          <Download className="w-4 h-4" />
+        </Button>
       </div>
 
       {lonnsslippForMonth && (
@@ -357,11 +397,11 @@ export default function LonnTimer() {
             </div>
             <Button
               size="sm"
-              onClick={downloadLonnsslipp}
-              data-testid="button-download-lonnsslipp"
+              onClick={openLonnsslipp}
+              data-testid="button-open-lonnsslipp"
             >
-              <Download className="w-3.5 h-3.5 mr-1.5" />
-              Last ned
+              <Eye className="w-3.5 h-3.5 mr-1.5" />
+              Åpne lønnsslipp
             </Button>
           </CardContent>
         </Card>
