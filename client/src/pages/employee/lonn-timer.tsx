@@ -594,7 +594,7 @@ export default function LonnTimer() {
           if (!open) closePdfViewer();
         }}
       >
-        <DialogContent className="max-w-3xl w-[100vw] h-[100dvh] sm:h-[90vh] p-0 flex flex-col gap-0 sm:rounded-lg rounded-none">
+        <DialogContent className="max-w-3xl w-[95vw] h-[85vh] p-0 flex flex-col gap-0">
           <DialogHeader className="px-4 py-3 border-b shrink-0">
             <DialogTitle className="text-base truncate pr-8" data-testid="text-pdf-viewer-title">
               {pdfViewer?.name || "Lønnsslipp"}
