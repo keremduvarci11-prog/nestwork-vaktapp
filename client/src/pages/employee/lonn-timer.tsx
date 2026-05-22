@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
+import { PdfViewer } from "@/components/pdf-viewer";
 import {
   Clock,
   TrendingUp,
@@ -77,7 +78,7 @@ export default function LonnTimer() {
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   const [selectedMonth, setSelectedMonth] = useState<string>(todayKey);
-  const [pdfViewer, setPdfViewer] = useState<{ url: string; name: string } | null>(null);
+  const [pdfViewer, setPdfViewer] = useState<{ blob: Blob; name: string } | null>(null);
 
   const { data: vakter, isLoading } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter/mine", user?.id],
@@ -195,8 +196,7 @@ export default function LonnTimer() {
       const result = await fetchLonnsslippBlob();
       if (!result) return;
       const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
-      const objectUrl = URL.createObjectURL(pdfBlob);
-      setPdfViewer({ url: objectUrl, name: result.filename });
+      setPdfViewer({ blob: pdfBlob, name: result.filename });
     } catch (e) {
       console.error("Open lonnsslipp failed:", e);
       toast({
@@ -207,58 +207,65 @@ export default function LonnTimer() {
     }
   };
 
-  const closePdfViewer = () => {
-    if (pdfViewer?.url) {
-      URL.revokeObjectURL(pdfViewer.url);
-    }
-    setPdfViewer(null);
-  };
+  const closePdfViewer = () => setPdfViewer(null);
+
+  const ensurePdfExt = (name: string) =>
+    /\.pdf$/i.test(name) ? name : `${name.replace(/\.[^.]+$/, "")}.pdf`;
 
   const downloadLonnsslipp = async () => {
     if (!user?.id || !lonnsslippForMonth) return;
     try {
       const result = await fetchLonnsslippBlob();
       if (!result) return;
+      const filename = ensurePdfExt(result.filename);
 
       if (Capacitor.isNativePlatform()) {
         const base64 = await blobToBase64(result.blob);
-        const safeName = result.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const written = await Filesystem.writeFile({
-          path: safeName,
-          data: base64,
-          directory: Directory.Cache,
-        });
-        const fileUri = written.uri;
+        const safeName = ensurePdfExt(filename.replace(/[^a-zA-Z0-9._-]/g, "_"));
+        let writeRes;
+        try {
+          writeRes = await Filesystem.writeFile({
+            path: safeName,
+            data: base64,
+            directory: Directory.Documents,
+            recursive: true,
+          });
+        } catch {
+          writeRes = await Filesystem.writeFile({
+            path: safeName,
+            data: base64,
+            directory: Directory.Cache,
+            recursive: true,
+          });
+        }
         try {
           await Share.share({
-            title: result.filename,
-            files: [fileUri],
+            title: filename,
+            files: [writeRes.uri],
             dialogTitle: "Lagre lønnsslipp",
           });
         } catch (shareErr: any) {
-          if (shareErr?.message && /cancel/i.test(String(shareErr.message))) return;
-          await Share.share({
-            title: result.filename,
-            url: fileUri,
-            dialogTitle: "Lagre lønnsslipp",
-          });
+          const msg = String(shareErr?.message || "");
+          if (/cancel/i.test(msg)) return;
+          throw new Error(msg || "Deling feilet");
         }
       } else {
         const objectUrl = URL.createObjectURL(result.blob);
         const a = document.createElement("a");
         a.href = objectUrl;
-        a.download = result.filename;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
       }
     } catch (e: any) {
-      if (e?.message && /cancel/i.test(String(e.message))) return;
+      const msg = String(e?.message || "");
+      if (/cancel/i.test(msg)) return;
       console.error("Download lonnsslipp failed:", e);
       toast({
         title: "Kunne ikke laste ned",
-        description: "Prøv igjen senere.",
+        description: msg || "Prøv igjen senere.",
         variant: "destructive",
       });
     }
@@ -604,20 +611,13 @@ export default function LonnTimer() {
           if (!open) closePdfViewer();
         }}
       >
-        <DialogContent className="max-w-3xl w-[95vw] h-[85vh] p-0 flex flex-col gap-0">
-          <DialogHeader className="px-4 py-3 border-b">
+        <DialogContent className="max-w-3xl w-[100vw] h-[100dvh] sm:h-[90vh] p-0 flex flex-col gap-0 sm:rounded-lg rounded-none">
+          <DialogHeader className="px-4 py-3 border-b shrink-0">
             <DialogTitle className="text-base truncate pr-8" data-testid="text-pdf-viewer-title">
               {pdfViewer?.name || "Lønnsslipp"}
             </DialogTitle>
           </DialogHeader>
-          {pdfViewer && (
-            <iframe
-              src={`${pdfViewer.url}#view=FitH&zoom=page-width`}
-              title={pdfViewer.name}
-              className="flex-1 w-full border-0"
-              data-testid="iframe-pdf-viewer"
-            />
-          )}
+          {pdfViewer && <PdfViewer src={pdfViewer.blob} />}
         </DialogContent>
       </Dialog>
     </div>
