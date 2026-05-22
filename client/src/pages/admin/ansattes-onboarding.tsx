@@ -56,6 +56,7 @@ import {
   Receipt,
   Upload,
   Trash,
+  Eye,
 } from "lucide-react";
 
 interface AdminLonnsslippMeta {
@@ -277,12 +278,96 @@ function buildMonthOptions(count: number = 24): { key: string; label: string }[]
   return opts;
 }
 
+async function fetchLonnsslippBlob(userId: string, maned: string, fallbackName: string): Promise<{ blob: Blob; filename: string } | null> {
+  const token = localStorage.getItem("token");
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`/api/users/${userId}/lonnsslipper/${maned}/file`, {
+    credentials: "include",
+    headers,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  let filename = fallbackName;
+  const cd = res.headers.get("Content-Disposition") || "";
+  const cdMatch = cd.match(/filename="?([^";]+)"?/i);
+  if (cdMatch) filename = cdMatch[1];
+  return { blob, filename };
+}
+
+const ensurePdfExt = (name: string) =>
+  /\.pdf$/i.test(name) ? name : `${name.replace(/\.[^.]+$/, "")}.pdf`;
+
 function LonnsslippSection({ userId, userName }: { userId: string; userName: string }) {
   const { toast } = useToast();
   const monthOpts = useMemo(() => buildMonthOptions(24), []);
   const [selectedManed, setSelectedManed] = useState<string>(monthOpts[0]?.key || "");
   const [file, setFile] = useState<File | null>(null);
   const [confirmDeleteManed, setConfirmDeleteManed] = useState<string | null>(null);
+  const [pdfViewer, setPdfViewer] = useState<{ url: string; name: string } | null>(null);
+
+  const closePdfViewer = () => {
+    if (pdfViewer?.url) URL.revokeObjectURL(pdfViewer.url);
+    setPdfViewer(null);
+  };
+
+  const openLonnsslipp = async (maned: string, filNavn: string) => {
+    try {
+      const result = await fetchLonnsslippBlob(userId, maned, filNavn || `lonnsslipp-${maned}.pdf`);
+      if (!result) return;
+      const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
+      const url = URL.createObjectURL(pdfBlob);
+      setPdfViewer({ url, name: result.filename });
+    } catch (e: any) {
+      console.error("Open lonnsslipp failed:", e);
+      toast({
+        title: "Kunne ikke åpne",
+        description: e?.message || "Prøv igjen senere.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const downloadLonnsslipp = async (maned: string, filNavn: string) => {
+    try {
+      const result = await fetchLonnsslippBlob(userId, maned, filNavn || `Lonnsslipp-${maned}-${userName.replace(/\s+/g, "_")}.pdf`);
+      if (!result) return;
+      const filename = ensurePdfExt(result.filename);
+      const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
+
+      const fileObj = new File([pdfBlob], filename, { type: "application/pdf" });
+      const nav: any = navigator;
+      if (nav.canShare && nav.canShare({ files: [fileObj] })) {
+        try {
+          await nav.share({ files: [fileObj], title: filename });
+          return;
+        } catch (shareErr: any) {
+          const msg = String(shareErr?.message || shareErr?.name || "");
+          if (/abort|cancel/i.test(msg)) return;
+        }
+      }
+
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (e: any) {
+      const msg = String(e?.message || "");
+      if (/abort|cancel/i.test(msg)) return;
+      console.error("Download lonnsslipp failed:", e);
+      toast({
+        title: "Kunne ikke laste ned",
+        description: msg || "Prøv igjen senere.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const { data: items, isLoading } = useQuery<AdminLonnsslippMeta[]>({
     queryKey: ["/api/users", userId, "lonnsslipper"],
@@ -421,12 +506,16 @@ function LonnsslippSection({ userId, userName }: { userId: string; userName: str
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() =>
-                        downloadAuthed(
-                          `/api/users/${userId}/lonnsslipper/${it.maned}/file`,
-                          `Lonnsslipp-${it.maned}-${userName.replace(/\s+/g, "_")}`,
-                        )
-                      }
+                      onClick={() => openLonnsslipp(it.maned, it.filNavn)}
+                      data-testid={`button-open-lonnsslipp-${it.maned}`}
+                      title="Åpne"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => downloadLonnsslipp(it.maned, it.filNavn)}
                       data-testid={`button-download-lonnsslipp-${it.maned}`}
                       title="Last ned"
                     >
@@ -451,6 +540,29 @@ function LonnsslippSection({ userId, userName }: { userId: string; userName: str
           )}
         </div>
       </section>
+
+      <Dialog
+        open={!!pdfViewer}
+        onOpenChange={(open) => {
+          if (!open) closePdfViewer();
+        }}
+      >
+        <DialogContent className="max-w-3xl w-[95vw] h-[85vh] p-0 flex flex-col gap-0">
+          <DialogHeader className="px-4 py-3 border-b shrink-0">
+            <DialogTitle className="text-base truncate pr-8" data-testid="text-admin-pdf-viewer-title">
+              {pdfViewer?.name || "Lønnsslipp"}
+            </DialogTitle>
+          </DialogHeader>
+          {pdfViewer && (
+            <iframe
+              src={pdfViewer.url}
+              title={pdfViewer.name}
+              className="flex-1 w-full border-0 bg-muted"
+              data-testid="iframe-admin-pdf-viewer"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={confirmDeleteManed !== null}
