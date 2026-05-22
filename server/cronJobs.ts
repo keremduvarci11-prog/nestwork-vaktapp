@@ -5,6 +5,8 @@ import { notifyRegion, notifyUser } from "./notifications";
 const regionGroups: Record<string, string[]> = {
   Bergen: ["Bergen", "Os"],
   Os: ["Bergen", "Os"],
+  Haugesund: ["Haugesund", "Stord"],
+  Stord: ["Haugesund", "Stord"],
 };
 
 export function startCronJobs() {

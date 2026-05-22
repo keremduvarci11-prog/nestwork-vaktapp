@@ -638,6 +638,8 @@ export async function registerRoutes(
   const regionGroups: Record<string, string[]> = {
     "Bergen": ["Bergen", "Os"],
     "Os": ["Os"],
+    "Haugesund": ["Haugesund", "Stord"],
+    "Stord": ["Haugesund", "Stord"],
   };
 
   app.get("/api/vakter", requireAuth, async (req, res) => {

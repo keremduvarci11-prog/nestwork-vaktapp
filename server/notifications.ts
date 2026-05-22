@@ -147,6 +147,8 @@ export async function notifyRegion(region: string, title: string, message: strin
   const regionGroups: Record<string, string[]> = {
     Bergen: ["Bergen", "Os"],
     Os: ["Bergen", "Os"],
+    Haugesund: ["Haugesund", "Stord"],
+    Stord: ["Haugesund", "Stord"],
   };
   const regions = regionGroups[region] || [region];
 
