@@ -19,10 +19,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Capacitor } from "@capacitor/core";
-import { Filesystem, Directory } from "@capacitor/filesystem";
-import { Share } from "@capacitor/share";
-import { PdfViewer } from "@/components/pdf-viewer";
 import {
   Clock,
   TrendingUp,
@@ -78,7 +74,7 @@ export default function LonnTimer() {
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   const [selectedMonth, setSelectedMonth] = useState<string>(todayKey);
-  const [pdfViewer, setPdfViewer] = useState<{ blob: Blob; name: string } | null>(null);
+  const [pdfViewer, setPdfViewer] = useState<{ url: string; name: string } | null>(null);
 
   const { data: vakter, isLoading } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter/mine", user?.id],
@@ -196,7 +192,8 @@ export default function LonnTimer() {
       const result = await fetchLonnsslippBlob();
       if (!result) return;
       const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
-      setPdfViewer({ blob: pdfBlob, name: result.filename });
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      setPdfViewer({ url: objectUrl, name: result.filename });
     } catch (e) {
       console.error("Open lonnsslipp failed:", e);
       toast({
@@ -207,7 +204,10 @@ export default function LonnTimer() {
     }
   };
 
-  const closePdfViewer = () => setPdfViewer(null);
+  const closePdfViewer = () => {
+    if (pdfViewer?.url) URL.revokeObjectURL(pdfViewer.url);
+    setPdfViewer(null);
+  };
 
   const ensurePdfExt = (name: string) =>
     /\.pdf$/i.test(name) ? name : `${name.replace(/\.[^.]+$/, "")}.pdf`;
@@ -218,50 +218,33 @@ export default function LonnTimer() {
       const result = await fetchLonnsslippBlob();
       if (!result) return;
       const filename = ensurePdfExt(result.filename);
+      const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
 
-      if (Capacitor.isNativePlatform()) {
-        const base64 = await blobToBase64(result.blob);
-        const safeName = ensurePdfExt(filename.replace(/[^a-zA-Z0-9._-]/g, "_"));
-        let writeRes;
+      const file = new File([pdfBlob], filename, { type: "application/pdf" });
+      const nav: any = navigator;
+      if (nav.canShare && nav.canShare({ files: [file] })) {
         try {
-          writeRes = await Filesystem.writeFile({
-            path: safeName,
-            data: base64,
-            directory: Directory.Documents,
-            recursive: true,
-          });
-        } catch {
-          writeRes = await Filesystem.writeFile({
-            path: safeName,
-            data: base64,
-            directory: Directory.Cache,
-            recursive: true,
-          });
-        }
-        try {
-          await Share.share({
-            title: filename,
-            files: [writeRes.uri],
-            dialogTitle: "Lagre lønnsslipp",
-          });
+          await nav.share({ files: [file], title: filename });
+          return;
         } catch (shareErr: any) {
-          const msg = String(shareErr?.message || "");
-          if (/cancel/i.test(msg)) return;
-          throw new Error(msg || "Deling feilet");
+          const msg = String(shareErr?.message || shareErr?.name || "");
+          if (/abort|cancel/i.test(msg)) return;
         }
-      } else {
-        const objectUrl = URL.createObjectURL(result.blob);
-        const a = document.createElement("a");
-        a.href = objectUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
       }
+
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch (e: any) {
       const msg = String(e?.message || "");
-      if (/cancel/i.test(msg)) return;
+      if (/abort|cancel/i.test(msg)) return;
       console.error("Download lonnsslipp failed:", e);
       toast({
         title: "Kunne ikke laste ned",
@@ -617,7 +600,14 @@ export default function LonnTimer() {
               {pdfViewer?.name || "Lønnsslipp"}
             </DialogTitle>
           </DialogHeader>
-          {pdfViewer && <PdfViewer src={pdfViewer.blob} />}
+          {pdfViewer && (
+            <iframe
+              src={pdfViewer.url}
+              title={pdfViewer.name}
+              className="flex-1 w-full border-0 bg-muted"
+              data-testid="iframe-pdf-viewer"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
