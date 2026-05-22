@@ -496,6 +496,109 @@ export async function registerRoutes(
     res.json({ ...safeUser, politiattestFile: resolveDocFileForList(safeUser.politiattestFile, safeUser.id, "politiattest") });
   });
 
+  const MONTH_NAMES_NB = [
+    "Januar", "Februar", "Mars", "April", "Mai", "Juni",
+    "Juli", "August", "September", "Oktober", "November", "Desember",
+  ];
+
+  function isValidManed(maned: string): boolean {
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(maned);
+  }
+
+  function manedLabel(maned: string): string {
+    const [y, m] = maned.split("-").map(Number);
+    return `${MONTH_NAMES_NB[m - 1]} ${y}`;
+  }
+
+  app.get("/api/users/:id/lonnsslipper", requireAuth, async (req, res) => {
+    const requesterId = getUserIdFromRequest(req);
+    if (!requesterId) return res.status(401).json({ message: "Ikke innlogget" });
+    const requester = await storage.getUser(requesterId);
+    if (!requester) return res.status(401).json({ message: "Bruker ikke funnet" });
+    if (requester.role !== "admin" && requesterId !== req.params.id) {
+      return res.status(403).json({ message: "Ingen tilgang" });
+    }
+    const rows = await storage.getLonnsslipperByUser(req.params.id);
+    res.json(rows);
+  });
+
+  app.post("/api/users/:id/lonnsslipper", requireAdmin, docUpload.single("file"), async (req, res) => {
+    const maned = String(req.body?.maned || "").trim();
+    if (!isValidManed(maned)) {
+      return res.status(400).json({ message: "Ugyldig måned (forventet YYYY-MM)" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "Ingen fil valgt" });
+    }
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (ext !== ".pdf" || req.file.mimetype !== "application/pdf") {
+      return res.status(400).json({ message: "Kun PDF-filer er tillatt" });
+    }
+    const targetUser = await storage.getUser(req.params.id);
+    if (!targetUser) return res.status(404).json({ message: "Bruker ikke funnet" });
+    const dataUrl = fileToDataUrl(req.file);
+    const adminId = getUserIdFromRequest(req) || null;
+    const saved = await storage.upsertLonnsslipp({
+      userId: req.params.id,
+      maned,
+      filNavn: req.file.originalname,
+      filData: dataUrl,
+      opplastetAv: adminId,
+    });
+    try {
+      await notifyUser(
+        req.params.id,
+        "Ny lønnsslipp tilgjengelig",
+        `Lønnsslipp for ${manedLabel(maned)} er lastet opp av admin.`,
+        "lonnsslipp",
+        "/lonn-timer",
+      );
+    } catch (err) {
+      console.error("[Lonnsslipp] notifyUser failed:", err);
+    }
+    res.json({
+      id: saved.id,
+      userId: saved.userId,
+      maned: saved.maned,
+      filNavn: saved.filNavn,
+      opplastetAt: saved.opplastetAt,
+      opplastetAv: saved.opplastetAv,
+    });
+  });
+
+  app.get("/api/users/:id/lonnsslipper/:maned/file", async (req, res) => {
+    const requesterId = getUserIdFromRequest(req);
+    if (!requesterId) return res.status(401).json({ message: "Ikke innlogget" });
+    const requester = await storage.getUser(requesterId);
+    if (!requester) return res.status(401).json({ message: "Bruker ikke funnet" });
+    if (requester.role !== "admin" && requesterId !== req.params.id) {
+      return res.status(403).json({ message: "Ingen tilgang" });
+    }
+    if (!isValidManed(req.params.maned)) {
+      return res.status(400).json({ message: "Ugyldig måned" });
+    }
+    const row = await storage.getLonnsslipp(req.params.id, req.params.maned);
+    if (!row) return res.status(404).json({ message: "Lønnsslipp ikke funnet" });
+    const match = row.filData.match(/^data:([^;]+)(?:;name=([^;]+))?;base64,(.+)$/);
+    if (!match) return res.status(404).json({ message: "Ugyldig filformat" });
+    const [, mimeType, , base64Data] = match;
+    const buffer = Buffer.from(base64Data, "base64");
+    const filename = row.filNavn || `lonnsslipp-${req.params.maned}.pdf`;
+    res.set("Content-Type", mimeType);
+    res.set("Content-Disposition", `attachment; filename="${filename.replace(/"/g, "")}"`);
+    res.set("Cache-Control", "private, no-cache");
+    res.send(buffer);
+  });
+
+  app.delete("/api/users/:id/lonnsslipper/:maned", requireAdmin, async (req, res) => {
+    if (!isValidManed(req.params.maned)) {
+      return res.status(400).json({ message: "Ugyldig måned" });
+    }
+    const ok = await storage.deleteLonnsslipp(req.params.id, req.params.maned);
+    if (!ok) return res.status(404).json({ message: "Lønnsslipp ikke funnet" });
+    res.json({ ok: true });
+  });
+
   app.get("/api/barnehager", requireAuth, async (_req, res) => {
     const all = await storage.getAllBarnehager();
     const regionOrder = ["Bergen", "Os", "Fusa", "Stord", "Haugesund", "Stavanger", "Bryne", "Kristiansand", "Arendal", "Drammen", "Oslo", "Lørenskog", "Fredrikstad", "Trondheim"];

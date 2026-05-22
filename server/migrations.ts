@@ -24,6 +24,23 @@ export async function runMigrations() {
       ALTER TABLE vakter ADD COLUMN IF NOT EXISTS timer_godkjent_at TIMESTAMP;
     `);
     console.log("[Migration] timer_godkjent columns OK");
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS lonnsslipper (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL,
+        maned TEXT NOT NULL,
+        fil_navn TEXT NOT NULL,
+        fil_data TEXT NOT NULL,
+        opplastet_at TIMESTAMP DEFAULT now(),
+        opplastet_av VARCHAR
+      );
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS lonnsslipper_user_maned_unique
+      ON lonnsslipper (user_id, maned);
+    `);
+    console.log("[Migration] lonnsslipper OK");
   } catch (err: any) {
     console.error("[Migration] Feil:", err.message);
   } finally {

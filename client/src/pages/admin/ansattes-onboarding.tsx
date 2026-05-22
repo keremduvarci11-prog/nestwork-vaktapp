@@ -30,6 +30,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   Search,
   CheckCircle2,
@@ -46,7 +53,19 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Receipt,
+  Upload,
+  Trash,
 } from "lucide-react";
+
+interface AdminLonnsslippMeta {
+  id: string;
+  userId: string;
+  maned: string;
+  filNavn: string;
+  opplastetAt: string | null;
+  opplastetAv: string | null;
+}
 
 interface OnboardingItem {
   id: string;
@@ -244,6 +263,229 @@ async function downloadAuthed(url: string, suggestedName: string) {
     console.error("Download failed:", e);
     alert("Kunne ikke laste ned filen. Prøv igjen.");
   }
+}
+
+function buildMonthOptions(count: number = 24): { key: string; label: string }[] {
+  const now = new Date();
+  const opts: { key: string; label: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = `${MONTH_NAMES_NB_FULL[d.getMonth()].charAt(0).toUpperCase()}${MONTH_NAMES_NB_FULL[d.getMonth()].slice(1)} ${d.getFullYear()}`;
+    opts.push({ key, label });
+  }
+  return opts;
+}
+
+function LonnsslippSection({ userId, userName }: { userId: string; userName: string }) {
+  const { toast } = useToast();
+  const monthOpts = useMemo(() => buildMonthOptions(24), []);
+  const [selectedManed, setSelectedManed] = useState<string>(monthOpts[0]?.key || "");
+  const [file, setFile] = useState<File | null>(null);
+  const [confirmDeleteManed, setConfirmDeleteManed] = useState<string | null>(null);
+
+  const { data: items, isLoading } = useQuery<AdminLonnsslippMeta[]>({
+    queryKey: ["/api/users", userId, "lonnsslipper"],
+    enabled: !!userId,
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!file) throw new Error("Ingen fil valgt");
+      if (!selectedManed) throw new Error("Velg en måned");
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("maned", selectedManed);
+      const res = await fetch(`/api/users/${userId}/lonnsslipper`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Lønnsslipp lastet opp",
+        description: `${userName} er varslet.`,
+      });
+      setFile(null);
+      const input = document.getElementById(`file-lonnsslipp-${userId}`) as HTMLInputElement | null;
+      if (input) input.value = "";
+      queryClient.invalidateQueries({ queryKey: ["/api/users", userId, "lonnsslipper"] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Kunne ikke laste opp",
+        description: err?.message || "Ukjent feil",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (maned: string) => {
+      const res = await fetch(`/api/users/${userId}/lonnsslipper/${maned}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Lønnsslipp slettet" });
+      setConfirmDeleteManed(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/users", userId, "lonnsslipper"] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Kunne ikke slette",
+        description: err?.message || "Ukjent feil",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <>
+      <section>
+        <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+          <Receipt className="w-3.5 h-3.5" /> Lønnsslipper
+        </h3>
+
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Select value={selectedManed} onValueChange={setSelectedManed}>
+              <SelectTrigger className="flex-1" data-testid="select-lonnsslipp-maned">
+                <SelectValue placeholder="Velg måned" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOpts.map((o) => (
+                  <SelectItem key={o.key} value={o.key} data-testid={`option-lonnsslipp-${o.key}`}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Input
+            id={`file-lonnsslipp-${userId}`}
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            data-testid="input-lonnsslipp-file"
+          />
+          <Button
+            onClick={() => uploadMutation.mutate()}
+            disabled={!file || !selectedManed || uploadMutation.isPending}
+            className="w-full"
+            data-testid="button-upload-lonnsslipp"
+          >
+            {uploadMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Upload className="w-4 h-4 mr-2" />
+            )}
+            Last opp lønnsslipp
+          </Button>
+          <p className="text-[10px] text-muted-foreground">
+            Én lønnsslipp per måned. Ny opplasting overskriver eksisterende. Ansatt får varsel automatisk.
+          </p>
+        </div>
+
+        <div className="mt-3 space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Opplastede lønnsslipper
+          </p>
+          {isLoading ? (
+            <Skeleton className="h-10 w-full rounded-md" />
+          ) : items && items.length > 0 ? (
+            <div className="space-y-1.5">
+              {items.map((it) => (
+                <div
+                  key={it.id}
+                  className="flex items-center justify-between gap-2 rounded-md border p-2"
+                  data-testid={`row-lonnsslipp-${it.maned}`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{monthKeyToLabel(it.maned)}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{it.filNavn}</p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() =>
+                        downloadAuthed(
+                          `/api/users/${userId}/lonnsslipper/${it.maned}/file`,
+                          `Lonnsslipp-${it.maned}-${userName.replace(/\s+/g, "_")}`,
+                        )
+                      }
+                      data-testid={`button-download-lonnsslipp-${it.maned}`}
+                      title="Last ned"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setConfirmDeleteManed(it.maned)}
+                      data-testid={`button-delete-lonnsslipp-${it.maned}`}
+                      title="Slett"
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Ingen lønnsslipper lastet opp.</p>
+          )}
+        </div>
+      </section>
+
+      <AlertDialog
+        open={confirmDeleteManed !== null}
+        onOpenChange={(o) => !o && setConfirmDeleteManed(null)}
+      >
+        <AlertDialogContent data-testid="dialog-confirm-delete-lonnsslipp">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Slette lønnsslipp for {confirmDeleteManed ? monthKeyToLabel(confirmDeleteManed) : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Filen fjernes permanent. Ansatt vil ikke lenger se den.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-lonnsslipp">Avbryt</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (confirmDeleteManed) deleteMutation.mutate(confirmDeleteManed);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-lonnsslipp"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Slett"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 function EmployeeDetailDialog({
@@ -541,6 +783,11 @@ function EmployeeDetailDialog({
                 Estimat oppdateres automatisk hver gang en vakt blir godkjent.
               </p>
             </section>
+
+            <Separator />
+
+            {/* Lønnsslipper */}
+            <LonnsslippSection userId={emp.userId} userName={emp.name} />
 
             <Separator />
 

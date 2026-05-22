@@ -144,6 +144,18 @@ export const personalreglerGodkjenning = pgTable("personalregler_godkjenning", {
   userVersionUnique: uniqueIndex("personalregler_user_version_unique").on(table.userId, table.versionId),
 }));
 
+export const lonnsslipper = pgTable("lonnsslipper", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  maned: text("maned").notNull(),
+  filNavn: text("fil_navn").notNull(),
+  filData: text("fil_data").notNull(),
+  opplastetAt: timestamp("opplastet_at").defaultNow(),
+  opplastetAv: varchar("opplastet_av"),
+}, (table) => ({
+  userManedUnique: uniqueIndex("lonnsslipper_user_maned_unique").on(table.userId, table.maned),
+}));
+
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
@@ -168,6 +180,7 @@ export const insertAvailabilitySchema = createInsertSchema(availability).omit({ 
 export const insertBlockedDateSchema = createInsertSchema(blockedDates).omit({ createdAt: true });
 export const insertPersonalreglerGodkjenningSchema = createInsertSchema(personalreglerGodkjenning).omit({ id: true, acceptedAt: true });
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
+export const insertLonnsslippSchema = createInsertSchema(lonnsslipper).omit({ id: true, opplastetAt: true });
 
 export type InsertPersonalreglerGodkjenning = z.infer<typeof insertPersonalreglerGodkjenningSchema>;
 export type PersonalreglerGodkjenning = typeof personalreglerGodkjenning.$inferSelect;
@@ -193,3 +206,5 @@ export type InsertAvailability = z.infer<typeof insertAvailabilitySchema>;
 export type Availability = typeof availability.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertLonnsslipp = z.infer<typeof insertLonnsslippSchema>;
+export type Lonnsslipp = typeof lonnsslipper.$inferSelect;

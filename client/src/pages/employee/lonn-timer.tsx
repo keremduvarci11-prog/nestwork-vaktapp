@@ -21,8 +21,18 @@ import {
   FileDown,
   Hourglass,
   CheckCircle2,
+  Download,
 } from "lucide-react";
 import type { Vakt, Barnehage } from "@shared/schema";
+
+interface LonnsslippMeta {
+  id: string;
+  userId: string;
+  maned: string;
+  filNavn: string;
+  opplastetAt: string | null;
+  opplastetAv: string | null;
+}
 
 const MONTH_NAMES = [
   "Januar",
@@ -66,6 +76,11 @@ export default function LonnTimer() {
     queryKey: ["/api/barnehager"],
   });
 
+  const { data: lonnsslipper } = useQuery<LonnsslippMeta[]>({
+    queryKey: ["/api/users", user?.id, "lonnsslipper"],
+    enabled: !!user?.id,
+  });
+
   const barnehageMap = useMemo(() => {
     const m = new Map<string, string>();
     (barnehager || []).forEach((b) => m.set(b.id, b.name));
@@ -85,9 +100,12 @@ export default function LonnTimer() {
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       if (key >= MIN_MONTH_KEY) set.add(key);
     });
+    (lonnsslipper || []).forEach((l) => {
+      if (l.maned && l.maned >= MIN_MONTH_KEY) set.add(l.maned);
+    });
     if (set.size === 0) set.add(MIN_MONTH_KEY);
     return Array.from(set).sort((a, b) => b.localeCompare(a));
-  }, [vakter, todayKey]);
+  }, [vakter, lonnsslipper, todayKey]);
 
   const monthVakter = useMemo(() => {
     if (!vakter) return [];
@@ -133,6 +151,39 @@ export default function LonnTimer() {
     const [y, m] = selectedMonth.split("-").map(Number);
     return `${MONTH_NAMES[m - 1]} ${y}`;
   })();
+
+  const lonnsslippForMonth = (lonnsslipper || []).find((l) => l.maned === selectedMonth);
+
+  const downloadLonnsslipp = async () => {
+    if (!user?.id || !lonnsslippForMonth) return;
+    try {
+      const res = await fetch(
+        `/api/users/${user.id}/lonnsslipper/${lonnsslippForMonth.maned}/file`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      let filename = lonnsslippForMonth.filNavn || `lonnsslipp-${selectedMonth}.pdf`;
+      const cd = res.headers.get("Content-Disposition") || "";
+      const cdMatch = cd.match(/filename="?([^";]+)"?/i);
+      if (cdMatch) filename = cdMatch[1];
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (e) {
+      console.error("Download lonnsslipp failed:", e);
+      toast({
+        title: "Kunne ikke laste ned",
+        description: "Prøv igjen senere.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const downloadPdf = async () => {
     const { jsPDF } = await import("jspdf");
@@ -287,11 +338,34 @@ export default function LonnTimer() {
           onClick={downloadPdf}
           disabled={monthVakter.length === 0}
           data-testid="button-download-pdf"
-          title="Last ned lønnsslipp"
+          title="Generer PDF-oversikt"
         >
           <FileDown className="w-4 h-4" />
         </Button>
       </div>
+
+      {lonnsslippForMonth && (
+        <Card className="border-green-500/40 bg-green-500/5">
+          <CardContent className="p-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                Lønnsslipp klar
+              </p>
+              <p className="text-xs text-muted-foreground truncate" data-testid="text-lonnsslipp-filnavn">
+                {lonnsslippForMonth.filNavn}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={downloadLonnsslipp}
+              data-testid="button-download-lonnsslipp"
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Last ned
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading ? (
         <div className="space-y-3">

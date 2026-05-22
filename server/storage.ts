@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
-  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning,
+  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning, lonnsslipper,
   type User, type InsertUser,
   type Barnehage, type InsertBarnehage,
   type Vakt, type InsertVakt,
@@ -14,6 +14,7 @@ import {
   type Availability,
   type PushSubscription, type InsertPushSubscription,
   type PersonalreglerGodkjenning,
+  type Lonnsslipp, type InsertLonnsslipp,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -96,6 +97,11 @@ export interface IStorage {
 
   getPersonalreglerGodkjenning(userId: string, versionId: number): Promise<PersonalreglerGodkjenning | undefined>;
   createPersonalreglerGodkjenning(userId: string, versionId: number): Promise<PersonalreglerGodkjenning>;
+
+  getLonnsslipperByUser(userId: string): Promise<Omit<Lonnsslipp, "filData">[]>;
+  getLonnsslipp(userId: string, maned: string): Promise<Lonnsslipp | undefined>;
+  upsertLonnsslipp(data: InsertLonnsslipp): Promise<Lonnsslipp>;
+  deleteLonnsslipp(userId: string, maned: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -477,6 +483,54 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return row;
+  }
+
+  async getLonnsslipperByUser(userId: string): Promise<Omit<Lonnsslipp, "filData">[]> {
+    return db
+      .select({
+        id: lonnsslipper.id,
+        userId: lonnsslipper.userId,
+        maned: lonnsslipper.maned,
+        filNavn: lonnsslipper.filNavn,
+        opplastetAt: lonnsslipper.opplastetAt,
+        opplastetAv: lonnsslipper.opplastetAv,
+      })
+      .from(lonnsslipper)
+      .where(eq(lonnsslipper.userId, userId))
+      .orderBy(desc(lonnsslipper.maned));
+  }
+
+  async getLonnsslipp(userId: string, maned: string): Promise<Lonnsslipp | undefined> {
+    const [row] = await db
+      .select()
+      .from(lonnsslipper)
+      .where(and(eq(lonnsslipper.userId, userId), eq(lonnsslipper.maned, maned)));
+    return row;
+  }
+
+  async upsertLonnsslipp(data: InsertLonnsslipp): Promise<Lonnsslipp> {
+    const [row] = await db
+      .insert(lonnsslipper)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [lonnsslipper.userId, lonnsslipper.maned],
+        set: {
+          filNavn: data.filNavn,
+          filData: data.filData,
+          opplastetAt: sql`now()`,
+          opplastetAv: data.opplastetAv,
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async deleteLonnsslipp(userId: string, maned: string): Promise<boolean> {
+    const [deleted] = await db
+      .delete(lonnsslipper)
+      .where(and(eq(lonnsslipper.userId, userId), eq(lonnsslipper.maned, maned)))
+      .returning();
+    return !!deleted;
   }
 }
 
