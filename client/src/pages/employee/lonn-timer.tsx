@@ -168,51 +168,24 @@ export default function LonnTimer() {
     return { blob, filename };
   };
 
-  const openLonnsslipp = async () => {
-    try {
-      const result = await fetchLonnsslippBlob();
-      if (!result) return;
-      const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
-      const objectUrl = URL.createObjectURL(pdfBlob);
-      const win = window.open(objectUrl, "_blank");
-      if (!win) {
-        toast({
-          title: "Kunne ikke åpne",
-          description: "Tillat popup-vinduer for å se lønnsslippen.",
-          variant: "destructive",
-        });
-      }
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-    } catch (e) {
-      console.error("Open lonnsslipp failed:", e);
-      toast({
-        title: "Kunne ikke åpne",
-        description: "Prøv igjen senere.",
-        variant: "destructive",
-      });
+  const openLonnsslipp = () => {
+    if (!user?.id || !lonnsslippForMonth) return;
+    const url = `/api/users/${user.id}/lonnsslipper/${lonnsslippForMonth.maned}/file?inline=1`;
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    if (!win) {
+      window.location.href = url;
     }
   };
 
-  const downloadLonnsslipp = async () => {
-    try {
-      const result = await fetchLonnsslippBlob();
-      if (!result) return;
-      const objectUrl = URL.createObjectURL(result.blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = result.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    } catch (e) {
-      console.error("Download lonnsslipp failed:", e);
-      toast({
-        title: "Kunne ikke laste ned",
-        description: "Prøv igjen senere.",
-        variant: "destructive",
-      });
-    }
+  const downloadLonnsslipp = () => {
+    if (!user?.id || !lonnsslippForMonth) return;
+    const url = `/api/users/${user.id}/lonnsslipper/${lonnsslippForMonth.maned}/file`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = lonnsslippForMonth.filNavn || `lonnsslipp-${selectedMonth}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const downloadPdf = async () => {
@@ -362,16 +335,6 @@ export default function LonnTimer() {
             })}
           </SelectContent>
         </Select>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={downloadPdf}
-          disabled={monthVakter.length === 0}
-          data-testid="button-download-pdf"
-          title="Generer PDF-oversikt"
-        >
-          <FileDown className="w-4 h-4" />
-        </Button>
         <Button
           variant="outline"
           size="icon"

@@ -584,8 +584,10 @@ export async function registerRoutes(
     const [, mimeType, , base64Data] = match;
     const buffer = Buffer.from(base64Data, "base64");
     const filename = row.filNavn || `lonnsslipp-${req.params.maned}.pdf`;
+    const inline = req.query.inline === "1" || req.query.inline === "true";
+    const disposition = inline ? "inline" : "attachment";
     res.set("Content-Type", mimeType);
-    res.set("Content-Disposition", `attachment; filename="${filename.replace(/"/g, "")}"`);
+    res.set("Content-Disposition", `${disposition}; filename="${filename.replace(/"/g, "")}"`);
     res.set("Cache-Control", "private, no-cache");
     res.send(buffer);
   });
