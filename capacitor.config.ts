@@ -35,6 +35,14 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: true,
+    // Push is iOS-only (APNs). Excluding the push plugin on Android removes
+    // all Firebase code from the APK and eliminates the startup-crash risk
+    // Google Play reported (Firebase auto-init without google-services.json).
+    includePlugins: [
+      "@capacitor/keyboard",
+      "@capacitor/splash-screen",
+      "@capacitor/status-bar",
+    ],
   },
 };
 
