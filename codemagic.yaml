@@ -21,9 +21,18 @@ workflows:
           echo "allprojects { configurations.all { exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
           exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8' } }" >> android/build.gradle
       - name: Install npm dependencies
-        script: npm install
+        script: |
+          # Deterministic install from the lockfile
+          npm ci --no-audit --no-fund
+          # Workaround for npm's optional-deps bug on macOS ARM (npm/cli#4828):
+          # native binaries for rollup/esbuild sometimes aren't installed,
+          # which makes "vite build" exit with status 1.
+          node -e "require('@rollup/rollup-darwin-arm64')" 2>/dev/null || npm i --no-save @rollup/rollup-darwin-arm64
+          node -e "require('@esbuild/darwin-arm64')" 2>/dev/null || npm i --no-save @esbuild/darwin-arm64
       - name: Build web assets
-        script: npm run build
+        script: |
+          set -o pipefail
+          npm run build 2>&1 | tee build-web.log
       - name: Sync Capacitor
         script: npx cap sync android
       - name: Set Android SDK location
