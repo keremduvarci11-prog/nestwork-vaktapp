@@ -234,7 +234,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMelding(m: InsertMelding): Promise<Melding> {
-    const [created] = await db.insert(meldinger).values(m).returning();
+    const { fromUserId, ...rest } = m;
+    if (!fromUserId) {
+      throw new Error("createMelding: fromUserId er påkrevd");
+    }
+    const [created] = await db.insert(meldinger).values({ ...rest, fromUserId }).returning();
     return created;
   }
 

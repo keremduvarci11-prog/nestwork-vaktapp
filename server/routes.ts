@@ -14,6 +14,11 @@ import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 
 const JWT_SECRET = process.env.SESSION_SECRET || "nestwork-secret-key";
 
+function asString(value: unknown): string {
+  if (Array.isArray(value)) return typeof value[0] === "string" ? value[0] : "";
+  return typeof value === "string" ? value : "";
+}
+
 function getOsloTodayString(): string {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Oslo",
@@ -154,7 +159,7 @@ export async function registerRoutes(
   app.use("/uploads/profiles", express.default.static(path.join(process.cwd(), "uploads", "profiles")));
 
   app.get("/uploads/documents/:filename", requireAuth, (req, res) => {
-    const filePath = path.join(process.cwd(), "uploads", "documents", req.params.filename);
+    const filePath = path.join(process.cwd(), "uploads", "documents", asString(req.params.filename));
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ message: "Fil ikke funnet" });
     }
@@ -227,7 +232,7 @@ export async function registerRoutes(
   }
 
   app.get("/api/users/:id/profile-image-data", async (req, res) => {
-    const user = await storage.getUser(req.params.id);
+    const user = await storage.getUser(asString(req.params.id));
     if (!user?.profileImage || !user.profileImage.startsWith("data:")) {
       return res.status(404).json({ message: "Ingen profilbilde" });
     }
@@ -262,10 +267,10 @@ export async function registerRoutes(
     if (!requesterId) return res.status(401).json({ message: "Ikke innlogget" });
     const requester = await storage.getUser(requesterId);
     if (!requester) return res.status(401).json({ message: "Bruker ikke funnet" });
-    if (requester.role !== "admin" && requesterId !== req.params.id) {
+    if (requester.role !== "admin" && requesterId !== asString(req.params.id)) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
-    const user = await storage.getUser(req.params.id);
+    const user = await storage.getUser(asString(req.params.id));
     const value = kind === "cv" ? user?.cvFile : user?.politiattestFile;
     if (!value || !value.startsWith("data:")) {
       return res.status(404).json({ message: "Fil ikke funnet" });
@@ -323,7 +328,7 @@ export async function registerRoutes(
     const requesterId = getUserIdFromRequest(req);
     const requester = requesterId ? await storage.getUser(requesterId) : null;
     const isAdmin = requester?.role === "admin";
-    const isSelf = requesterId === req.params.id;
+    const isSelf = requesterId === asString(req.params.id);
 
     if (!isAdmin && !isSelf) {
       return res.status(403).json({ message: "Ingen tilgang" });
@@ -340,7 +345,7 @@ export async function registerRoutes(
       }
     }
 
-    const updated = await storage.updateUser(req.params.id, safeData);
+    const updated = await storage.updateUser(asString(req.params.id), safeData);
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
     res.json(safeUser);
@@ -348,7 +353,7 @@ export async function registerRoutes(
 
   app.delete("/api/users/:id", requireAdmin, async (req, res) => {
     try {
-      const ok = await storage.deleteUser(req.params.id);
+      const ok = await storage.deleteUser(asString(req.params.id));
       if (!ok) return res.status(404).json({ message: "Bruker ikke funnet" });
       res.json({ ok: true });
     } catch (err: any) {
@@ -405,13 +410,13 @@ export async function registerRoutes(
     const pw = newPassword || "nestwork2026";
     if (pw.length < 6) return res.status(400).json({ message: "Passord må være minst 6 tegn" });
     const hashed = await hashPassword(pw);
-    const updated = await storage.updateUser(req.params.id, { password: hashed });
+    const updated = await storage.updateUser(asString(req.params.id), { password: hashed });
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     res.json({ success: true });
   });
 
   app.post("/api/users/:id/change-password", requireAuth, async (req, res) => {
-    if (getUserIdFromRequest(req) !== req.params.id) {
+    if (getUserIdFromRequest(req) !== asString(req.params.id)) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
     const { currentPassword, newPassword } = req.body;
@@ -421,18 +426,18 @@ export async function registerRoutes(
     if (newPassword.length < 6) {
       return res.status(400).json({ message: "Passord må være minst 6 tegn" });
     }
-    const user = await storage.getUser(req.params.id);
+    const user = await storage.getUser(asString(req.params.id));
     if (!user) return res.status(404).json({ message: "Bruker ikke funnet" });
     if (!(await comparePassword(currentPassword, user.password))) {
       return res.status(401).json({ message: "Feil nåværende passord" });
     }
     const hashed = await hashPassword(newPassword);
-    await storage.updateUser(req.params.id, { password: hashed });
+    await storage.updateUser(asString(req.params.id), { password: hashed });
     res.json({ success: true });
   });
 
   app.post("/api/users/:id/profile-image", requireAuth, upload.single("image"), async (req, res) => {
-    if (getUserIdFromRequest(req) !== req.params.id) {
+    if (getUserIdFromRequest(req) !== asString(req.params.id)) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
     if (!req.file) {
@@ -445,7 +450,7 @@ export async function registerRoutes(
     }
     const base64 = req.file.buffer.toString("base64");
     const dataUrl = `data:${mimeType};base64,${base64}`;
-    const updated = await storage.updateUser(req.params.id, { profileImage: dataUrl });
+    const updated = await storage.updateUser(asString(req.params.id), { profileImage: dataUrl });
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
     res.json(safeUser);
@@ -469,28 +474,28 @@ export async function registerRoutes(
   }
 
   app.post("/api/users/:id/upload-cv", requireAuth, docUpload.single("file"), async (req, res) => {
-    if (getUserIdFromRequest(req) !== req.params.id) {
+    if (getUserIdFromRequest(req) !== asString(req.params.id)) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
     if (!req.file) {
       return res.status(400).json({ message: "Ingen fil valgt" });
     }
     const dataUrl = fileToDataUrl(req.file);
-    const updated = await storage.updateUser(req.params.id, { cvFile: dataUrl });
+    const updated = await storage.updateUser(asString(req.params.id), { cvFile: dataUrl });
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
     res.json({ ...safeUser, cvFile: resolveDocFileForList(safeUser.cvFile, safeUser.id, "cv") });
   });
 
   app.post("/api/users/:id/upload-politiattest", requireAuth, docUpload.single("file"), async (req, res) => {
-    if (getUserIdFromRequest(req) !== req.params.id) {
+    if (getUserIdFromRequest(req) !== asString(req.params.id)) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
     if (!req.file) {
       return res.status(400).json({ message: "Ingen fil valgt" });
     }
     const dataUrl = fileToDataUrl(req.file);
-    const updated = await storage.updateUser(req.params.id, { politiattestFile: dataUrl });
+    const updated = await storage.updateUser(asString(req.params.id), { politiattestFile: dataUrl });
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
     res.json({ ...safeUser, politiattestFile: resolveDocFileForList(safeUser.politiattestFile, safeUser.id, "politiattest") });
@@ -515,10 +520,10 @@ export async function registerRoutes(
     if (!requesterId) return res.status(401).json({ message: "Ikke innlogget" });
     const requester = await storage.getUser(requesterId);
     if (!requester) return res.status(401).json({ message: "Bruker ikke funnet" });
-    if (requester.role !== "admin" && requesterId !== req.params.id) {
+    if (requester.role !== "admin" && requesterId !== asString(req.params.id)) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
-    const rows = await storage.getLonnsslipperByUser(req.params.id);
+    const rows = await storage.getLonnsslipperByUser(asString(req.params.id));
     res.json(rows);
   });
 
@@ -534,12 +539,12 @@ export async function registerRoutes(
     if (ext !== ".pdf" || req.file.mimetype !== "application/pdf") {
       return res.status(400).json({ message: "Kun PDF-filer er tillatt" });
     }
-    const targetUser = await storage.getUser(req.params.id);
+    const targetUser = await storage.getUser(asString(req.params.id));
     if (!targetUser) return res.status(404).json({ message: "Bruker ikke funnet" });
     const dataUrl = fileToDataUrl(req.file);
     const adminId = getUserIdFromRequest(req) || null;
     const saved = await storage.upsertLonnsslipp({
-      userId: req.params.id,
+      userId: asString(req.params.id),
       maned,
       filNavn: req.file.originalname,
       filData: dataUrl,
@@ -547,7 +552,7 @@ export async function registerRoutes(
     });
     try {
       await notifyUser(
-        req.params.id,
+        asString(req.params.id),
         "Ny lønnsslipp tilgjengelig",
         `Lønnsslipp for ${manedLabel(maned)} er lastet opp av admin.`,
         "lonnsslipp",
@@ -571,19 +576,19 @@ export async function registerRoutes(
     if (!requesterId) return res.status(401).json({ message: "Ikke innlogget" });
     const requester = await storage.getUser(requesterId);
     if (!requester) return res.status(401).json({ message: "Bruker ikke funnet" });
-    if (requester.role !== "admin" && requesterId !== req.params.id) {
+    if (requester.role !== "admin" && requesterId !== asString(req.params.id)) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }
-    if (!isValidManed(req.params.maned)) {
+    if (!isValidManed(asString(req.params.maned))) {
       return res.status(400).json({ message: "Ugyldig måned" });
     }
-    const row = await storage.getLonnsslipp(req.params.id, req.params.maned);
+    const row = await storage.getLonnsslipp(asString(req.params.id), asString(req.params.maned));
     if (!row) return res.status(404).json({ message: "Lønnsslipp ikke funnet" });
     const match = row.filData.match(/^data:([^;]+)(?:;name=([^;]+))?;base64,(.+)$/);
     if (!match) return res.status(404).json({ message: "Ugyldig filformat" });
     const [, mimeType, , base64Data] = match;
     const buffer = Buffer.from(base64Data, "base64");
-    const filename = row.filNavn || `lonnsslipp-${req.params.maned}.pdf`;
+    const filename = row.filNavn || `lonnsslipp-${asString(req.params.maned)}.pdf`;
     const inline = req.query.inline === "1" || req.query.inline === "true";
     const disposition = inline ? "inline" : "attachment";
     res.set("Content-Type", mimeType);
@@ -593,10 +598,10 @@ export async function registerRoutes(
   });
 
   app.delete("/api/users/:id/lonnsslipper/:maned", requireAdmin, async (req, res) => {
-    if (!isValidManed(req.params.maned)) {
+    if (!isValidManed(asString(req.params.maned))) {
       return res.status(400).json({ message: "Ugyldig måned" });
     }
-    const ok = await storage.deleteLonnsslipp(req.params.id, req.params.maned);
+    const ok = await storage.deleteLonnsslipp(asString(req.params.id), asString(req.params.maned));
     if (!ok) return res.status(404).json({ message: "Lønnsslipp ikke funnet" });
     res.json({ ok: true });
   });
@@ -617,7 +622,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/barnehager/:id", requireAuth, async (req, res) => {
-    const b = await storage.getBarnehage(req.params.id);
+    const b = await storage.getBarnehage(asString(req.params.id));
     if (!b) return res.status(404).json({ message: "Barnehage ikke funnet" });
     res.json(b);
   });
@@ -630,7 +635,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/barnehager/:id", requireAdmin, async (req, res) => {
-    const updated = await storage.updateBarnehage(req.params.id, req.body);
+    const updated = await storage.updateBarnehage(asString(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Barnehage ikke funnet" });
     res.json(updated);
   });
@@ -643,7 +648,7 @@ export async function registerRoutes(
   };
 
   app.get("/api/vakter", requireAuth, async (req, res) => {
-    const region = req.query.region as string;
+    const region = asString(req.query.region);
     if (region) {
       const regions = regionGroups[region] || [region];
       const v = await storage.getVakterByRegions(regions);
@@ -654,24 +659,24 @@ export async function registerRoutes(
   });
 
   app.get("/api/vakter/mine/:ansattId", requireAuth, async (req, res) => {
-    if (getUserIdFromRequest(req) !== req.params.ansattId) {
+    if (getUserIdFromRequest(req) !== asString(req.params.ansattId)) {
       const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
       if (!currentUser || currentUser.role !== "admin") {
         return res.status(403).json({ message: "Ingen tilgang" });
       }
     }
-    const v = await storage.getVakterByAnsatt(req.params.ansattId);
+    const v = await storage.getVakterByAnsatt(asString(req.params.ansattId));
     res.json(v);
   });
 
   app.get("/api/vakter/:id", requireAuth, async (req, res) => {
-    const v = await storage.getVakt(req.params.id);
+    const v = await storage.getVakt(asString(req.params.id));
     if (!v) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(v);
   });
 
   app.get("/api/vakter/:id/kalender", requireAuth, async (req, res) => {
-    const v = await storage.getVakt(req.params.id);
+    const v = await storage.getVakt(asString(req.params.id));
     if (!v) return res.status(404).json({ message: "Vakt ikke funnet" });
     const bh = await storage.getBarnehage(v.barnehageId);
     const bhName = bh?.name || "Ukjent barnehage";
@@ -778,7 +783,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/vakter/:id", requireAdmin, async (req, res) => {
-    const before = await storage.getVakt(req.params.id);
+    const before = await storage.getVakt(asString(req.params.id));
     const patch = { ...req.body };
     const effectiveDato = patch.dato ?? before?.dato;
     const effectiveAnsattId = patch.ansattId ?? before?.ansattId;
@@ -790,7 +795,7 @@ export async function registerRoutes(
     ) {
       patch.status = "godkjent";
     }
-    const updated = await storage.updateVakt(req.params.id, patch);
+    const updated = await storage.updateVakt(asString(req.params.id), patch);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
 
@@ -870,17 +875,17 @@ export async function registerRoutes(
   });
 
   app.post("/api/vakter/:id/ta", requireAuth, async (req, res) => {
-    const vakt = await storage.getVakt(req.params.id);
+    const vakt = await storage.getVakt(asString(req.params.id));
     if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
     if (vakt.status !== "ledig") return res.status(400).json({ message: "Vakten er ikke ledig" });
 
-    const existing = await storage.getVaktInteresser(req.params.id);
+    const existing = await storage.getVaktInteresser(asString(req.params.id));
     if (existing.some(i => i.ansattId === getUserIdFromRequest(req))) {
       return res.status(400).json({ message: "Du har allerede meldt interesse for denne vakten" });
     }
 
     const interesse = await storage.createVaktInteresse({
-      vaktId: req.params.id,
+      vaktId: asString(req.params.id),
       ansattId: getUserIdFromRequest(req)!,
     });
     res.json(interesse);
@@ -902,7 +907,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/vakter/:id/interesser", requireAuth, async (req, res) => {
-    const interesser = await storage.getVaktInteresser(req.params.id);
+    const interesser = await storage.getVaktInteresser(asString(req.params.id));
     res.json(interesser);
   });
 
@@ -921,10 +926,10 @@ export async function registerRoutes(
     if (!ansattId) {
       return res.status(400).json({ message: "Mangler ansattId" });
     }
-    const before = await storage.getVakt(req.params.id);
+    const before = await storage.getVakt(asString(req.params.id));
     const autoGodkjenn = isPastDateOslo(before?.dato);
     const newStatus = autoGodkjenn ? "godkjent" : "tildelt";
-    const updated = await storage.updateVakt(req.params.id, {
+    const updated = await storage.updateVakt(asString(req.params.id), {
       status: newStatus,
       ansattId,
     });
@@ -991,12 +996,12 @@ export async function registerRoutes(
   });
 
   app.post("/api/vakter/:id/godta", requireAuth, async (req, res) => {
-    const vakt = await storage.getVakt(req.params.id);
+    const vakt = await storage.getVakt(asString(req.params.id));
     if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
     if (vakt.status !== "tildelt" || vakt.ansattId !== getUserIdFromRequest(req)) {
       return res.status(403).json({ message: "Denne vakten er ikke tildelt deg" });
     }
-    const updated = await storage.updateVakt(req.params.id, { status: "godkjent" });
+    const updated = await storage.updateVakt(asString(req.params.id), { status: "godkjent" });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
 
     res.json(updated);
@@ -1041,7 +1046,7 @@ export async function registerRoutes(
 
   app.post("/api/vakter/:id/innsend-timer", requireAuth, async (req, res) => {
     const userId = getUserIdFromRequest(req);
-    const vakt = await storage.getVakt(req.params.id);
+    const vakt = await storage.getVakt(asString(req.params.id));
     if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
     if (vakt.ansattId !== userId) {
       return res.status(403).json({ message: "Du kan kun sende inn timer for dine egne vakter" });
@@ -1059,7 +1064,7 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Du kan ikke sende inn timer for en fremtidig vakt" });
     }
 
-    const updated = await storage.markVaktTimerInnsendt(req.params.id);
+    const updated = await storage.markVaktTimerInnsendt(asString(req.params.id));
     if (!updated) {
       return res.status(409).json({ message: "Timer er allerede sendt inn for denne vakten" });
     }
@@ -1082,7 +1087,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/vakter/:id/godkjenn-timer", requireAdmin, async (req, res) => {
-    const vakt = await storage.getVakt(req.params.id);
+    const vakt = await storage.getVakt(asString(req.params.id));
     if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
     if (!vakt.timerInnsendt) {
       return res.status(400).json({ message: "Timer er ikke sendt inn for denne vakten" });
@@ -1090,7 +1095,7 @@ export async function registerRoutes(
     if (vakt.timerGodkjent) {
       return res.status(400).json({ message: "Timer er allerede godkjent" });
     }
-    const updated = await storage.markVaktTimerGodkjent(req.params.id);
+    const updated = await storage.markVaktTimerGodkjent(asString(req.params.id));
     if (!updated) {
       return res.status(409).json({ message: "Timer er allerede godkjent" });
     }
@@ -1102,10 +1107,10 @@ export async function registerRoutes(
     const updateData: any = { status: "godkjent" };
     if (ansattId) updateData.ansattId = ansattId;
 
-    const updated = await storage.updateVakt(req.params.id, updateData);
+    const updated = await storage.updateVakt(asString(req.params.id), updateData);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
 
-    await storage.deleteVaktInteresser(req.params.id);
+    await storage.deleteVaktInteresser(asString(req.params.id));
 
     if (updated.ansattId) {
       try {
@@ -1157,8 +1162,8 @@ export async function registerRoutes(
   });
 
   app.post("/api/vakter/:id/avslaa", requireAdmin, async (req, res) => {
-    const before = await storage.getVakt(req.params.id);
-    const updated = await storage.updateVakt(req.params.id, { status: "ledig", ansattId: null });
+    const before = await storage.getVakt(asString(req.params.id));
+    const updated = await storage.updateVakt(asString(req.params.id), { status: "ledig", ansattId: null });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
 
@@ -1176,9 +1181,9 @@ export async function registerRoutes(
   });
 
   app.delete("/api/vakter/:id", requireAdmin, async (req, res) => {
-    const vakt = await storage.getVakt(req.params.id);
+    const vakt = await storage.getVakt(asString(req.params.id));
     if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
-    const deleted = await storage.deleteVakt(req.params.id);
+    const deleted = await storage.deleteVakt(asString(req.params.id));
     if (!deleted) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json({ success: true });
 
@@ -1202,10 +1207,10 @@ export async function registerRoutes(
 
   app.get("/api/meldinger/user/:userId", requireAuth, async (req, res) => {
     const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
-    if (getUserIdFromRequest(req) !== req.params.userId && currentUser?.role !== "admin") {
+    if (getUserIdFromRequest(req) !== asString(req.params.userId) && currentUser?.role !== "admin") {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
-    const m = await storage.getMeldingerByUser(req.params.userId);
+    const m = await storage.getMeldingerByUser(asString(req.params.userId));
     res.json(m);
   });
 
@@ -1254,53 +1259,53 @@ export async function registerRoutes(
   });
 
   app.patch("/api/meldinger/:id/read", requireAdmin, async (req, res) => {
-    await storage.markMeldingRead(req.params.id);
+    await storage.markMeldingRead(asString(req.params.id));
     res.json({ success: true });
   });
 
   app.patch("/api/meldinger/:id/reply", requireAdmin, async (req, res) => {
     const { reply } = req.body;
     if (!reply?.trim()) return res.status(400).json({ message: "Svar kan ikke vere tomt" });
-    const updated = await storage.replyToMelding(req.params.id, reply);
+    const updated = await storage.replyToMelding(asString(req.params.id), reply);
     if (!updated) return res.status(404).json({ message: "Melding ikke funnet" });
     res.json(updated);
   });
 
   app.patch("/api/meldinger/:id/seen-user", requireAuth, async (req, res) => {
-    await storage.markSeenByUser(req.params.id);
+    await storage.markSeenByUser(asString(req.params.id));
     res.json({ success: true });
   });
 
   app.patch("/api/meldinger/:id/seen-admin", requireAdmin, async (req, res) => {
-    await storage.markSeenByAdmin(req.params.id);
+    await storage.markSeenByAdmin(asString(req.params.id));
     res.json({ success: true });
   });
 
   app.patch("/api/meldinger/:id/close", requireAdmin, async (req, res) => {
-    const updated = await storage.closeMelding(req.params.id);
+    const updated = await storage.closeMelding(asString(req.params.id));
     if (!updated) return res.status(404).json({ message: "Melding ikke funnet" });
     res.json(updated);
   });
 
   app.patch("/api/meldinger/:id/reopen", requireAdmin, async (req, res) => {
-    const updated = await storage.reopenMelding(req.params.id);
+    const updated = await storage.reopenMelding(asString(req.params.id));
     if (!updated) return res.status(404).json({ message: "Melding ikke funnet" });
     res.json(updated);
   });
 
   app.delete("/api/meldinger/:id", requireAdmin, async (req, res) => {
-    const deleted = await storage.deleteMelding(req.params.id);
+    const deleted = await storage.deleteMelding(asString(req.params.id));
     if (!deleted) return res.status(404).json({ message: "Melding ikke funnet" });
     res.json({ success: true });
   });
 
   app.patch("/api/meldinger/:id/hide-user", requireAuth, async (req, res) => {
-    await storage.hideMeldingForUser(req.params.id);
+    await storage.hideMeldingForUser(asString(req.params.id));
     res.json({ success: true });
   });
 
   app.get("/api/meldinger/:id/samtale", requireAuth, async (req, res) => {
-    const melding = await storage.getMelding(req.params.id);
+    const melding = await storage.getMelding(asString(req.params.id));
     if (!melding) return res.status(404).json({ message: "Samtale ikke funnet" });
     const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
     const isAdmin = currentUser?.role === "admin";
@@ -1308,12 +1313,12 @@ export async function registerRoutes(
     if (!isAdmin && !isParticipant) {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
-    const msgs = await storage.getSamtaleMeldinger(req.params.id);
+    const msgs = await storage.getSamtaleMeldinger(asString(req.params.id));
     res.json(msgs);
   });
 
   app.post("/api/meldinger/:id/samtale", requireAuth, async (req, res) => {
-    const melding = await storage.getMelding(req.params.id);
+    const melding = await storage.getMelding(asString(req.params.id));
     if (!melding) return res.status(404).json({ message: "Samtale ikke funnet" });
     if (melding.closed) return res.status(400).json({ message: "Samtalen er avsluttet" });
     const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
@@ -1325,7 +1330,7 @@ export async function registerRoutes(
     const { message } = req.body;
     if (!message?.trim()) return res.status(400).json({ message: "Melding kan ikke vere tom" });
     const created = await storage.createSamtaleMelding({
-      meldingId: req.params.id,
+      meldingId: asString(req.params.id),
       fromUserId: getUserIdFromRequest(req)!,
       message,
     });
@@ -1408,13 +1413,13 @@ export async function registerRoutes(
 
   app.get("/api/meldinger/unread-count/user/:userId", requireAuth, async (req, res) => {
     const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
-    if (getUserIdFromRequest(req) !== req.params.userId && currentUser?.role !== "admin") {
+    if (getUserIdFromRequest(req) !== asString(req.params.userId) && currentUser?.role !== "admin") {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
     const allAdmins = (await storage.getAllUsers()).filter(u => u.role === "admin");
     const adminIds = new Set(allAdmins.map(a => a.id));
     adminIds.add("admin");
-    const userMeldinger = await storage.getMeldingerByUser(req.params.userId);
+    const userMeldinger = await storage.getMeldingerByUser(asString(req.params.userId));
     let count = 0;
     for (const m of userMeldinger) {
       if (m.hiddenByUser) continue;
@@ -1434,7 +1439,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/favoritter/:userId", requireAuth, async (req, res) => {
-    const f = await storage.getFavoritter(req.params.userId);
+    const f = await storage.getFavoritter(asString(req.params.userId));
     res.json(f);
   });
 
@@ -1444,7 +1449,7 @@ export async function registerRoutes(
   });
 
   app.delete("/api/favoritter/:id", requireAuth, async (req, res) => {
-    await storage.removeFavoritt(req.params.id);
+    await storage.removeFavoritt(asString(req.params.id));
     res.json({ success: true });
   });
 
@@ -1524,18 +1529,18 @@ export async function registerRoutes(
 
   app.get("/api/onboarding/:userId", requireAuth, async (req, res) => {
     const currentUser = await storage.getUser(getUserIdFromRequest(req)!);
-    if (getUserIdFromRequest(req) !== req.params.userId && currentUser?.role !== "admin") {
+    if (getUserIdFromRequest(req) !== asString(req.params.userId) && currentUser?.role !== "admin") {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
-    let items = await storage.getOnboarding(req.params.userId);
+    let items = await storage.getOnboarding(asString(req.params.userId));
     const defaultItems = ["Bytt passord", "Last opp profilbilde", "Last opp CV", "Last opp politiattest", "Signert kontrakt"];
     const existingNames = new Set(items.map((i) => i.item));
     const missing = defaultItems.filter((d) => !existingNames.has(d));
     if (missing.length > 0) {
       for (const item of missing) {
-        await storage.createOnboarding({ userId: req.params.userId, item, completed: false });
+        await storage.createOnboarding({ userId: asString(req.params.userId), item, completed: false });
       }
-      items = await storage.getOnboarding(req.params.userId);
+      items = await storage.getOnboarding(asString(req.params.userId));
     }
     res.json(items);
   });
@@ -1547,7 +1552,7 @@ export async function registerRoutes(
 
   app.patch("/api/onboarding/:id", requireAuth, async (req, res) => {
     const { completed } = req.body;
-    const updated = await storage.toggleOnboarding(req.params.id, completed);
+    const updated = await storage.toggleOnboarding(asString(req.params.id), completed);
     if (!updated) return res.status(404).json({ message: "Ikke funnet" });
     res.json(updated);
   });
@@ -1568,7 +1573,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/varsler/:id/read", requireAuth, async (req, res) => {
-    await storage.markVarselRead(req.params.id);
+    await storage.markVarselRead(asString(req.params.id));
     res.json({ success: true });
   });
 
@@ -1779,7 +1784,7 @@ export async function registerRoutes(
 
   // Admin: en spesifikk ansatts tilgjengelighet for en måned (med vakt-overlay)
   app.get("/api/admin/availability/user/:userId", requireAdmin, async (req, res) => {
-    const { userId } = req.params;
+    const userId = asString(req.params.userId);
     const month = typeof req.query.month === "string" ? req.query.month : undefined;
     if (month !== undefined && !isValidMonth(month)) {
       return res.status(400).json({ message: "Ugyldig måned" });
