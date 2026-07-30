@@ -1,0 +1,1 @@
+- [Codemagic/GitHub sync](codemagic-github-sync.md) — mobile builds clone GitHub main; push from Replit first, and lockfile firewall URLs break npm ci outside Replit.
