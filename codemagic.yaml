@@ -30,9 +30,7 @@ workflows:
           node -e "require('@rollup/rollup-darwin-arm64')" 2>/dev/null || npm i --no-save @rollup/rollup-darwin-arm64
           node -e "require('@esbuild/darwin-arm64')" 2>/dev/null || npm i --no-save @esbuild/darwin-arm64
       - name: Build web assets
-        script: |
-          set -o pipefail
-          npm run build 2>&1 | tee build-web.log
+        script: npm run build
       - name: Sync Capacitor
         script: npx cap sync android
       - name: Set Android SDK location
