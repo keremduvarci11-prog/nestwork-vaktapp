@@ -180,7 +180,9 @@ function App() {
     const askPushPermission = async () => {
       try {
         const cap = (window as any).Capacitor;
-        if (cap?.isNativePlatform?.()) {
+        // Push is iOS-only (APNs). The plugin is excluded from the Android
+        // build, so only import it when actually running on iOS.
+        if (cap?.isNativePlatform?.() && cap?.getPlatform?.() === "ios") {
           const { PushNotifications } = await import("@capacitor/push-notifications");
           const result = await PushNotifications.requestPermissions();
           console.log("[Push] Permission result:", result.receive);
