@@ -5,7 +5,9 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       java: 21
-      node: 20
+      # Vite 7 requires Node >= 20.19; a bare "20" can resolve to an older
+      # 20.x on Codemagic and make "Build web assets" fail with status 1.
+      node: 20.20.0
       groups:
         - keystore_credentials
       vars:
