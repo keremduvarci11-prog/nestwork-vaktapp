@@ -77,7 +77,6 @@ function buildRowValues(vakt: Vakt, ansatt: User | null, barnehage: Barnehage | 
   const ansattLabel = ansatt
     ? `${ansatt.externalId ? ansatt.externalId + " " : ""}${fornavn(ansatt.name)}`.trim()
     : "---------";
-  const timelonn = ansatt?.timelonn && Number(ansatt.timelonn) > 0 ? `${Number(ansatt.timelonn)}kr` : "";
   return [
     uke,
     ansattLabel,
@@ -87,10 +86,10 @@ function buildRowValues(vakt: Vakt, ansatt: User | null, barnehage: Barnehage | 
     formatTid(vakt.startTid),
     formatTid(vakt.sluttTid),
     beregnTimer(vakt),
-    timelonn,
-    vakt.fakturert ? "Ja" : "Nei",
-    vakt.lonnUtbetalt ? "Ja" : "Nei",
-    vakt.vikarkode || "",
+    "", // I: Timelønn — føres ikke i arket
+    "", // J: står tom
+    vakt.lonnUtbetalt ? "Ja" : "Nei", // K
+    vakt.vikarkode || "", // L: kode
   ];
 }
 
@@ -106,10 +105,10 @@ async function getSheetGridId(sheets: any): Promise<number> {
 function cellFormatRequests(gridId: number, rowIdx: number, vakt: Vakt): any[] {
   const style = rowStyle(vakt);
   const requests: any[] = [
-    // A–L: radfarge etter status
+    // A–H: radfarge etter status (Uke t.o.m. Timer)
     {
       repeatCell: {
-        range: { sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: 0, endColumnIndex: 12 },
+        range: { sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: 0, endColumnIndex: 8 },
         cell: {
           userEnteredFormat: {
             backgroundColor: style.bg,
@@ -119,10 +118,10 @@ function cellFormatRequests(gridId: number, rowIdx: number, vakt: Vakt): any[] {
         fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.foregroundColor",
       },
     },
-    // M–P: nøytral formatering (hvit bakgrunn, svart tekst)
-    {
+    // I–J og M–P: nøytral formatering (hvit bakgrunn, svart tekst)
+    ...[[8, 10], [12, 16]].map(([start, end]) => ({
       repeatCell: {
-        range: { sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: 12, endColumnIndex: 16 },
+        range: { sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: start, endColumnIndex: end },
         cell: {
           userEnteredFormat: {
             backgroundColor: COLORS.white,
@@ -131,26 +130,33 @@ function cellFormatRequests(gridId: number, rowIdx: number, vakt: Vakt): any[] {
         },
         fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.foregroundColor",
       },
-    },
-  ];
-  // J (Fakturert?) og K (Har vi betalt?): rød med hvit tekst når "Nei"
-  const flagCols: Array<[number, boolean]> = [
-    [9, !!vakt.fakturert],
-    [10, !!vakt.lonnUtbetalt],
-  ];
-  for (const [col, done] of flagCols) {
-    requests.push({
+    })),
+    // K (Har vi betalt?): rød med hvit tekst når "Nei"
+    {
       repeatCell: {
-        range: { sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: col, endColumnIndex: col + 1 },
+        range: { sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: 10, endColumnIndex: 11 },
         cell: {
-          userEnteredFormat: done
+          userEnteredFormat: vakt.lonnUtbetalt
             ? { backgroundColor: COLORS.white, textFormat: { foregroundColor: COLORS.black } }
             : { backgroundColor: COLORS.red, textFormat: { foregroundColor: COLORS.textWhite } },
         },
         fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.foregroundColor",
       },
-    });
-  }
+    },
+    // L (Kode): alltid gul med svart skrift
+    {
+      repeatCell: {
+        range: { sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: 11, endColumnIndex: 12 },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: COLORS.yellow,
+            textFormat: { foregroundColor: COLORS.black },
+          },
+        },
+        fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.foregroundColor",
+      },
+    },
+  ];
   return requests;
 }
 
