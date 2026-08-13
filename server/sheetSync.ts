@@ -64,12 +64,8 @@ function rowStyle(vakt: Vakt): RowStyle {
   if (vakt.sykIkkeMott) return { bg: COLORS.red, fg: COLORS.black };
   if (vakt.provetime) return { bg: COLORS.orange, fg: COLORS.black };
   if (vakt.timerGodkjent) return { bg: COLORS.white, fg: COLORS.black }; // fullført
-  const harAnsatt = !!vakt.ansattId;
-  const bekreftet = vakt.status === "godkjent";
-  if (!harAnsatt || !bekreftet || !vakt.barnehageInformert) {
-    return { bg: COLORS.green, fg: COLORS.textWhite }; // ledig / plassert men ikke klar
-  }
-  return { bg: COLORS.yellow, fg: COLORS.black }; // aktiv vakt
+  if (vakt.ansattId) return { bg: COLORS.yellow, fg: COLORS.black }; // tildelt en ansatt
+  return { bg: COLORS.green, fg: COLORS.textWhite }; // ledig / lagt ut uten tildeling
 }
 
 function buildRowValues(vakt: Vakt, ansatt: User | null, barnehage: Barnehage | null): (string | number)[] {
@@ -157,6 +153,17 @@ function cellFormatRequests(gridId: number, rowIdx: number, vakt: Vakt): any[] {
       },
     },
   ];
+  // Kantlinjer: rundt A–H og K–L, ingen mellom de tomme feltene I–J
+  const solid = { style: "SOLID", color: COLORS.black };
+  const none = { style: "NONE" };
+  const borderRange = (start: number, end: number) => ({
+    sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: start, endColumnIndex: end,
+  });
+  requests.push(
+    { updateBorders: { range: borderRange(0, 8), top: solid, bottom: solid, left: solid, right: solid, innerVertical: solid } },
+    { updateBorders: { range: borderRange(8, 10), top: none, bottom: none, innerVertical: none } },
+    { updateBorders: { range: borderRange(10, 12), top: solid, bottom: solid, left: solid, right: solid, innerVertical: solid } },
+  );
   return requests;
 }
 
