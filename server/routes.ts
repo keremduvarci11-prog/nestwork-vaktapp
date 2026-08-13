@@ -10,6 +10,7 @@ import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema } from "@shared/schema";
 import { appendVaktToSheet, removeVaktFromSheet, getSpreadsheetUrl } from "./googleSheets";
+import { queueVaktSync, removeVaktRowFromSheet } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 
 const JWT_SECRET = process.env.SESSION_SECRET || "nestwork-secret-key";
@@ -707,6 +708,10 @@ export async function registerRoutes(
     res.send(ics);
   });
 
+  // Synk en vakt til admins vaktlogg-ark (fire-and-forget, køes internt;
+  // ferske data hentes inne i køen)
+  const queueSheetSync = (vaktId: string) => queueVaktSync(vaktId);
+
   app.post("/api/vakter", requireAdmin, async (req, res) => {
     const parsed = insertVaktSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
@@ -721,6 +726,7 @@ export async function registerRoutes(
     }
 
     const created = await storage.createVakt(payload);
+    queueSheetSync(created.id);
 
     try {
       const bh = await storage.getBarnehage(created.barnehageId);
@@ -798,6 +804,7 @@ export async function registerRoutes(
     const updated = await storage.updateVakt(asString(req.params.id), patch);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
+    queueSheetSync(updated.id);
 
     (async () => {
       try {
@@ -936,6 +943,7 @@ export async function registerRoutes(
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
 
     res.json(updated);
+    queueSheetSync(updated.id);
 
     (async () => {
       try {
@@ -1005,6 +1013,7 @@ export async function registerRoutes(
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
 
     res.json(updated);
+    queueSheetSync(updated.id);
 
     (async () => {
       try {
@@ -1069,6 +1078,7 @@ export async function registerRoutes(
       return res.status(409).json({ message: "Timer er allerede sendt inn for denne vakten" });
     }
     res.json(updated);
+    queueSheetSync(updated.id);
 
     (async () => {
       try {
@@ -1100,6 +1110,7 @@ export async function registerRoutes(
       return res.status(409).json({ message: "Timer er allerede godkjent" });
     }
     res.json(updated);
+    queueSheetSync(updated.id);
   });
 
   app.post("/api/vakter/:id/godkjenn", requireAdmin, async (req, res) => {
@@ -1109,6 +1120,7 @@ export async function registerRoutes(
 
     const updated = await storage.updateVakt(asString(req.params.id), updateData);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+    queueSheetSync(updated.id);
 
     await storage.deleteVaktInteresser(asString(req.params.id));
 
@@ -1166,6 +1178,7 @@ export async function registerRoutes(
     const updated = await storage.updateVakt(asString(req.params.id), { status: "ledig", ansattId: null });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
+    queueSheetSync(updated.id);
 
     if (before?.status === "godkjent" && before.ansattId) {
       (async () => {
@@ -1186,6 +1199,7 @@ export async function registerRoutes(
     const deleted = await storage.deleteVakt(asString(req.params.id));
     if (!deleted) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json({ success: true });
+    removeVaktRowFromSheet(asString(req.params.id));
 
     if (vakt.status === "godkjent" && vakt.barnehageId) {
       (async () => {

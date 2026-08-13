@@ -60,6 +60,11 @@ export const vakter = pgTable("vakter", {
   timerInnsendtAt: timestamp("timer_innsendt_at"),
   timerGodkjent: boolean("timer_godkjent").default(false),
   timerGodkjentAt: timestamp("timer_godkjent_at"),
+  barnehageInformert: boolean("barnehage_informert").default(false),
+  provetime: boolean("provetime").default(false),
+  sykIkkeMott: boolean("syk_ikke_mott").default(false),
+  fakturert: boolean("fakturert").default(false),
+  lonnUtbetalt: boolean("lonn_utbetalt").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -44,6 +44,11 @@ function EditVaktForm({
   const [status, setStatus] = useState(vakt.status);
   const [ansattId, setAnsattId] = useState(vakt.ansattId || "");
   const [trekkPause, setTrekkPause] = useState(vakt.trekkPause || false);
+  const [barnehageInformert, setBarnehageInformert] = useState(vakt.barnehageInformert || false);
+  const [provetime, setProvetime] = useState(vakt.provetime || false);
+  const [sykIkkeMott, setSykIkkeMott] = useState(vakt.sykIkkeMott || false);
+  const [fakturert, setFakturert] = useState(vakt.fakturert || false);
+  const [lonnUtbetalt, setLonnUtbetalt] = useState(vakt.lonnUtbetalt || false);
 
   const selectedBh = barnehager.find((b) => b.id === barnehageId);
 
@@ -60,6 +65,11 @@ function EditVaktForm({
         region: selectedBh?.region || vakt.region,
         ansattId: ansattId || null,
         trekkPause,
+        barnehageInformert,
+        provetime,
+        sykIkkeMott,
+        fakturert,
+        lonnUtbetalt,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
@@ -169,6 +179,22 @@ function EditVaktForm({
             onCheckedChange={setTrekkPause}
             data-testid="edit-switch-trekk-pause"
           />
+        </div>
+
+        <div className="space-y-1.5 p-2.5 rounded-md bg-muted/50 border">
+          <p className="text-xs font-bold mb-1.5">Vaktlogg-status</p>
+          {[
+            { label: "Barnehage informert", checked: barnehageInformert, set: setBarnehageInformert, testid: "edit-switch-barnehage-informert" },
+            { label: "Prøvetime", checked: provetime, set: setProvetime, testid: "edit-switch-provetime" },
+            { label: "Syk / møtte ikke", checked: sykIkkeMott, set: setSykIkkeMott, testid: "edit-switch-syk" },
+            { label: "Fakturert", checked: fakturert, set: setFakturert, testid: "edit-switch-fakturert" },
+            { label: "Lønn utbetalt", checked: lonnUtbetalt, set: setLonnUtbetalt, testid: "edit-switch-lonn-utbetalt" },
+          ].map((f) => (
+            <div key={f.label} className="flex items-center justify-between py-0.5">
+              <span className="text-xs font-medium">{f.label}</span>
+              <Switch checked={f.checked} onCheckedChange={f.set} data-testid={f.testid} />
+            </div>
+          ))}
         </div>
 
         <div className="space-y-2">

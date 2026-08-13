@@ -41,6 +41,26 @@ export async function runMigrations() {
       ON lonnsslipper (user_id, maned);
     `);
     console.log("[Migration] lonnsslipper OK");
+
+    await client.query(`
+      ALTER TABLE vakter
+        ADD COLUMN IF NOT EXISTS barnehage_informert BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS provetime BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS syk_ikke_mott BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS fakturert BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS lonn_utbetalt BOOLEAN DEFAULT false;
+    `);
+    await client.query(`
+      UPDATE vakter SET
+        barnehage_informert = COALESCE(barnehage_informert, false),
+        provetime = COALESCE(provetime, false),
+        syk_ikke_mott = COALESCE(syk_ikke_mott, false),
+        fakturert = COALESCE(fakturert, false),
+        lonn_utbetalt = COALESCE(lonn_utbetalt, false)
+      WHERE barnehage_informert IS NULL OR provetime IS NULL
+         OR syk_ikke_mott IS NULL OR fakturert IS NULL OR lonn_utbetalt IS NULL;
+    `);
+    console.log("[Migration] vakter sheet-sync kolonner OK");
   } catch (err: any) {
     console.error("[Migration] Feil:", err.message);
   } finally {
