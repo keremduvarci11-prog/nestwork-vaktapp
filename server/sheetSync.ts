@@ -8,8 +8,9 @@ import { getUncachableGoogleSheetClient } from "./googleSheets";
 import { storage } from "./storage";
 import type { Vakt, User, Barnehage } from "@shared/schema";
 
+// Originalarket «Nestwork timer jobbet» — det ENESTE arket vaktloggen skal bruke
 const SPREADSHEET_ID =
-  process.env.VAKT_SHEET_ID || "1iGTVCjApX88NCYtZT_5CRqVT7cls5ZvhNrLeKSuzbXc";
+  process.env.VAKT_SHEET_ID || "1fd7xZET8otXv3uVFThpPq96pKsE3EDidNAMfjuVNZFA";
 const SHEET_NAME = "Sheet1";
 const ID_COL_INDEX = 15; // kolonne P (0-basert)
 const READ_RANGE = `${SHEET_NAME}!A:P`; // hele arket, uansett lengde

@@ -2,11 +2,10 @@
 name: Vaktlogg Google Sheet
 description: Hvilket ark vaktlogg-synken peker på og plasseringsregler
 ---
-- Originalarket «Nestwork timer jobbet»: ID `1fd7xZET8otXv3uVFThpPq96pKsE3EDidNAMfjuVNZFA`, fane Sheet1 (gridId 0). Satt via shared env `VAKT_SHEET_ID`.
-- Brukerens gamle ark var en Excel-fil (.xlsx i Drive) — Sheets API nekter Office-filer; bruker konverterte manuelt.
-- Regel: nye vakter skal sorteres inn på dato INNE i ukeblokken (samme dag samlet), aldri nederst i blokken. Fikset i sheetSync.
-- Kolonne P (vakt-ID) er skjult i arket. Uke 34–37-vakter for Lucas/Saada/Sandra er backfillet med ID-er.
-- Sheets-synk kjører kun der appen kjører — prod var ikke publisert med synk per aug 2026.
-- Abderrahmane Saada føres som «9088 Saada» i arket; prod-externalId oppdatert til 9088 (var 81126). NB: synken skriver fornavn («Abderrahmane»), så auto-oppdatering vil overskrive «Saada» — vurder navnebytte hvis det plager brukeren.
-- Ingebjørg Helland føres som «9091 Ingebjørg» — prod-externalId rettet til 9091 (var 91478).
-- Publisert app (aug 2026) kjører gammel synk: skriver til TEST-arket (fallback-ID) og legger rader nederst. Må republiseres for at synk skal treffe originalarket sortert. 77 vakter (Roza/Gavin/Ingebjørg sep–okt) er manuelt backfillet sortert i originalarket med ID i P.
+- ENESTE gyldige ark (brukerens krav): «Nestwork timer jobbet», ID `1fd7xZET8otXv3uVFThpPq96pKsE3EDidNAMfjuVNZFA`, fane Sheet1 (gridId 0). Alle andre ark (test-ark, «Godkjente vakter») skal IKKE brukes til vaktloggen.
+- `VAKT_SHEET_ID` (production env) og kodens fallback peker begge på dette arket.
+- Regel: nye vakter sorteres inn på dato INNE i ukeblokken (samme dag samlet), aldri nederst. Ny uke → nederst med én blank rad.
+- Kolonne P (skjult) = vakt-ID som kobler rad til appen. Kolonner: A=uke, B=«kode Fornavn», C=barnehage, E=dato dd.mm.yyyy, F/G=tid, H=bruttotimer, K=Ja/Nei (rød ved Nei), L=vikarkode (gul).
+- Timeføringskoder i arket vinner over appen: Saada=9088, Ingebjørg=9091 (prod-externalId rettet).
+- Bruker republiserte appen ca. 17. aug 2026 — etter det skal synken gå automatisk til originalarket. Før det ble alt backfillet manuelt (t.o.m. Bibi 18–19.08, Sandra uke 35).
+- ALLTID sjekk om ansatte allerede har vakter for datoene før nye opprettes (unngå duplikater — skjedde med Gavin/Ingebjørg sep–okt).
