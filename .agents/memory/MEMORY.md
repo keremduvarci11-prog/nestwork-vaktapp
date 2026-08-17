@@ -1,1 +1,2 @@
 - [Codemagic/GitHub sync](codemagic-github-sync.md) — mobile builds clone GitHub main; push from Replit first, and lockfile firewall URLs break npm ci outside Replit.
+- [Vaktlogg Google Sheet](vaktlogg-sheet.md) — original-arkets ID, VAKT_SHEET_ID, og regel om datosortering i ukeblokk.

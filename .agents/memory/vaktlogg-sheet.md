@@ -1,0 +1,9 @@
+---
+name: Vaktlogg Google Sheet
+description: Hvilket ark vaktlogg-synken peker på og plasseringsregler
+---
+- Originalarket «Nestwork timer jobbet»: ID `1fd7xZET8otXv3uVFThpPq96pKsE3EDidNAMfjuVNZFA`, fane Sheet1 (gridId 0). Satt via shared env `VAKT_SHEET_ID`.
+- Brukerens gamle ark var en Excel-fil (.xlsx i Drive) — Sheets API nekter Office-filer; bruker konverterte manuelt.
+- Regel: nye vakter skal sorteres inn på dato INNE i ukeblokken (samme dag samlet), aldri nederst i blokken. Fikset i sheetSync.
+- Kolonne P (vakt-ID) er skjult i arket. Uke 34–37-vakter for Lucas/Saada/Sandra er backfillet med ID-er.
+- Sheets-synk kjører kun der appen kjører — prod var ikke publisert med synk per aug 2026.
