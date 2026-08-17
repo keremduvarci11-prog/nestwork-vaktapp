@@ -7,3 +7,4 @@ description: Hvilket ark vaktlogg-synken peker på og plasseringsregler
 - Regel: nye vakter skal sorteres inn på dato INNE i ukeblokken (samme dag samlet), aldri nederst i blokken. Fikset i sheetSync.
 - Kolonne P (vakt-ID) er skjult i arket. Uke 34–37-vakter for Lucas/Saada/Sandra er backfillet med ID-er.
 - Sheets-synk kjører kun der appen kjører — prod var ikke publisert med synk per aug 2026.
+- Abderrahmane Saada føres som «9088 Saada» i arket; prod-externalId oppdatert til 9088 (var 81126). NB: synken skriver fornavn («Abderrahmane»), så auto-oppdatering vil overskrive «Saada» — vurder navnebytte hvis det plager brukeren.
