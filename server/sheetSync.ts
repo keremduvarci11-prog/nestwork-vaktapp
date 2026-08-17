@@ -208,36 +208,46 @@ async function doSync(vakt: Vakt, ansatt: User | null, barnehage: Barnehage | nu
   let rowIdx = rows.findIndex((r) => r[ID_COL_INDEX] === vakt.id);
 
   if (rowIdx === -1) {
-    // Ny rad. Finn riktig plassering: etter siste rad i samme ukeblokk,
-    // ellers nederst med én blank rad mellom ukene.
+    // Ny rad. Plasser den sortert på dato INNE i riktig ukeblokk:
+    // rett etter siste eksisterende rad med samme eller tidligere dato,
+    // slik at alle vakter på samme dag ligger samlet.
     let lastNonEmpty = 0;
     rows.forEach((r, i) => {
       if (r.some((c) => String(c).trim() !== "")) lastNonEmpty = i;
     });
+    let firstWeekRow = -1;
     let lastWeekRow = -1;
-    for (let i = rows.length - 1; i >= 1; i--) {
-      if (String(rows[i][0]).trim() === String(uke)) { lastWeekRow = i; break; }
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === String(uke)) {
+        if (firstWeekRow === -1) firstWeekRow = i;
+        lastWeekRow = i;
+      }
     }
 
-    if (lastWeekRow !== -1 && lastWeekRow < lastNonEmpty) {
-      // Ukeblokken finnes midt i arket → sett inn rad rett under blokken
-      rowIdx = lastWeekRow + 1;
+    if (lastWeekRow !== -1) {
+      // Finn riktig plass i ukeblokken: etter siste rad med dato <= vaktens dato
+      const newDateKey = vakt.dato; // yyyy-mm-dd sorterer riktig
+      rowIdx = firstWeekRow; // default: øverst i blokken
+      for (let i = firstWeekRow; i <= lastWeekRow; i++) {
+        const dateCell = String(rows[i]?.[4] || "").trim(); // dd.mm.yyyy
+        const parts = dateCell.split(".");
+        const key = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : "";
+        if (key && key <= newDateKey) rowIdx = i + 1;
+      }
+      // Sett alltid inn en ny rad slik at rader under skyves ned
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId: SPREADSHEET_ID,
         requestBody: {
           requests: [{
             insertDimension: {
               range: { sheetId: gridId, dimension: "ROWS", startIndex: rowIdx, endIndex: rowIdx + 1 },
-              inheritFromBefore: true,
+              inheritFromBefore: rowIdx > firstWeekRow,
             },
           }],
         },
       });
-    } else if (lastWeekRow !== -1) {
-      // Ukeblokken er nederst → fortsett rett under
-      rowIdx = lastNonEmpty + 1;
     } else {
-      // Ny uke → hopp over én rad (blank rad mellom ukene)
+      // Ny uke → nederst, med én blank rad mellom ukene
       rowIdx = lastNonEmpty + 2;
     }
   }
