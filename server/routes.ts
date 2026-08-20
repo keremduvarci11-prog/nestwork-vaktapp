@@ -369,7 +369,15 @@ export async function registerRoutes(
       if (!name || !email) {
         return res.status(400).json({ message: "Navn og e-post må fylles ut" });
       }
-      const makeUsername = (n: string) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "").slice(0, 20);
+      const makeUsername = (n: string) => {
+        const parts = n
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .split(/[^a-z0-9]+/)
+          .filter(Boolean);
+        return `${parts[0] || ""}${parts.at(-1) || ""}`.slice(0, 20);
+      };
       let uname = providedUsername || makeUsername(name);
       const existing = await storage.getUserByUsername(uname);
       if (existing) {
