@@ -143,7 +143,14 @@ const TEST_USERNAMES = (process.env.TEST_USERNAMES || "amandafrederich")
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
-export async function notifyRegion(region: string, title: string, message: string, type: string = "vakt", link?: string) {
+export async function notifyRegion(
+  region: string,
+  title: string,
+  message: string,
+  type: string = "vakt",
+  link?: string,
+  excludedUserIds: string[] = []
+) {
   const regionGroups: Record<string, string[]> = {
     Bergen: ["Bergen", "Os"],
     Os: ["Bergen", "Os"],
@@ -166,10 +173,11 @@ export async function notifyRegion(region: string, title: string, message: strin
   // Merge & dedupe by user id (test users in the matched region are not double-notified)
   const byId = new Map<string, typeof regionUsers[number]>();
   for (const u of [...regionUsers, ...testUsers]) byId.set(u.id, u);
-  const recipients = Array.from(byId.values());
+  const excluded = new Set(excludedUserIds);
+  const recipients = Array.from(byId.values()).filter((user) => !excluded.has(user.id));
 
   console.log(
-    `[Push] notifyRegion "${region}" -> ${regions.join(", ")} -> ${regionUsers.length} region + ${testUsers.length} test = ${recipients.length} total`
+    `[Push] notifyRegion "${region}" -> ${regions.join(", ")} -> ${regionUsers.length} region + ${testUsers.length} test, ${excluded.size} excluded = ${recipients.length} total`
   );
 
   for (const user of recipients) {

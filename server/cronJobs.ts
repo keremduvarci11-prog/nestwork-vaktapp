@@ -24,12 +24,16 @@ export function startCronJobs() {
           const diffHours = diffMs / (1000 * 60 * 60);
           if (diffHours >= 2 && diffHours < 2.1) {
             const bh = await storage.getBarnehage(vakt.barnehageId);
+            const occupiedEmployeeIds = allVakter
+              .filter((otherVakt) => otherVakt.dato === vakt.dato && !!otherVakt.ansattId)
+              .map((otherVakt) => otherVakt.ansattId!);
             await notifyRegion(
               vakt.region,
               "Vakt fremdeles ledig",
               `Vakten ${vakt.dato} hos ${bh?.name || "ukjent"} er fremdeles ledig. Var rask!`,
               "reminder",
-              "/"
+              "/",
+              occupiedEmployeeIds
             );
           }
         }

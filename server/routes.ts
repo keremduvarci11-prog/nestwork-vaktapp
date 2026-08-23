@@ -755,12 +755,16 @@ export async function registerRoutes(
           "/mine-vakter"
         );
       } else {
+        const occupiedEmployeeIds = (await storage.getVakter())
+          .filter((vakt) => vakt.dato === created.dato && !!vakt.ansattId)
+          .map((vakt) => vakt.ansattId!);
         await notifyRegion(
           created.region,
           "Ny vakt tilgjengelig",
           `Ny vakt ${created.dato} hos ${bh?.name || "ukjent"} (${created.startTid?.slice(0, 5)} - ${created.sluttTid?.slice(0, 5)})`,
           "vakt",
-          "/"
+          "/",
+          occupiedEmployeeIds
         );
       }
 
