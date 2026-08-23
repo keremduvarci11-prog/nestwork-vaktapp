@@ -61,6 +61,23 @@ export async function runMigrations() {
          OR syk_ikke_mott IS NULL OR fakturert IS NULL OR lonn_utbetalt IS NULL;
     `);
     console.log("[Migration] vakter sheet-sync kolonner OK");
+
+    await client.query(`
+      ALTER TABLE meldinger
+        ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP DEFAULT now();
+    `);
+    await client.query(`
+      UPDATE meldinger AS m
+      SET last_activity_at = GREATEST(
+        COALESCE(
+          (SELECT MAX(sm.created_at) FROM samtale_meldinger AS sm WHERE sm.melding_id = m.id),
+          TIMESTAMP '1970-01-01'
+        ),
+        COALESCE(m.replied_at, TIMESTAMP '1970-01-01'),
+        COALESCE(m.created_at, now())
+      );
+    `);
+    console.log("[Migration] meldinger aktivitetstid OK");
   } catch (err: any) {
     console.error("[Migration] Feil:", err.message);
   } finally {

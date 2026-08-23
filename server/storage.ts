@@ -54,6 +54,7 @@ export interface IStorage {
   hideMeldingForUser(id: string): Promise<void>;
   markSeenByUser(id: string): Promise<void>;
   markSeenByAdmin(id: string): Promise<void>;
+  updateMeldingActivity(id: string, markUnreadForAdmin: boolean): Promise<void>;
 
   getSamtaleMeldinger(meldingId: string): Promise<SamtaleMelding[]>;
   createSamtaleMelding(m: InsertSamtaleMelding): Promise<SamtaleMelding>;
@@ -226,7 +227,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMeldinger(): Promise<Melding[]> {
-    return db.select().from(meldinger).orderBy(desc(meldinger.createdAt));
+    return db.select().from(meldinger).orderBy(desc(meldinger.lastActivityAt), desc(meldinger.createdAt));
   }
 
   async getMeldingerByUser(userId: string): Promise<Melding[]> {
@@ -291,6 +292,15 @@ export class DatabaseStorage implements IStorage {
 
   async markSeenByAdmin(id: string): Promise<void> {
     await db.update(meldinger).set({ lastSeenByAdmin: new Date(), read: true }).where(eq(meldinger.id, id));
+  }
+
+  async updateMeldingActivity(id: string, markUnreadForAdmin: boolean): Promise<void> {
+    await db.update(meldinger)
+      .set({
+        lastActivityAt: new Date(),
+        ...(markUnreadForAdmin ? { lastSeenByAdmin: null, read: false } : {}),
+      })
+      .where(eq(meldinger.id, id));
   }
 
   async getSamtaleMeldinger(meldingId: string): Promise<SamtaleMelding[]> {

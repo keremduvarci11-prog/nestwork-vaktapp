@@ -1228,7 +1228,21 @@ export async function registerRoutes(
 
   app.get("/api/meldinger", requireAdmin, async (_req, res) => {
     const all = await storage.getMeldinger();
-    res.json(all);
+    const allAdmins = (await storage.getAllUsers()).filter((user) => user.role === "admin");
+    const adminIds = new Set(allAdmins.map((admin) => admin.id));
+    const withReplyStatus = await Promise.all(all.map(async (melding) => {
+      const samtale = await storage.getSamtaleMeldinger(melding.id);
+      const lastAdminSeen = melding.lastSeenByAdmin || new Date(0);
+      const hasNewReply = samtale.some(
+        (svar) =>
+          !adminIds.has(svar.fromUserId) &&
+          svar.fromUserId !== "admin" &&
+          !!svar.createdAt &&
+          new Date(svar.createdAt) > lastAdminSeen
+      );
+      return { ...melding, hasNewReply };
+    }));
+    res.json(withReplyStatus);
   });
 
   app.get("/api/meldinger/user/:userId", requireAuth, async (req, res) => {
@@ -1360,6 +1374,7 @@ export async function registerRoutes(
       fromUserId: getUserIdFromRequest(req)!,
       message,
     });
+    await storage.updateMeldingActivity(melding.id, !isAdmin);
 
     try {
       if (isAdmin) {

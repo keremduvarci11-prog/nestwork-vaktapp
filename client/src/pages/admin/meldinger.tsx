@@ -16,6 +16,10 @@ function isAdminMessage(fromUserId: string, adminIds: Set<string>) {
   return fromUserId === "admin" || adminIds.has(fromUserId);
 }
 
+type AdminMelding = Melding & {
+  hasNewReply?: boolean;
+};
+
 function SamtaleView({
   melding,
   sender,
@@ -360,7 +364,7 @@ export default function AdminMeldinger() {
   const [openMeldingId, setOpenMeldingId] = useState<string | null>(null);
   const [showNyMelding, setShowNyMelding] = useState(false);
 
-  const { data: meldinger, isLoading } = useQuery<Melding[]>({
+  const { data: meldinger, isLoading } = useQuery<AdminMelding[]>({
     queryKey: ["/api/meldinger"],
   });
   const { data: users } = useQuery<UserType[]>({
@@ -379,7 +383,10 @@ export default function AdminMeldinger() {
     return false;
   }) || [];
 
-  const unreadCount = myMeldinger.filter((m) => !m.read).length || 0;
+  const unreadCount = myMeldinger.filter((m) => {
+    const fromAdmin = isAdminMessage(m.fromUserId, adminIds);
+    return (!fromAdmin && !m.read) || m.hasNewReply;
+  }).length || 0;
   const openMelding = myMeldinger.find((m) => m.id === openMeldingId);
 
   if (showNyMelding && users) {
@@ -439,10 +446,11 @@ export default function AdminMeldinger() {
           {myMeldinger.map((m) => {
             const fromAdmin = isAdminMessage(m.fromUserId, adminIds);
             const otherUser = fromAdmin ? userMap.get(m.toUserId || "") : userMap.get(m.fromUserId);
+            const hasNewMessage = (!fromAdmin && !m.read) || !!m.hasNewReply;
             return (
               <Card
                 key={m.id}
-                className={`cursor-pointer hover-elevate ${!m.read ? "border-primary/30" : ""} ${m.closed ? "opacity-60" : ""}`}
+                className={`cursor-pointer hover-elevate ${hasNewMessage ? "border-primary/30" : ""} ${m.closed ? "opacity-60" : ""}`}
                 onClick={() => setOpenMeldingId(m.id)}
                 data-testid={`card-melding-${m.id}`}
               >
@@ -455,7 +463,7 @@ export default function AdminMeldinger() {
                           {otherUser?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
                         </AvatarFallback>
                       </Avatar>
-                      {!m.read && !m.closed && (
+                      {hasNewMessage && !m.closed && (
                         <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-primary rounded-full border-2 border-background" />
                       )}
                     </div>
@@ -469,10 +477,15 @@ export default function AdminMeldinger() {
                           <p className="text-xs text-muted-foreground">{otherUser?.region}</p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                          {m.createdAt && (
+                          {(m.lastActivityAt || m.createdAt) && (
                             <p className="text-xs text-muted-foreground">
-                              {new Date(m.createdAt).toLocaleDateString("nb-NO", { day: "numeric", month: "short" })}
+                              {new Date(m.lastActivityAt || m.createdAt!).toLocaleDateString("nb-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                             </p>
+                          )}
+                          {hasNewMessage && !m.closed && (
+                            <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                              Ny melding
+                            </span>
                           )}
                           {m.closed && (
                             <span className="text-[10px] text-muted-foreground">Avsluttet</span>

@@ -81,6 +81,7 @@ export const meldinger = pgTable("meldinger", {
   hiddenByUser: boolean("hidden_by_user").default(false),
   lastSeenByUser: timestamp("last_seen_by_user"),
   lastSeenByAdmin: timestamp("last_seen_by_admin"),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
