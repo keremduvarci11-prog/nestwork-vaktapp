@@ -3,13 +3,13 @@ name: Vaktlogg write policy
 description: Durable rules for when shifts may write to the billing sheet and how legacy rows are identified
 ---
 
-## Write only at creation
+## Create once, then update in place
 
-A shift may write to the billing sheet only once, when the shift is created. Assignment, acceptance, editing, status changes, hour submission, and hour approval must never trigger sheet synchronization. Deleting a shift may remove its linked sheet row.
+A shift may create a billing-sheet row only once, when the shift is created. Admin changes to billing-relevant shift data, such as employee, client, date, times, description, payment flag, or shift code, may update that same linked row. Deleting a shift may remove it. Hour submission, hour approval, and status-only events must never trigger sheet synchronization.
 
-**Why:** Re-syncing later lifecycle events caused historical shifts to appear again as billing duplicates.
+**Why:** Re-syncing hour lifecycle events caused historical shifts to appear again as billing duplicates, while legitimate admin corrections still need to be reflected in place.
 
-**How to apply:** Any new shift lifecycle endpoint must leave the sheet untouched unless it is the creation endpoint or an explicit deletion of the linked row.
+**How to apply:** New lifecycle endpoints must leave the sheet untouched unless they create a shift, delete its linked row, or explicitly edit billing-relevant row content. Updates must locate the existing row by shift ID and fail closed rather than append when identity is ambiguous.
 
 ## Fail-closed legacy matching
 

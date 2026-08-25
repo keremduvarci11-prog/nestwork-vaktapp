@@ -717,10 +717,22 @@ export async function registerRoutes(
     res.send(ics);
   });
 
-  // En vakt føres i arket kun når den opprettes. Senere hendelser
-  // (tildeling, aksept, redigering og timegodkjenning) skal aldri starte
-  // en ny arksynk og dermed heller aldri lage en ekstra fakturarad.
+  // Opprettelse legger inn én rad. Faktiske admin-endringer av radinnhold
+  // oppdaterer den samme raden via vakt-ID. Timeinnsending, timegodkjenning
+  // og rene statusendringer skal aldri starte arksynk.
   const queueNewShiftSheetSync = (vaktId: string) => queueVaktSync(vaktId);
+  const sheetRowEditFields = new Set([
+    "ansattId",
+    "barnehageId",
+    "beskrivelse",
+    "dato",
+    "startTid",
+    "sluttTid",
+    "lonnUtbetalt",
+    "vikarkode",
+    "sykIkkeMott",
+    "provetime",
+  ]);
 
   app.post("/api/vakter", requireAdmin, async (req, res) => {
     const parsed = insertVaktSchema.safeParse(req.body);
@@ -782,6 +794,9 @@ export async function registerRoutes(
 
   app.patch("/api/vakter/:id", requireAdmin, async (req, res) => {
     const before = await storage.getVakt(asString(req.params.id));
+    const shouldUpdateSheet = Object.keys(req.body ?? {}).some((key) =>
+      sheetRowEditFields.has(key),
+    );
     const patch = { ...req.body };
     const effectiveStartTid = patch.startTid ?? before?.startTid ?? "";
     const effectiveSluttTid = patch.sluttTid ?? before?.sluttTid ?? "";
@@ -798,6 +813,7 @@ export async function registerRoutes(
     }
     const updated = await storage.updateVakt(asString(req.params.id), patch);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+    if (shouldUpdateSheet) queueVaktSync(updated.id, before);
     res.json(updated);
 
     (async () => {
