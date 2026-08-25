@@ -8,6 +8,7 @@ import { getUncachableGoogleSheetClient } from "./googleSheets";
 import { storage } from "./storage";
 import type { Vakt, User, Barnehage } from "@shared/schema";
 import { calculatePaidHours } from "@shared/shiftHours";
+import { findLegacyRowMatch } from "./sheetRowMatching";
 
 // Originalarket «Nestwork timer jobbet» — det ENESTE arket vaktloggen skal bruke
 const SPREADSHEET_ID =
@@ -171,25 +172,60 @@ function cellFormatRequests(gridId: number, rowIdx: number, vakt: Vakt): any[] {
 // vakt aldri gjenoppstår i arket.
 let syncChain: Promise<void> = Promise.resolve();
 
-export function queueVaktSync(vaktId: string): void {
+export function queueVaktSync(vaktId: string, previousVakt?: Vakt): void {
   syncChain = syncChain
     .then(async () => {
       const vakt = await storage.getVakt(vaktId);
       if (!vakt) return; // slettet i mellomtiden — remove-jobben tar seg av raden
       const ansatt = vakt.ansattId ? await storage.getUser(vakt.ansattId) : null;
       const barnehage = await storage.getBarnehage(vakt.barnehageId);
-      await doSync(vakt, ansatt ?? null, barnehage ?? null);
+      const previousAnsatt = previousVakt?.ansattId
+        ? await storage.getUser(previousVakt.ansattId)
+        : null;
+      const previousBarnehage = previousVakt
+        ? await storage.getBarnehage(previousVakt.barnehageId)
+        : null;
+      await doSync(
+        vakt,
+        ansatt ?? null,
+        barnehage ?? null,
+        previousVakt
+          ? {
+              vakt: previousVakt,
+              ansatt: previousAnsatt ?? null,
+              barnehage: previousBarnehage ?? null,
+            }
+          : undefined,
+      );
     })
     .catch((err) => console.error("[SheetSync] Feil ved synk:", err?.message || err));
 }
 
-export function removeVaktRowFromSheet(vaktId: string): void {
+export function removeVaktRowFromSheet(vaktId: string, deletedVakt?: Vakt): void {
   syncChain = syncChain
-    .then(() => doRemove(vaktId))
+    .then(async () => {
+      const ansatt = deletedVakt?.ansattId
+        ? await storage.getUser(deletedVakt.ansattId)
+        : null;
+      const barnehage = deletedVakt
+        ? await storage.getBarnehage(deletedVakt.barnehageId)
+        : null;
+      await doRemove(
+        vaktId,
+        deletedVakt
+          ? buildRowValues(deletedVakt, ansatt ?? null, barnehage ?? null)
+          : undefined,
+      );
+    })
     .catch((err) => console.error("[SheetSync] Feil ved sletting:", err?.message || err));
 }
 
-async function doSync(vakt: Vakt, ansatt: User | null, barnehage: Barnehage | null): Promise<void> {
+async function doSync(
+  vakt: Vakt,
+  ansatt: User | null,
+  barnehage: Barnehage | null,
+  previous?: { vakt: Vakt; ansatt: User | null; barnehage: Barnehage | null },
+): Promise<void> {
   const sheets = await getUncachableGoogleSheetClient();
   const gridId = await getSheetGridId(sheets);
 
@@ -204,6 +240,27 @@ async function doSync(vakt: Vakt, ansatt: User | null, barnehage: Barnehage | nu
 
   // Finn eksisterende rad for denne vakten (kolonne P)
   let rowIdx = rows.findIndex((r) => r[ID_COL_INDEX] === vakt.id);
+
+  if (rowIdx === -1) {
+    const legacyMatch = findLegacyRowMatch(
+      rows,
+      previous
+        ? [values, buildRowValues(previous.vakt, previous.ansatt, previous.barnehage)]
+        : [values],
+    );
+    if (legacyMatch.kind === "ambiguous") {
+      const rowNumbers = legacyMatch.rowIndexes.map((index) => index + 1).join(", ");
+      throw new Error(
+        `Tvetydige historiske rader (${rowNumbers}) for vakt ${vakt.id}; ingen ny rad ble opprettet`,
+      );
+    }
+    if (legacyMatch.kind === "match") {
+      rowIdx = legacyMatch.rowIndex;
+      console.log(
+        `[SheetSync] Overtar historisk rad ${rowIdx + 1} for vakt ${vakt.id}`,
+      );
+    }
+  }
 
   if (rowIdx === -1) {
     // Ny rad. Plasser den sortert på dato INNE i riktig ukeblokk:
@@ -270,7 +327,7 @@ async function doSync(vakt: Vakt, ansatt: User | null, barnehage: Barnehage | nu
   console.log(`[SheetSync] Rad ${rowNum} synket for vakt ${vakt.id} (${values[1]} ${values[4]})`);
 }
 
-async function doRemove(vaktId: string): Promise<void> {
+async function doRemove(vaktId: string, deletedValues?: (string | number)[]): Promise<void> {
   const sheets = await getUncachableGoogleSheetClient();
   const gridId = await getSheetGridId(sheets);
   const res = await sheets.spreadsheets.values.get({
@@ -278,7 +335,17 @@ async function doRemove(vaktId: string): Promise<void> {
     range: READ_RANGE,
   });
   const rows: string[][] = res.data.values || [];
-  const rowIdx = rows.findIndex((r) => r[ID_COL_INDEX] === vaktId);
+  let rowIdx = rows.findIndex((r) => r[ID_COL_INDEX] === vaktId);
+  if (rowIdx === -1 && deletedValues) {
+    const legacyMatch = findLegacyRowMatch(rows, [deletedValues]);
+    if (legacyMatch.kind === "ambiguous") {
+      const rowNumbers = legacyMatch.rowIndexes.map((index) => index + 1).join(", ");
+      throw new Error(
+        `Tvetydige historiske rader (${rowNumbers}) ved sletting av vakt ${vaktId}; ingen rad ble slettet`,
+      );
+    }
+    if (legacyMatch.kind === "match") rowIdx = legacyMatch.rowIndex;
+  }
   if (rowIdx === -1) return;
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SPREADSHEET_ID,

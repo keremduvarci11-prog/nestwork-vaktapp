@@ -8,8 +8,8 @@ import fs from "fs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { storage } from "./storage";
-import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema } from "@shared/schema";
-import { appendVaktToSheet, removeVaktFromSheet, getSpreadsheetUrl } from "./googleSheets";
+import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema, type Vakt } from "@shared/schema";
+import { getSpreadsheetUrl } from "./googleSheets";
 import { queueVaktSync, removeVaktRowFromSheet } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
@@ -719,7 +719,8 @@ export async function registerRoutes(
 
   // Synk en vakt til admins vaktlogg-ark (fire-and-forget, køes internt;
   // ferske data hentes inne i køen)
-  const queueSheetSync = (vaktId: string) => queueVaktSync(vaktId);
+  const queueSheetSync = (vaktId: string, previousVakt?: Vakt) =>
+    queueVaktSync(vaktId, previousVakt);
 
   app.post("/api/vakter", requireAdmin, async (req, res) => {
     const parsed = insertVaktSchema.safeParse(req.body);
@@ -772,24 +773,6 @@ export async function registerRoutes(
         );
       }
 
-      if (autoGodkjenn && created.ansattId) {
-        const timer = calculatePaidHours(created.startTid || "", created.sluttTid || "");
-        const ansatt = await storage.getUser(created.ansattId);
-        await appendVaktToSheet({
-          dato: created.dato || "",
-          barnehageNavn: bh?.name || created.barnehageId || "",
-          region: created.region || "",
-          ansattNavn: ansatt?.name || "",
-          ansattId: ansatt?.externalId || null,
-          vikarkode: created.vikarkode || "",
-          startTid: created.startTid || "",
-          sluttTid: created.sluttTid || "",
-          timer: Math.round(timer * 100) / 100,
-          trekkPause: shouldDeductPause(created.startTid || "", created.sluttTid || ""),
-          status: "godkjent",
-          timelonn: ansatt?.timelonn ?? null,
-        });
-      }
     } catch (err) {
       console.error("[Notify] Feil ved varsling:", err);
     }
@@ -816,7 +799,7 @@ export async function registerRoutes(
     const updated = await storage.updateVakt(asString(req.params.id), patch);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
-    queueSheetSync(updated.id);
+    queueSheetSync(updated.id, before);
 
     (async () => {
       try {
@@ -854,34 +837,8 @@ export async function registerRoutes(
           );
         }
 
-        const needsSheetUpdate = becameGodkjent || (ansattChanged && updated.status === "godkjent");
-        if (needsSheetUpdate) {
-          if (before?.ansattId && before.status === "godkjent") {
-            const oldAnsatt = await storage.getUser(before.ansattId);
-            const oldBh = await storage.getBarnehage(before.barnehageId);
-            await removeVaktFromSheet(oldBh?.name || before.barnehageId, before.dato || "", oldAnsatt?.name || "");
-          }
-
-          const timer = calculatePaidHours(updated.startTid || "", updated.sluttTid || "");
-          const ansatt = await storage.getUser(updated.ansattId!);
-          const barnehage = await storage.getBarnehage(updated.barnehageId);
-          await appendVaktToSheet({
-            dato: updated.dato || "",
-            barnehageNavn: barnehage?.name || updated.barnehageId || "",
-            region: updated.region || "",
-            ansattNavn: ansatt?.name || "",
-            ansattId: ansatt?.externalId || null,
-            vikarkode: updated.vikarkode || "",
-            startTid: updated.startTid || "",
-            sluttTid: updated.sluttTid || "",
-            timer: Math.round(timer * 100) / 100,
-            trekkPause: shouldDeductPause(updated.startTid || "", updated.sluttTid || ""),
-            status: "godkjent",
-            timelonn: ansatt?.timelonn ?? null,
-          });
-        }
       } catch (err) {
-        console.error("[Notify/Sheets] Feil ved vakt-oppdatering:", err);
+        console.error("[Notify] Feil ved vakt-oppdatering:", err);
       }
     })();
   });
@@ -948,7 +905,7 @@ export async function registerRoutes(
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
 
     res.json(updated);
-    queueSheetSync(updated.id);
+    queueSheetSync(updated.id, before);
 
     (async () => {
       try {
@@ -971,32 +928,8 @@ export async function registerRoutes(
           );
         }
 
-        if (before?.ansattId && before.ansattId !== ansattId && before.status === "godkjent") {
-          const oldAnsatt = await storage.getUser(before.ansattId);
-          const oldBh = await storage.getBarnehage(before.barnehageId);
-          await removeVaktFromSheet(oldBh?.name || before.barnehageId, before.dato || "", oldAnsatt?.name || "");
-        }
-
-        if (autoGodkjenn) {
-          const timer = calculatePaidHours(updated.startTid || "", updated.sluttTid || "");
-          const ansatt = await storage.getUser(ansattId);
-          await appendVaktToSheet({
-            dato: updated.dato || "",
-            barnehageNavn: bh?.name || updated.barnehageId || "",
-            region: updated.region || "",
-            ansattNavn: ansatt?.name || "",
-            ansattId: ansatt?.externalId || null,
-            vikarkode: updated.vikarkode || "",
-            startTid: updated.startTid || "",
-            sluttTid: updated.sluttTid || "",
-            timer: Math.round(timer * 100) / 100,
-            trekkPause: shouldDeductPause(updated.startTid || "", updated.sluttTid || ""),
-            status: "godkjent",
-            timelonn: ansatt?.timelonn ?? null,
-          });
-        }
       } catch (err) {
-        console.error("[Notify/Sheets] Feil ved tildeling:", err);
+        console.error("[Notify] Feil ved tildeling:", err);
       }
     })();
   });
@@ -1011,27 +944,12 @@ export async function registerRoutes(
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
 
     res.json(updated);
-    queueSheetSync(updated.id);
+    queueSheetSync(updated.id, vakt);
 
     (async () => {
       try {
         const ansatt = await storage.getUser(getUserIdFromRequest(req)!);
         const bh = await storage.getBarnehage(updated.barnehageId);
-        const timer = calculatePaidHours(updated.startTid || "", updated.sluttTid || "");
-        await appendVaktToSheet({
-          dato: updated.dato || "",
-          barnehageNavn: bh?.name || updated.barnehageId || "",
-          region: updated.region || "",
-          ansattNavn: ansatt?.name || "",
-          ansattId: ansatt?.externalId || null,
-          vikarkode: updated.vikarkode || "",
-          startTid: updated.startTid || "",
-          sluttTid: updated.sluttTid || "",
-          timer: Math.round(timer * 100) / 100,
-          trekkPause: shouldDeductPause(updated.startTid || "", updated.sluttTid || ""),
-          status: "godkjent",
-          timelonn: ansatt?.timelonn ?? null,
-        });
         await notifyAdmins(
           "Tildelt vakt godtatt",
           `${ansatt?.name || "En ansatt"} har godtatt vakt ${updated.dato} hos ${bh?.name || "ukjent"}.`,
@@ -1039,7 +957,7 @@ export async function registerRoutes(
           "/admin/alle-vakter"
         );
       } catch (err) {
-        console.error("Google Sheets/Notify error:", err);
+        console.error("[Notify] Feil ved godta-varsling:", err);
       }
     })();
   });
@@ -1106,12 +1024,14 @@ export async function registerRoutes(
 
   app.post("/api/vakter/:id/godkjenn", requireAdmin, async (req, res) => {
     const { ansattId } = req.body || {};
+    const before = await storage.getVakt(asString(req.params.id));
+    if (!before) return res.status(404).json({ message: "Vakt ikke funnet" });
     const updateData: any = { status: "godkjent" };
     if (ansattId) updateData.ansattId = ansattId;
 
     const updated = await storage.updateVakt(asString(req.params.id), updateData);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
-    queueSheetSync(updated.id);
+    queueSheetSync(updated.id, before);
 
     await storage.deleteVaktInteresser(asString(req.params.id));
 
@@ -1132,29 +1052,6 @@ export async function registerRoutes(
 
     res.json(updated);
 
-    (async () => {
-      try {
-        const ansatt = updated.ansattId ? await storage.getUser(updated.ansattId) : null;
-        const barnehage = updated.barnehageId ? await storage.getBarnehage(updated.barnehageId) : null;
-        const timer = calculatePaidHours(updated.startTid || "", updated.sluttTid || "");
-        await appendVaktToSheet({
-          dato: updated.dato || "",
-          barnehageNavn: barnehage?.name || updated.barnehageId || "",
-          region: updated.region || "",
-          ansattNavn: ansatt?.name || "",
-          ansattId: ansatt?.externalId || null,
-          vikarkode: updated.vikarkode || "",
-          startTid: updated.startTid || "",
-          sluttTid: updated.sluttTid || "",
-          timer: Math.round(timer * 100) / 100,
-          trekkPause: shouldDeductPause(updated.startTid || "", updated.sluttTid || ""),
-          status: "godkjent",
-          timelonn: ansatt?.timelonn ?? null,
-        });
-      } catch (err) {
-        console.error("[Google Sheets] Error:", err);
-      }
-    })();
   });
 
   app.post("/api/vakter/:id/avslaa", requireAdmin, async (req, res) => {
@@ -1162,19 +1059,7 @@ export async function registerRoutes(
     const updated = await storage.updateVakt(asString(req.params.id), { status: "ledig", ansattId: null });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json(updated);
-    queueSheetSync(updated.id);
-
-    if (before?.status === "godkjent" && before.ansattId) {
-      (async () => {
-        try {
-          const oldAnsatt = await storage.getUser(before.ansattId!);
-          const oldBh = await storage.getBarnehage(before.barnehageId);
-          await removeVaktFromSheet(oldBh?.name || before.barnehageId, before.dato || "", oldAnsatt?.name || "");
-        } catch (err) {
-          console.error("[Google Sheets] Error removing avslatt vakt:", err);
-        }
-      })();
-    }
+    queueSheetSync(updated.id, before);
   });
 
   app.delete("/api/vakter/:id", requireAdmin, async (req, res) => {
@@ -1183,19 +1068,7 @@ export async function registerRoutes(
     const deleted = await storage.deleteVakt(asString(req.params.id));
     if (!deleted) return res.status(404).json({ message: "Vakt ikke funnet" });
     res.json({ success: true });
-    removeVaktRowFromSheet(asString(req.params.id));
-
-    if (vakt.status === "godkjent" && vakt.barnehageId) {
-      (async () => {
-        try {
-          const bh = await storage.getBarnehage(vakt.barnehageId);
-          const ansatt = vakt.ansattId ? await storage.getUser(vakt.ansattId) : null;
-          await removeVaktFromSheet(bh?.name || vakt.barnehageId, vakt.dato || "", ansatt?.name || "");
-        } catch (err) {
-          console.error("[Google Sheets] Error removing deleted vakt:", err);
-        }
-      })();
-    }
+    removeVaktRowFromSheet(asString(req.params.id), vakt);
   });
 
   app.get("/api/meldinger", requireAdmin, async (_req, res) => {

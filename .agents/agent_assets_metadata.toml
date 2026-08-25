@@ -18,3 +18,10 @@ id = "fOSYGj__YLAsppWyqzhms"
 uri = "file://nestwork-keystore.tar.gz"
 type = "unspecified"
 title = "nestwork-keystore.tar.gz"
+
+[[outputs]]
+id = "oiDUheboEa6J5Zwdf1jOy"
+uri = "file://.agents/outputs/duplikatrapport-google-sheet-2026-08-25.csv"
+type = "table"
+title = "Oppdatert duplikatrapport – Google Sheet"
+description = "Full kontroll fra rad 851 og nedover: 23 høy-sannsynlige duplikatpar og 5 rader for manuell kontroll. Ingen rader er slettet."
