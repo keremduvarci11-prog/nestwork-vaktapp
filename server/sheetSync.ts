@@ -7,6 +7,7 @@
 import { getUncachableGoogleSheetClient } from "./googleSheets";
 import { storage } from "./storage";
 import type { Vakt, User, Barnehage } from "@shared/schema";
+import { calculatePaidHours } from "@shared/shiftHours";
 
 // Originalarket «Nestwork timer jobbet» — det ENESTE arket vaktloggen skal bruke
 const SPREADSHEET_ID =
@@ -47,12 +48,8 @@ function formatTid(t: string | null): string {
 }
 
 function beregnTimer(vakt: Vakt): number {
-  if (!vakt.startTid || !vakt.sluttTid) return 0;
-  const [sh, sm] = vakt.startTid.split(":").map(Number);
-  const [eh, em] = vakt.sluttTid.split(":").map(Number);
-  // Arket føres med brutto timer (pause trekkes ikke fra i vaktloggen)
-  const timer = (eh * 60 + em - sh * 60 - sm) / 60;
-  return Math.max(0, Math.round(timer * 100) / 100);
+  const timer = calculatePaidHours(vakt.startTid || "", vakt.sluttTid || "");
+  return Math.round(timer * 100) / 100;
 }
 
 function fornavn(name: string): string {

@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, TrendingUp, CheckCircle } from "lucide-react";
 import type { Vakt } from "@shared/schema";
+import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 
 export default function Inntjening() {
   const { user } = useAuth();
@@ -23,15 +24,7 @@ export default function Inntjening() {
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear && v.status === "godkjent" && v.dato <= todayStr;
   })?.sort((a, b) => a.dato.localeCompare(b.dato)) || [];
 
-  const calcHours = (start: string, end: string, trekkPause?: boolean | null) => {
-    const [sh, sm] = start.split(":").map(Number);
-    const [eh, em] = end.split(":").map(Number);
-    let hours = (eh * 60 + em - sh * 60 - sm) / 60;
-    if (trekkPause) hours -= 0.5;
-    return Math.max(0, hours);
-  };
-
-  const totalHours = monthVakter.reduce((sum, v) => sum + calcHours(v.startTid, v.sluttTid, v.trekkPause), 0);
+  const totalHours = monthVakter.reduce((sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid), 0);
   const totalEarnings = totalHours * timelonn;
 
   const todayFormatted = today.toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
@@ -97,7 +90,7 @@ export default function Inntjening() {
               <h2 className="text-sm font-semibold mb-3">Fullforte vakter denne maneden</h2>
               <div className="space-y-2">
                 {monthVakter.map((v) => {
-                  const hours = calcHours(v.startTid, v.sluttTid, v.trekkPause);
+                  const hours = calculatePaidHours(v.startTid, v.sluttTid);
                   const date = new Date(v.dato + "T00:00:00");
                   return (
                     <div key={v.id} className="flex items-center justify-between py-2 border-b last:border-0" data-testid={`row-vakt-${v.id}`}>
@@ -107,7 +100,7 @@ export default function Inntjening() {
                           <p className="text-sm font-medium">{date.toLocaleDateString("nb-NO", { day: "numeric", month: "short" })}</p>
                           <p className="text-xs text-muted-foreground">
                             {v.startTid?.slice(0, 5)} - {v.sluttTid?.slice(0, 5)}
-                            {v.trekkPause ? " (30m pause)" : ""}
+                            {shouldDeductPause(v.startTid, v.sluttTid) ? " (30m pause)" : ""}
                           </p>
                         </div>
                       </div>

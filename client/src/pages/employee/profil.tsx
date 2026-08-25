@@ -13,17 +13,9 @@ import logoSrc from "@assets/nestwork_logo_centered.png";
 import { useTheme } from "@/components/theme-provider";
 import { ImageCropper } from "@/components/image-cropper";
 import type { Vakt } from "@shared/schema";
+import { calculatePaidHours } from "@shared/shiftHours";
 
 const MONTH_NAMES_NB = ["januar", "februar", "mars", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "desember"];
-
-function calcShiftHours(start: string, end: string, trekkPause?: boolean | null) {
-  if (!start || !end) return 0;
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let h = (eh * 60 + em - sh * 60 - sm) / 60;
-  if (trekkPause) h -= 0.5;
-  return Math.max(0, h);
-}
 
 function formatNok(n: number) {
   return n.toLocaleString("nb-NO", { maximumFractionDigits: 2 });
@@ -102,7 +94,7 @@ export default function Profil() {
       if (!v.dato || v.status !== "godkjent") return;
       const d = new Date(v.dato + "T00:00:00");
       if (d.getFullYear() !== y || d.getMonth() !== m) return;
-      totalHours += calcShiftHours(v.startTid || "", v.sluttTid || "", v.trekkPause);
+      totalHours += calculatePaidHours(v.startTid || "", v.sluttTid || "");
       count += 1;
     });
     const brutto = totalHours * timelonn;

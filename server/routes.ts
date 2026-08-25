@@ -12,6 +12,7 @@ import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema } from "@s
 import { appendVaktToSheet, removeVaktFromSheet, getSpreadsheetUrl } from "./googleSheets";
 import { queueVaktSync, removeVaktRowFromSheet } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
+import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 
 const JWT_SECRET = process.env.SESSION_SECRET || "nestwork-secret-key";
 
@@ -724,7 +725,10 @@ export async function registerRoutes(
     const parsed = insertVaktSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
 
-    let payload = parsed.data;
+    let payload = {
+      ...parsed.data,
+      trekkPause: shouldDeductPause(parsed.data.startTid, parsed.data.sluttTid),
+    };
     const autoGodkjenn =
       payload.status === "tildelt" &&
       !!payload.ansattId &&
@@ -769,14 +773,7 @@ export async function registerRoutes(
       }
 
       if (autoGodkjenn && created.ansattId) {
-        let timer = 0;
-        if (created.startTid && created.sluttTid) {
-          const [sh, sm] = created.startTid.split(":").map(Number);
-          const [eh, em] = created.sluttTid.split(":").map(Number);
-          timer = (eh * 60 + em - sh * 60 - sm) / 60;
-          if (created.trekkPause) timer -= 0.5;
-          timer = Math.max(0, timer);
-        }
+        const timer = calculatePaidHours(created.startTid || "", created.sluttTid || "");
         const ansatt = await storage.getUser(created.ansattId);
         await appendVaktToSheet({
           dato: created.dato || "",
@@ -788,7 +785,7 @@ export async function registerRoutes(
           startTid: created.startTid || "",
           sluttTid: created.sluttTid || "",
           timer: Math.round(timer * 100) / 100,
-          trekkPause: created.trekkPause || false,
+          trekkPause: shouldDeductPause(created.startTid || "", created.sluttTid || ""),
           status: "godkjent",
           timelonn: ansatt?.timelonn ?? null,
         });
@@ -803,6 +800,9 @@ export async function registerRoutes(
   app.patch("/api/vakter/:id", requireAdmin, async (req, res) => {
     const before = await storage.getVakt(asString(req.params.id));
     const patch = { ...req.body };
+    const effectiveStartTid = patch.startTid ?? before?.startTid ?? "";
+    const effectiveSluttTid = patch.sluttTid ?? before?.sluttTid ?? "";
+    patch.trekkPause = shouldDeductPause(effectiveStartTid, effectiveSluttTid);
     const effectiveDato = patch.dato ?? before?.dato;
     const effectiveAnsattId = patch.ansattId ?? before?.ansattId;
     const effectiveStatus = patch.status ?? before?.status;
@@ -862,14 +862,7 @@ export async function registerRoutes(
             await removeVaktFromSheet(oldBh?.name || before.barnehageId, before.dato || "", oldAnsatt?.name || "");
           }
 
-          let timer = 0;
-          if (updated.startTid && updated.sluttTid) {
-            const [sh, sm] = updated.startTid.split(":").map(Number);
-            const [eh, em] = updated.sluttTid.split(":").map(Number);
-            timer = (eh * 60 + em - sh * 60 - sm) / 60;
-            if (updated.trekkPause) timer -= 0.5;
-            timer = Math.max(0, timer);
-          }
+          const timer = calculatePaidHours(updated.startTid || "", updated.sluttTid || "");
           const ansatt = await storage.getUser(updated.ansattId!);
           const barnehage = await storage.getBarnehage(updated.barnehageId);
           await appendVaktToSheet({
@@ -882,7 +875,7 @@ export async function registerRoutes(
             startTid: updated.startTid || "",
             sluttTid: updated.sluttTid || "",
             timer: Math.round(timer * 100) / 100,
-            trekkPause: updated.trekkPause || false,
+            trekkPause: shouldDeductPause(updated.startTid || "", updated.sluttTid || ""),
             status: "godkjent",
             timelonn: ansatt?.timelonn ?? null,
           });
@@ -985,14 +978,7 @@ export async function registerRoutes(
         }
 
         if (autoGodkjenn) {
-          let timer = 0;
-          if (updated.startTid && updated.sluttTid) {
-            const [sh, sm] = updated.startTid.split(":").map(Number);
-            const [eh, em] = updated.sluttTid.split(":").map(Number);
-            timer = (eh * 60 + em - sh * 60 - sm) / 60;
-            if (updated.trekkPause) timer -= 0.5;
-            timer = Math.max(0, timer);
-          }
+          const timer = calculatePaidHours(updated.startTid || "", updated.sluttTid || "");
           const ansatt = await storage.getUser(ansattId);
           await appendVaktToSheet({
             dato: updated.dato || "",
@@ -1004,7 +990,7 @@ export async function registerRoutes(
             startTid: updated.startTid || "",
             sluttTid: updated.sluttTid || "",
             timer: Math.round(timer * 100) / 100,
-            trekkPause: updated.trekkPause || false,
+            trekkPause: shouldDeductPause(updated.startTid || "", updated.sluttTid || ""),
             status: "godkjent",
             timelonn: ansatt?.timelonn ?? null,
           });
@@ -1031,14 +1017,7 @@ export async function registerRoutes(
       try {
         const ansatt = await storage.getUser(getUserIdFromRequest(req)!);
         const bh = await storage.getBarnehage(updated.barnehageId);
-        let timer = 0;
-        if (updated.startTid && updated.sluttTid) {
-          const [sh, sm] = updated.startTid.split(":").map(Number);
-          const [eh, em] = updated.sluttTid.split(":").map(Number);
-          timer = (eh * 60 + em - sh * 60 - sm) / 60;
-          if (updated.trekkPause) timer -= 0.5;
-          timer = Math.max(0, timer);
-        }
+        const timer = calculatePaidHours(updated.startTid || "", updated.sluttTid || "");
         await appendVaktToSheet({
           dato: updated.dato || "",
           barnehageNavn: bh?.name || updated.barnehageId || "",
@@ -1049,7 +1028,7 @@ export async function registerRoutes(
           startTid: updated.startTid || "",
           sluttTid: updated.sluttTid || "",
           timer: Math.round(timer * 100) / 100,
-          trekkPause: updated.trekkPause || false,
+          trekkPause: shouldDeductPause(updated.startTid || "", updated.sluttTid || ""),
           status: "godkjent",
           timelonn: ansatt?.timelonn ?? null,
         });
@@ -1157,14 +1136,7 @@ export async function registerRoutes(
       try {
         const ansatt = updated.ansattId ? await storage.getUser(updated.ansattId) : null;
         const barnehage = updated.barnehageId ? await storage.getBarnehage(updated.barnehageId) : null;
-        let timer = 0;
-        if (updated.startTid && updated.sluttTid) {
-          const [sh, sm] = updated.startTid.split(":").map(Number);
-          const [eh, em] = updated.sluttTid.split(":").map(Number);
-          timer = (eh * 60 + em - sh * 60 - sm) / 60;
-          if (updated.trekkPause) timer -= 0.5;
-          timer = Math.max(0, timer);
-        }
+        const timer = calculatePaidHours(updated.startTid || "", updated.sluttTid || "");
         await appendVaktToSheet({
           dato: updated.dato || "",
           barnehageNavn: barnehage?.name || updated.barnehageId || "",
@@ -1175,7 +1147,7 @@ export async function registerRoutes(
           startTid: updated.startTid || "",
           sluttTid: updated.sluttTid || "",
           timer: Math.round(timer * 100) / 100,
-          trekkPause: updated.trekkPause || false,
+          trekkPause: shouldDeductPause(updated.startTid || "", updated.sluttTid || ""),
           status: "godkjent",
           timelonn: ansatt?.timelonn ?? null,
         });
@@ -1505,22 +1477,13 @@ export async function registerRoutes(
     const currentMonth = now.getMonth(); // 0-indexed
     const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
 
-    const calcHours = (start: string, end: string, trekkPause?: boolean | null) => {
-      if (!start || !end) return 0;
-      const [sh, sm] = start.split(":").map(Number);
-      const [eh, em] = end.split(":").map(Number);
-      let h = (eh * 60 + em - sh * 60 - sm) / 60;
-      if (trekkPause) h -= 0.5;
-      return Math.max(0, h);
-    };
-
     const monthAggByUser = new Map<string, { hours: number; count: number }>();
     for (const v of allVakter) {
       if (!v.ansattId || !v.dato) continue;
       if (v.status !== "godkjent") continue;
       const d = new Date(v.dato + "T00:00:00");
       if (d.getFullYear() !== currentYear || d.getMonth() !== currentMonth) continue;
-      const h = calcHours(v.startTid || "", v.sluttTid || "", v.trekkPause);
+      const h = calculatePaidHours(v.startTid || "", v.sluttTid || "");
       const cur = monthAggByUser.get(v.ansattId) || { hours: 0, count: 0 };
       cur.hours += h;
       cur.count += 1;

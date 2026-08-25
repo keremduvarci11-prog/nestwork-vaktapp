@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus, Coffee, CheckCircle2 } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
+import { shouldDeductPause } from "@shared/shiftHours";
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   ledig: { label: "Ledig", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
@@ -43,7 +44,7 @@ function EditVaktForm({
   const [beskrivelse, setBeskrivelse] = useState(vakt.beskrivelse || "");
   const [status, setStatus] = useState(vakt.status);
   const [ansattId, setAnsattId] = useState(vakt.ansattId || "");
-  const [trekkPause, setTrekkPause] = useState(vakt.trekkPause || false);
+  const automaticPause = shouldDeductPause(startTid, sluttTid);
   const [barnehageInformert, setBarnehageInformert] = useState(vakt.barnehageInformert || false);
   const [provetime, setProvetime] = useState(vakt.provetime || false);
   const [sykIkkeMott, setSykIkkeMott] = useState(vakt.sykIkkeMott || false);
@@ -64,7 +65,6 @@ function EditVaktForm({
         status,
         region: selectedBh?.region || vakt.region,
         ansattId: ansattId || null,
-        trekkPause,
         barnehageInformert,
         provetime,
         sykIkkeMott,
@@ -169,16 +169,16 @@ function EditVaktForm({
           </Select>
         </div>
 
-        <div className="flex items-center justify-between p-2.5 rounded-md bg-muted/50 border">
+        <div className="flex items-center gap-2 p-2.5 rounded-md bg-muted/50 border">
           <div className="flex items-center gap-2">
             <Coffee className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-medium">Trekk 30 min pause</span>
+            <div>
+              <p className="text-xs font-medium">Pause beregnes automatisk</p>
+              <p className="text-[10px] text-muted-foreground">
+                {automaticPause ? "30 min pause trekkes" : "Ingen pause under 5,5 timer"}
+              </p>
+            </div>
           </div>
-          <Switch
-            checked={trekkPause}
-            onCheckedChange={setTrekkPause}
-            data-testid="edit-switch-trekk-pause"
-          />
         </div>
 
         <div className="space-y-1.5 p-2.5 rounded-md bg-muted/50 border">

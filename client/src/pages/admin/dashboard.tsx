@@ -8,6 +8,7 @@ import { Users, Calendar, Clock, TrendingUp, List } from "lucide-react";
 import { Link } from "wouter";
 import type { Vakt, Barnehage, User } from "@shared/schema";
 import { PushPermissionBanner } from "@/components/push-banner";
+import { calculatePaidHours } from "@shared/shiftHours";
 
 function osloNow(): { todayIso: string; nowMinutes: number } {
   const fmt = new Intl.DateTimeFormat("en-GB", {
@@ -79,15 +80,7 @@ export default function AdminDashboard() {
   const tildelteVakter = useMemo(() => vakter?.filter((v) => isVaktActive(v) && v.status === "tildelt") || [], [vakter, tick]);
   const weekVakter = vakter?.filter((v) => v.dato >= weekStart && v.dato <= weekEnd && v.status === "godkjent") || [];
 
-  const calcHours = (start: string, end: string, trekkPause?: boolean | null) => {
-    const [sh, sm] = start.split(":").map(Number);
-    const [eh, em] = end.split(":").map(Number);
-    let hours = (eh * 60 + em - sh * 60 - sm) / 60;
-    if (trekkPause) hours -= 0.5;
-    return Math.max(0, hours);
-  };
-
-  const weekHours = weekVakter.reduce((sum, v) => sum + calcHours(v.startTid, v.sluttTid, v.trekkPause), 0);
+  const weekHours = weekVakter.reduce((sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid), 0);
 
   const bhMap = new Map(barnehager?.map((b) => [b.id, b]) || []);
   const userMap = new Map(users?.map((u) => [u.id, u]) || []);

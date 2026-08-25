@@ -31,6 +31,7 @@ import {
   Eye,
 } from "lucide-react";
 import type { Vakt, Barnehage } from "@shared/schema";
+import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 
 interface LonnsslippMeta {
   id: string;
@@ -55,14 +56,6 @@ const MONTH_NAMES = [
   "November",
   "Desember",
 ];
-
-function calcHours(start: string, end: string, trekkPause?: boolean | null) {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let hours = (eh * 60 + em - sh * 60 - sm) / 60;
-  if (trekkPause) hours -= 0.5;
-  return Math.max(0, hours);
-}
 
 function formatNok(amount: number) {
   return amount.toLocaleString("nb-NO", { maximumFractionDigits: 2 });
@@ -128,7 +121,7 @@ export default function LonnTimer() {
 
   const totals = useMemo(() => {
     const totalHours = monthVakter.reduce(
-      (sum, v) => sum + calcHours(v.startTid, v.sluttTid, v.trekkPause),
+      (sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid),
       0,
     );
     const grossPay = totalHours * timelonn;
@@ -314,7 +307,7 @@ export default function LonnTimer() {
         doc.addPage();
         y = margin;
       }
-      const hours = calcHours(v.startTid, v.sluttTid, v.trekkPause);
+      const hours = calculatePaidHours(v.startTid, v.sluttTid);
       const amount = hours * timelonn;
       const d = new Date(v.dato + "T00:00:00");
       const dateStr = d.toLocaleDateString("nb-NO", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -322,12 +315,12 @@ export default function LonnTimer() {
       const bhTrim = bhName.length > 24 ? bhName.slice(0, 22) + ".." : bhName;
       doc.text(dateStr, margin, y);
       doc.text(bhTrim, margin + 70, y);
-      doc.text(`${v.startTid?.slice(0, 5)}-${v.sluttTid?.slice(0, 5)}${v.trekkPause ? "*" : ""}`, margin + 220, y);
+      doc.text(`${v.startTid?.slice(0, 5)}-${v.sluttTid?.slice(0, 5)}${shouldDeductPause(v.startTid, v.sluttTid) ? "*" : ""}`, margin + 220, y);
       doc.text(hours.toFixed(2), margin + 300, y);
       doc.text(`${formatNok(amount)} kr`, margin + 360, y);
       y += 14;
     });
-    if (monthVakter.some((v) => v.trekkPause)) {
+    if (monthVakter.some((v) => shouldDeductPause(v.startTid, v.sluttTid))) {
       y += 4;
       doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
@@ -492,7 +485,7 @@ export default function LonnTimer() {
               <h2 className="text-sm font-semibold mb-3">Vakter denne måneden</h2>
               <div className="space-y-2">
                 {monthVakter.map((v) => {
-                  const hours = calcHours(v.startTid, v.sluttTid, v.trekkPause);
+                  const hours = calculatePaidHours(v.startTid, v.sluttTid);
                   const date = new Date(v.dato + "T00:00:00");
                   const submittable = canSubmit(v);
                   const isPending = submitTimer.isPending && submitTimer.variables === v.id;
@@ -518,7 +511,7 @@ export default function LonnTimer() {
                               )}
                               <p className="text-xs text-muted-foreground">
                                 {v.startTid?.slice(0, 5)} - {v.sluttTid?.slice(0, 5)}
-                                {v.trekkPause ? " (30m pause)" : ""}
+                                {shouldDeductPause(v.startTid, v.sluttTid) ? " (30m pause)" : ""}
                               </p>
                             </div>
                           </div>

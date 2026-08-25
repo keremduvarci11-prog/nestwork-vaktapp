@@ -5,11 +5,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, X, UserCheck, Coffee, Clock } from "lucide-react";
 import type { Barnehage, User } from "@shared/schema";
+import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 
 export default function NyVakt() {
   const { toast } = useToast();
@@ -22,7 +22,6 @@ export default function NyVakt() {
   const [ansattId, setAnsattId] = useState("");
   const [ansattSearch, setAnsattSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [trekkPause, setTrekkPause] = useState(false);
 
   const { data: barnehager } = useQuery<Barnehage[]>({
     queryKey: ["/api/barnehager"],
@@ -52,13 +51,9 @@ export default function NyVakt() {
   const selectedBh = barnehager?.find((b) => b.id === barnehageId);
 
   const calcHours = () => {
-    if (!startTid || !sluttTid) return 0;
-    const [sh, sm] = startTid.split(":").map(Number);
-    const [eh, em] = sluttTid.split(":").map(Number);
-    let hours = (eh * 60 + em - sh * 60 - sm) / 60;
-    if (trekkPause) hours -= 0.5;
-    return Math.max(0, hours);
+    return calculatePaidHours(startTid, sluttTid);
   };
+  const automaticPause = shouldDeductPause(startTid, sluttTid);
 
   const createVakt = useMutation({
     mutationFn: () =>
@@ -72,7 +67,6 @@ export default function NyVakt() {
         ansattId: ansattId || null,
         region: selectedBh?.region || "",
         beskrivelse,
-        trekkPause,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
@@ -87,7 +81,6 @@ export default function NyVakt() {
       setAnsattId("");
       setAnsattSearch("");
       setShowSearch(false);
-      setTrekkPause(false);
     },
     onError: () => {
       toast({ title: "Feil", description: "Kunne ikke opprette vakt", variant: "destructive" });
@@ -158,19 +151,16 @@ export default function NyVakt() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
               <div className="flex items-center gap-2">
                 <Coffee className="w-4 h-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Trekk 30 min pause</p>
-                  <p className="text-xs text-muted-foreground">Trekker fra ubetalt pause</p>
+                  <p className="text-sm font-medium">Pause beregnes automatisk</p>
+                  <p className="text-xs text-muted-foreground">
+                    {automaticPause ? "30 min ubetalt pause trekkes" : "Ingen pause for vakter under 5,5 timer"}
+                  </p>
                 </div>
               </div>
-              <Switch
-                checked={trekkPause}
-                onCheckedChange={setTrekkPause}
-                data-testid="switch-trekk-pause"
-              />
             </div>
 
             {startTid && sluttTid && (
@@ -178,7 +168,7 @@ export default function NyVakt() {
                 <Clock className="w-3.5 h-3.5" />
                 <span>
                   Betalte timer: <strong className="text-foreground">{calcHours().toFixed(1)}t</strong>
-                  {trekkPause && " (30 min pause trukket)"}
+                  {automaticPause && " (30 min pause trukket)"}
                 </span>
               </div>
             )}

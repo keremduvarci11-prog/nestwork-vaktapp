@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, Building2, CheckCircle2, Timer, AlertCircle, UserCheck, CalendarPlus, Phone } from "lucide-react";
 import type { Vakt, Barnehage } from "@shared/schema";
+import { shouldDeductPause } from "@shared/shiftHours";
 
 const statusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle2 }> = {
   tildelt: { label: "Tildelt deg", className: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200", icon: UserCheck },
@@ -165,7 +166,7 @@ export default function MineVakter() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{vakt.trekkPause ? " (30m pause)" : ""}</span>
+                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{shouldDeductPause(vakt.startTid, vakt.sluttTid) ? " (30m pause)" : ""}</span>
                     </div>
                     <div className="flex items-center gap-1.5 col-span-2">
                       <Building2 className="w-3.5 h-3.5" />
@@ -233,7 +234,7 @@ export default function MineVakter() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{vakt.trekkPause ? " (30m pause)" : ""}</span>
+                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{shouldDeductPause(vakt.startTid, vakt.sluttTid) ? " (30m pause)" : ""}</span>
                     </div>
                     <div className="flex items-center gap-1.5 col-span-2">
                       <Building2 className="w-3.5 h-3.5" />

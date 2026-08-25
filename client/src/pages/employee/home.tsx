@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardList, UserCheck, CheckCircle2, HandMetal, Phone } from "lucide-react";
 import { PushPermissionBanner } from "@/components/push-banner";
 import type { Vakt, Barnehage, Onboarding, VaktInteresse } from "@shared/schema";
+import { shouldDeductPause } from "@shared/shiftHours";
 
 
 export default function EmployeeHome() {
@@ -144,7 +145,7 @@ export default function EmployeeHome() {
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{vakt.trekkPause ? " (30m pause)" : ""}</span>
+                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{shouldDeductPause(vakt.startTid, vakt.sluttTid) ? " (30m pause)" : ""}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
                       <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
@@ -215,7 +216,7 @@ export default function EmployeeHome() {
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{vakt.trekkPause ? " (30m pause)" : ""}</span>
+                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{shouldDeductPause(vakt.startTid, vakt.sluttTid) ? " (30m pause)" : ""}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
                       <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
