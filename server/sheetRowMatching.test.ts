@@ -50,14 +50,24 @@ test("stops when several legacy rows could be the same shift", () => {
   });
 });
 
-test("does not match partial or blank rows", () => {
-  const partial = row();
-  partial[2] = "";
-  const rows = [row({ employee: "Ansatt" }), partial];
-  assert.deepEqual(findLegacyRowMatch(rows, [row()]), { kind: "none" });
+test("does not match rows missing required employee, date or times", () => {
+  for (const missingIndex of [1, 4, 5, 6]) {
+    const partial = row();
+    partial[missingIndex] = "";
+    const rows = [row({ employee: "Ansatt" }), partial];
+    assert.deepEqual(findLegacyRowMatch(rows, [row()]), { kind: "none" });
+  }
 });
 
-test("matches historical kindergarten aliases", () => {
+test("allows a blank historical kindergarten for the same employee and date", () => {
+  const legacy = row({ kindergarten: "" });
+  assert.deepEqual(findLegacyRowMatch([row({ employee: "Ansatt" }), legacy], [row()]), {
+    kind: "match",
+    rowIndex: 1,
+  });
+});
+
+test("matches historical kindergarten aliases for the same employee and date", () => {
   const legacy = row({ kindergarten: "Kuventræ Espira" });
   const current = row({ kindergarten: "Espira Kuventræ Barnehage" });
   assert.deepEqual(findLegacyRowMatch([row({ employee: "Ansatt" }), legacy], [current]), {
@@ -66,7 +76,7 @@ test("matches historical kindergarten aliases", () => {
   });
 });
 
-test("matches a one-character kindergarten spelling error", () => {
+test("matches a different historical kindergarten spelling", () => {
   const legacy = row({ kindergarten: "Rakkerungang Gårdsbarnehage" });
   const current = row({ kindergarten: "Rakkerungan Gårdbarnehage" });
   assert.deepEqual(findLegacyRowMatch([row({ employee: "Ansatt" }), legacy], [current]), {
@@ -92,25 +102,26 @@ test("allows a missing historical shift code", () => {
   });
 });
 
-test("does not treat a blank app shift code as a wildcard", () => {
-  const legacy = row({ code: "RESS" });
-  const current = row({ code: "" });
-  assert.deepEqual(findLegacyRowMatch([row({ employee: "Ansatt" }), legacy], [current]), {
-    kind: "none",
-  });
-});
-
-test("does not match two different nonblank shift codes", () => {
+test("matches different shift codes when employee, date and times are identical", () => {
   const legacy = row({ code: "RESS" });
   const current = row({ code: "LTV" });
   assert.deepEqual(findLegacyRowMatch([row({ employee: "Ansatt" }), legacy], [current]), {
-    kind: "none",
+    kind: "match",
+    rowIndex: 1,
   });
 });
 
 test("never matches a different employee number", () => {
   const legacy = row({ employee: "9029 Sakar" });
   const current = row({ employee: "9104 Nora" });
+  assert.deepEqual(findLegacyRowMatch([row({ employee: "Ansatt" }), legacy], [current]), {
+    kind: "none",
+  });
+});
+
+test("never matches the same employee on a different date", () => {
+  const legacy = row({ date: "13.08.2026" });
+  const current = row({ date: "14.08.2026" });
   assert.deepEqual(findLegacyRowMatch([row({ employee: "Ansatt" }), legacy], [current]), {
     kind: "none",
   });

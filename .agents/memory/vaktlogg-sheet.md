@@ -1,11 +1,20 @@
 ---
-name: Vaktlogg Google Sheet
-description: Hvilket ark vaktlogg-synken peker på og plasseringsregler
+name: Vaktlogg write policy
+description: Durable rules for when shifts may write to the billing sheet and how legacy rows are identified
 ---
-- ENESTE gyldige ark (brukerens krav): «Nestwork timer jobbet», ID `1fd7xZET8otXv3uVFThpPq96pKsE3EDidNAMfjuVNZFA`, fane Sheet1 (gridId 0). Alle andre ark (test-ark, «Godkjente vakter») skal IKKE brukes til vaktloggen.
-- `VAKT_SHEET_ID` (production env) og kodens fallback peker begge på dette arket.
-- Regel: nye vakter sorteres inn på dato INNE i ukeblokken (samme dag samlet), aldri nederst. Ny uke → nederst med én blank rad.
-- Kolonne P (skjult) = vakt-ID som kobler rad til appen. Kolonner: A=uke, B=«kode Fornavn», C=barnehage, E=dato dd.mm.yyyy, F/G=tid, H=bruttotimer, K=Ja/Nei (rød ved Nei), L=vikarkode (gul).
-- Timeføringskoder i arket vinner over appen: Saada=9088, Ingebjørg=9091 (prod-externalId rettet).
-- Prod-synk VERIFISERT OK 18. aug 2026: nye vakter havner automatisk sortert i originalarket (kan ha ~15 sek forsinkelse per rad). Manuell backfill trengs ikke lenger.
-- ALLTID sjekk om ansatte allerede har vakter for datoene før nye opprettes (unngå duplikater — skjedde med Gavin/Ingebjørg sep–okt).
+
+## Write only at creation
+
+A shift may write to the billing sheet only once, when the shift is created. Assignment, acceptance, editing, status changes, hour submission, and hour approval must never trigger sheet synchronization. Deleting a shift may remove its linked sheet row.
+
+**Why:** Re-syncing later lifecycle events caused historical shifts to appear again as billing duplicates.
+
+**How to apply:** Any new shift lifecycle endpoint must leave the sheet untouched unless it is the creation endpoint or an explicit deletion of the linked row.
+
+## Fail-closed legacy matching
+
+A legacy row can be claimed only when employee identity, date, start time, and end time match uniquely. Client-location labels and shift-code labels may differ between manual history and app-generated rows. Different employees must never be linked, and multiple candidates must stop without mutation.
+
+**Why:** Historical labels are inconsistent, while employee identity and shift timing are the reliable duplicate boundary.
+
+**How to apply:** Use this rule only to adopt one unlinked historical row during creation or to remove one uniquely linked legacy row during deletion.
