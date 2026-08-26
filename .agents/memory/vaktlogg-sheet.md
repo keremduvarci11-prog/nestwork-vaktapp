@@ -18,3 +18,11 @@ A legacy row can be claimed only when employee identity, date, start time, and e
 **Why:** Historical labels are inconsistent, while employee identity and shift timing are the reliable duplicate boundary.
 
 **How to apply:** Use this rule only to adopt one unlinked historical row during creation or to remove one uniquely linked legacy row during deletion.
+
+## Fast operational shift orders
+
+When the user asks to create or send shifts, treat the request as an authoritative order that the shifts are not already entered.
+
+**Why:** The user delegates these orders to save time; a long investigative workflow removes that value.
+
+**How to apply:** Run one targeted duplicate check for the requested employee and dates, then create immediately through the production app. Pause only for a real name/client ambiguity, an existing collision, or missing required details.
