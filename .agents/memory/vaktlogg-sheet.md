@@ -5,7 +5,7 @@ description: Durable rules for when shifts may write to the billing sheet and ho
 
 ## Create once, then update in place
 
-A shift may create a billing-sheet row only once, when the shift is created. Admin changes to billing-relevant shift data, such as employee, client, date, times, description, payment flag, or shift code, may update that same linked row. Deleting a shift may remove it. Hour submission, hour approval, and status-only events must never trigger sheet synchronization.
+A shift may create a billing-sheet row only once, when the shift is created. Admin changes to billing-relevant shift data, such as employee assignment, client, date, times, description, payment flag, or shift code, may update that same linked row. Approving an interested employee must replace the green available row with that employee on the same row and turn it yellow; rejecting/removing the assignment must update it back to green. Deleting a shift may remove it. Hour submission, hour approval, and status-only events must never trigger sheet synchronization.
 
 **Why:** Re-syncing hour lifecycle events caused historical shifts to appear again as billing duplicates, while legitimate admin corrections still need to be reflected in place.
 

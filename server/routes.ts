@@ -918,6 +918,7 @@ export async function registerRoutes(
       ansattId,
     });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+    queueVaktSync(updated.id, before);
 
     res.json(updated);
 
@@ -1042,6 +1043,9 @@ export async function registerRoutes(
 
     const updated = await storage.updateVakt(asString(req.params.id), updateData);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+    if (ansattId && before.ansattId !== updated.ansattId) {
+      queueVaktSync(updated.id, before);
+    }
 
     await storage.deleteVaktInteresser(asString(req.params.id));
 
@@ -1068,6 +1072,7 @@ export async function registerRoutes(
     const before = await storage.getVakt(asString(req.params.id));
     const updated = await storage.updateVakt(asString(req.params.id), { status: "ledig", ansattId: null });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
+    queueVaktSync(updated.id, before);
     res.json(updated);
   });
 
