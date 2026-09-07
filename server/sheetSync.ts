@@ -81,7 +81,7 @@ function buildRowValues(vakt: Vakt, ansatt: User | null, barnehage: Barnehage | 
     formatTid(vakt.startTid),
     formatTid(vakt.sluttTid),
     beregnTimer(vakt),
-    "", // I: Timelønn — føres ikke i arket
+    vakt.provetime ? "Testvakt" : "", // I: merk prøvetime; ellers tom
     "", // J: står tom
     vakt.lonnUtbetalt ? "Ja" : "Nei", // K
     vakt.vikarkode || "", // L: kode
