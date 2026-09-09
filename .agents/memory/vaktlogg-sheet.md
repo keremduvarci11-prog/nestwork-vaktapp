@@ -11,6 +11,14 @@ A shift may create a billing-sheet row only once, when the shift is created. Adm
 
 **How to apply:** New lifecycle endpoints must leave the sheet untouched unless they create a shift, delete its linked row, or explicitly edit billing-relevant row content. Updates must locate the existing row by shift ID and fail closed rather than append when identity is ambiguous.
 
+## Time corrections must sync
+
+Changing a shift's start or end time in the app must update the same Google Sheet row via shift ID. This includes early departure, illness, or other operational changes. The user reported that this currently fails in production, so verify this path explicitly when it is next fixed.
+
+**Why:** The sheet is used for billing, and stale times require manual correction and can produce incorrect invoicing.
+
+**How to apply:** Treat start- and end-time edits as billing-relevant updates. Confirm both the app record and the existing sheet row change without creating a second row.
+
 ## Fail-closed legacy matching
 
 A legacy row can be claimed only when employee identity, date, start time, and end time match uniquely. Client-location labels and shift-code labels may differ between manual history and app-generated rows. Different employees must never be linked, and multiple candidates must stop without mutation.
