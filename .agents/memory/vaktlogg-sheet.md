@@ -27,6 +27,14 @@ A legacy row can be claimed only when employee identity, date, start time, and e
 
 **How to apply:** Use this rule only to adopt one unlinked historical row during creation or to remove one uniquely linked legacy row during deletion.
 
+## Durable delivery before acknowledgement
+
+Every billing-relevant shift mutation must create or update a persistent sync job atomically with the database mutation. Sheet writes must be serialized across production instances, retried with a bounded backoff, and reconciled by shift ID. A missing connector or process restart may delay the row, but must not discard the work.
+
+**Why:** The previous in-memory, fire-and-forget path acknowledged app changes before Google accepted them and permanently lost rows after connector failures or restarts. Deployment code also cannot rely on reading raw connector access tokens even when the workspace connection is valid.
+
+**How to apply:** New write paths must rely on the database-backed outbox rather than direct or in-memory calls. Use the supported connector proxy with deployment identity, isolate development from the production sheet, and keep destructive legacy-row handling retry-safe.
+
 ## Fast operational shift orders
 
 When the user asks to create or send shifts, treat the request as an authoritative order that the shifts are not already entered.

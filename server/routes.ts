@@ -10,7 +10,7 @@ import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema, type Vakt } from "@shared/schema";
 import { getSpreadsheetUrl } from "./googleSheets";
-import { queueVaktSync, removeVaktRowFromSheet } from "./sheetSync";
+import { wakeSheetSyncWorker } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 
@@ -720,7 +720,6 @@ export async function registerRoutes(
   // Opprettelse legger inn én rad. Faktiske admin-endringer av radinnhold
   // oppdaterer den samme raden via vakt-ID. Timeinnsending, timegodkjenning
   // og rene statusendringer skal aldri starte arksynk.
-  const queueNewShiftSheetSync = (vaktId: string) => queueVaktSync(vaktId);
   const sheetRowEditFields = new Set([
     "ansattId",
     "barnehageId",
@@ -751,7 +750,7 @@ export async function registerRoutes(
     }
 
     const created = await storage.createVakt(payload);
-    queueNewShiftSheetSync(created.id);
+    wakeSheetSyncWorker();
 
     try {
       const bh = await storage.getBarnehage(created.barnehageId);
@@ -813,7 +812,7 @@ export async function registerRoutes(
     }
     const updated = await storage.updateVakt(asString(req.params.id), patch);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
-    if (shouldUpdateSheet) queueVaktSync(updated.id, before);
+    if (shouldUpdateSheet) wakeSheetSyncWorker();
     res.json(updated);
 
     (async () => {
@@ -918,7 +917,7 @@ export async function registerRoutes(
       ansattId,
     });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
-    queueVaktSync(updated.id, before);
+    wakeSheetSyncWorker();
 
     res.json(updated);
 
@@ -1044,7 +1043,7 @@ export async function registerRoutes(
     const updated = await storage.updateVakt(asString(req.params.id), updateData);
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     if (ansattId && before.ansattId !== updated.ansattId) {
-      queueVaktSync(updated.id, before);
+      wakeSheetSyncWorker();
     }
 
     await storage.deleteVaktInteresser(asString(req.params.id));
@@ -1072,7 +1071,7 @@ export async function registerRoutes(
     const before = await storage.getVakt(asString(req.params.id));
     const updated = await storage.updateVakt(asString(req.params.id), { status: "ledig", ansattId: null });
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
-    queueVaktSync(updated.id, before);
+    wakeSheetSyncWorker();
     res.json(updated);
   });
 
@@ -1081,8 +1080,8 @@ export async function registerRoutes(
     if (!vakt) return res.status(404).json({ message: "Vakt ikke funnet" });
     const deleted = await storage.deleteVakt(asString(req.params.id));
     if (!deleted) return res.status(404).json({ message: "Vakt ikke funnet" });
+    wakeSheetSyncWorker();
     res.json({ success: true });
-    removeVaktRowFromSheet(asString(req.params.id), vakt);
   });
 
   app.get("/api/meldinger", requireAdmin, async (_req, res) => {

@@ -1,56 +1,96 @@
-import { google } from "googleapis";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 
 const ORIGINAL_SPREADSHEET_ID =
   process.env.VAKT_SHEET_ID || "1fd7xZET8otXv3uVFThpPq96pKsE3EDidNAMfjuVNZFA";
 
-let connectionSettings: any;
+const connectors = new ReplitConnectors();
 
-async function getAccessToken() {
-  if (
-    connectionSettings?.settings?.expires_at &&
-    new Date(connectionSettings.settings.expires_at).getTime() > Date.now()
-  ) {
-    return connectionSettings.settings.access_token;
+async function connectorRequest(
+  path: string,
+  options?: { method?: string; body?: unknown },
+): Promise<any> {
+  const response = await connectors.proxy("google-sheet", path, {
+    method: options?.method,
+    body: options?.body,
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(
+      `Google Sheets connector failed (${response.status}): ${detail.slice(0, 500)}`,
+    );
   }
-
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? `repl ${process.env.REPL_IDENTITY}`
-    : process.env.WEB_REPL_RENEWAL
-      ? `depl ${process.env.WEB_REPL_RENEWAL}`
-      : null;
-
-  if (!xReplitToken) {
-    throw new Error("X-Replit-Token not found for repl/depl");
-  }
-
-  connectionSettings = await fetch(
-    `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=google-sheet`,
-    {
-      headers: {
-        Accept: "application/json",
-        "X-Replit-Token": xReplitToken,
-      },
-    },
-  )
-    .then((res) => res.json())
-    .then((data) => data.items?.[0]);
-
-  const accessToken =
-    connectionSettings?.settings?.access_token ||
-    connectionSettings?.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error("Google Sheet not connected");
-  }
-  return accessToken;
+  return response.json();
 }
 
 export async function getUncachableGoogleSheetClient() {
-  const accessToken = await getAccessToken();
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: accessToken });
-  return google.sheets({ version: "v4", auth: oauth2Client });
+  return {
+    spreadsheets: {
+      get: async ({
+        spreadsheetId,
+        fields,
+        ranges,
+        includeGridData,
+      }: {
+        spreadsheetId: string;
+        fields?: string;
+        ranges?: string | string[];
+        includeGridData?: boolean;
+      }) => {
+        const params = new URLSearchParams();
+        if (fields) params.set("fields", fields);
+        const requestedRanges = Array.isArray(ranges) ? ranges : ranges ? [ranges] : [];
+        for (const range of requestedRanges) params.append("ranges", range);
+        if (includeGridData !== undefined) {
+          params.set("includeGridData", String(includeGridData));
+        }
+        const query = params.toString();
+        const data = await connectorRequest(
+          `/v4/spreadsheets/${spreadsheetId}${query ? `?${query}` : ""}`,
+        );
+        return { data };
+      },
+      values: {
+        get: async ({
+          spreadsheetId,
+          range,
+        }: {
+          spreadsheetId: string;
+          range: string;
+        }) => {
+          const data = await connectorRequest(
+            `/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}`,
+          );
+          return { data };
+        },
+        batchUpdate: async ({
+          spreadsheetId,
+          requestBody,
+        }: {
+          spreadsheetId: string;
+          requestBody: unknown;
+        }) => {
+          const data = await connectorRequest(
+            `/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
+            { method: "POST", body: requestBody },
+          );
+          return { data };
+        },
+      },
+      batchUpdate: async ({
+        spreadsheetId,
+        requestBody,
+      }: {
+        spreadsheetId: string;
+        requestBody: unknown;
+      }) => {
+        const data = await connectorRequest(
+          `/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+          { method: "POST", body: requestBody },
+        );
+        return { data };
+      },
+    },
+  };
 }
 
 export async function getSpreadsheetUrl(): Promise<string> {

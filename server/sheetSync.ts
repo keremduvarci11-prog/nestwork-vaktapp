@@ -6,13 +6,16 @@
 //           P=VaktID (skjult teknisk kolonne som kobler rad til vakt i appen)
 import { getUncachableGoogleSheetClient } from "./googleSheets";
 import { storage } from "./storage";
+import { pool } from "./db";
 import type { Vakt, User, Barnehage } from "@shared/schema";
 import { calculatePaidHours } from "@shared/shiftHours";
 import { findLegacyRowMatch } from "./sheetRowMatching";
 
-// Originalarket «Nestwork timer jobbet» — det ENESTE arket vaktloggen skal bruke
+// Produksjon og utvikling må aldri dele arkmål ved et uhell.
 const SPREADSHEET_ID =
-  process.env.VAKT_SHEET_ID || "1fd7xZET8otXv3uVFThpPq96pKsE3EDidNAMfjuVNZFA";
+  process.env.NODE_ENV === "production"
+    ? process.env.VAKT_SHEET_ID || ""
+    : process.env.DEV_VAKT_SHEET_ID || "";
 const SHEET_NAME = "Sheet1";
 const ID_COL_INDEX = 15; // kolonne P (0-basert)
 const READ_RANGE = `${SHEET_NAME}!A:P`; // hele arket, uansett lengde
@@ -166,58 +169,347 @@ function cellFormatRequests(gridId: number, rowIdx: number, vakt: Vakt): any[] {
   return requests;
 }
 
-// Enkel kø slik at samtidige synk-kall ikke roter til radplassering.
-// Vaktdata hentes FERSKT inne i køen (ikke ved kø-tidspunkt), slik at en
-// treg tidligere endring aldri kan overskrive en nyere — og en slettet
-// vakt aldri gjenoppstår i arket.
-let syncChain: Promise<void> = Promise.resolve();
+type SheetSyncAction = "sync" | "delete";
 
-export function queueVaktSync(vaktId: string, previousVakt?: Vakt): void {
-  syncChain = syncChain
-    .then(async () => {
-      const vakt = await storage.getVakt(vaktId);
-      if (!vakt) return; // slettet i mellomtiden — remove-jobben tar seg av raden
-      const ansatt = vakt.ansattId ? await storage.getUser(vakt.ansattId) : null;
-      const barnehage = await storage.getBarnehage(vakt.barnehageId);
-      const previousAnsatt = previousVakt?.ansattId
-        ? await storage.getUser(previousVakt.ansattId)
-        : null;
-      const previousBarnehage = previousVakt
-        ? await storage.getBarnehage(previousVakt.barnehageId)
-        : null;
-      await doSync(
-        vakt,
-        ansatt ?? null,
-        barnehage ?? null,
-        previousVakt
-          ? {
-              vakt: previousVakt,
-              ansatt: previousAnsatt ?? null,
-              barnehage: previousBarnehage ?? null,
-            }
-          : undefined,
-      );
-    })
-    .catch((err) => console.error("[SheetSync] Feil ved synk:", err?.message || err));
+type SheetSyncJob = {
+  vakt_id: string;
+  action: SheetSyncAction;
+  payload: Vakt | null;
+  generation: string;
+  legacy_resolved: boolean;
+  attempts: number;
+};
+
+const WORKER_INTERVAL_MS = 30_000;
+const RECONCILE_INTERVAL_MS = 10 * 60_000;
+const RECENT_RECONCILE_DAYS = 14;
+const JOB_LEASE_MINUTES = 10;
+const SHEET_WRITER_LOCK_KEY = 1_573_291_370;
+
+let workerPromise: Promise<void> | null = null;
+let reconciliationPromise: Promise<void> | null = null;
+let workerStarted = false;
+
+function sheetSyncRuntimeEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") return true;
+  return (
+    process.env.ENABLE_DEV_SHEET_SYNC === "true" &&
+    Boolean(process.env.DEV_VAKT_SHEET_ID)
+  );
 }
 
-export function removeVaktRowFromSheet(vaktId: string, deletedVakt?: Vakt): void {
-  syncChain = syncChain
-    .then(async () => {
-      const ansatt = deletedVakt?.ansattId
-        ? await storage.getUser(deletedVakt.ansattId)
-        : null;
-      const barnehage = deletedVakt
-        ? await storage.getBarnehage(deletedVakt.barnehageId)
-        : null;
-      await doRemove(
-        vaktId,
-        deletedVakt
-          ? buildRowValues(deletedVakt, ansatt ?? null, barnehage ?? null)
-          : undefined,
-      );
+export function sheetSyncRetryDelayMs(attempts: number): number {
+  return Math.min(5 * 60_000, 1_000 * 2 ** Math.min(Math.max(attempts, 0), 9));
+}
+
+export function sheetSyncOperationForJob(
+  action: SheetSyncAction,
+  shiftExists: boolean,
+): "sync" | "delete" | "none" {
+  if (action === "delete") return "delete";
+  return shiftExists ? "sync" : "none";
+}
+
+export function findMissingRecentVaktIds(
+  allVakter: Vakt[],
+  rows: string[][],
+  now: Date,
+  lookbackDays = RECENT_RECONCILE_DAYS,
+): string[] {
+  const cutoff = now.getTime() - lookbackDays * 24 * 60 * 60_000;
+  const sheetIds = new Set(
+    rows.map((row) => String(row[ID_COL_INDEX] || "").trim()).filter(Boolean),
+  );
+
+  return allVakter
+    .filter((vakt) => {
+      if (!vakt.createdAt) return false;
+      return new Date(vakt.createdAt).getTime() >= cutoff;
     })
-    .catch((err) => console.error("[SheetSync] Feil ved sletting:", err?.message || err));
+    .filter((vakt) => !sheetIds.has(vakt.id))
+    .map((vakt) => vakt.id);
+}
+
+async function persistJob(
+  action: SheetSyncAction,
+  vaktId: string,
+  payload?: Vakt,
+  onlyIfMissing = false,
+): Promise<void> {
+  if (onlyIfMissing) {
+    await pool.query(
+      `INSERT INTO sheet_sync_jobs (vakt_id, action, payload)
+       VALUES ($1, $2, $3::jsonb)
+       ON CONFLICT (vakt_id) DO NOTHING`,
+      [vaktId, action, payload ? JSON.stringify(payload) : null],
+    );
+    return;
+  }
+
+  await pool.query(
+    `INSERT INTO sheet_sync_jobs (vakt_id, action, payload)
+     VALUES ($1, $2, $3::jsonb)
+     ON CONFLICT (vakt_id) DO UPDATE SET
+       action = EXCLUDED.action,
+       payload = CASE
+         WHEN sheet_sync_jobs.action = 'sync' AND EXCLUDED.action = 'sync'
+           THEN COALESCE(sheet_sync_jobs.payload, EXCLUDED.payload)
+         ELSE EXCLUDED.payload
+       END,
+       version = sheet_sync_jobs.version + 1,
+       generation = gen_random_uuid(),
+       legacy_resolved = CASE
+         WHEN sheet_sync_jobs.action = 'delete' AND EXCLUDED.action = 'delete'
+           THEN sheet_sync_jobs.legacy_resolved
+         ELSE false
+       END,
+       attempts = 0,
+       next_attempt_at = GREATEST(sheet_sync_jobs.next_attempt_at, now()),
+       last_error = NULL,
+       updated_at = now()`,
+    [vaktId, action, payload ? JSON.stringify(payload) : null],
+  );
+}
+
+async function claimNextJob(): Promise<SheetSyncJob | null> {
+  const result = await pool.query<SheetSyncJob & { payload: Record<string, unknown> | null }>(
+    `WITH next_job AS (
+       SELECT vakt_id
+       FROM sheet_sync_jobs
+       WHERE next_attempt_at <= now()
+       ORDER BY next_attempt_at, updated_at
+       LIMIT 1
+       FOR UPDATE SKIP LOCKED
+     )
+     UPDATE sheet_sync_jobs AS job
+     SET next_attempt_at = now() + ($1 * interval '1 minute')
+     FROM next_job
+     WHERE job.vakt_id = next_job.vakt_id
+     RETURNING job.vakt_id, job.action, job.payload,
+               job.generation::text, job.legacy_resolved, job.attempts`,
+    [JOB_LEASE_MINUTES],
+  );
+  const job = result.rows[0];
+  if (!job) return null;
+  return { ...job, payload: normalizeVaktPayload(job.payload) };
+}
+
+function normalizeVaktPayload(payload: Record<string, any> | null): Vakt | null {
+  if (!payload) return null;
+  if (payload.barnehageId !== undefined) return payload as Vakt;
+  return {
+    ...payload,
+    barnehageId: payload.barnehage_id,
+    ansattId: payload.ansatt_id,
+    startTid: payload.start_tid,
+    sluttTid: payload.slutt_tid,
+    trekkPause: payload.trekk_pause,
+    timerInnsendt: payload.timer_innsendt,
+    timerInnsendtAt: payload.timer_innsendt_at,
+    timerGodkjent: payload.timer_godkjent,
+    timerGodkjentAt: payload.timer_godkjent_at,
+    barnehageInformert: payload.barnehage_informert,
+    sykIkkeMott: payload.syk_ikke_mott,
+    lonnUtbetalt: payload.lonn_utbetalt,
+    createdAt: payload.created_at,
+  } as Vakt;
+}
+
+async function completeJob(job: SheetSyncJob): Promise<void> {
+  await pool.query(
+    "DELETE FROM sheet_sync_jobs WHERE vakt_id = $1 AND generation = $2::uuid",
+    [job.vakt_id, job.generation],
+  );
+}
+
+async function retryJob(job: SheetSyncJob, error: unknown): Promise<void> {
+  const message = error instanceof Error ? error.message : String(error);
+  const delayMs = sheetSyncRetryDelayMs(job.attempts);
+  await pool.query(
+    `UPDATE sheet_sync_jobs
+     SET attempts = attempts + 1,
+         next_attempt_at = now() + ($3 * interval '1 millisecond'),
+         last_error = $4,
+         updated_at = now()
+     WHERE vakt_id = $1 AND generation = $2::uuid`,
+    [job.vakt_id, job.generation, delayMs, message.slice(0, 2000)],
+  );
+  console.error(
+    `[SheetSync] ${job.action} feilet for ${job.vakt_id}; prøver igjen om ${Math.round(delayMs / 1000)}s: ${message}`,
+  );
+}
+
+async function processJob(job: SheetSyncJob): Promise<void> {
+  if (sheetSyncOperationForJob(job.action, true) === "delete") {
+    const deletedVakt = job.payload ?? undefined;
+    const ansatt = deletedVakt?.ansattId
+      ? await storage.getUser(deletedVakt.ansattId)
+      : null;
+    const barnehage = deletedVakt
+      ? await storage.getBarnehage(deletedVakt.barnehageId)
+      : null;
+    await doRemove(
+      job.vakt_id,
+      deletedVakt
+        ? buildRowValues(deletedVakt, ansatt ?? null, barnehage ?? null)
+        : undefined,
+      job.legacy_resolved,
+      async () => {
+        await pool.query(
+          `UPDATE sheet_sync_jobs
+           SET legacy_resolved = true, updated_at = now()
+           WHERE vakt_id = $1 AND generation = $2::uuid`,
+          [job.vakt_id, job.generation],
+        );
+      },
+    );
+    return;
+  }
+
+  const vakt = await storage.getVakt(job.vakt_id);
+  if (sheetSyncOperationForJob(job.action, Boolean(vakt)) === "none") return;
+  if (!vakt) return;
+  const ansatt = vakt.ansattId ? await storage.getUser(vakt.ansattId) : null;
+  const barnehage = await storage.getBarnehage(vakt.barnehageId);
+  const previousVakt = job.payload ?? undefined;
+  const previousAnsatt = previousVakt?.ansattId
+    ? await storage.getUser(previousVakt.ansattId)
+    : null;
+  const previousBarnehage = previousVakt
+    ? await storage.getBarnehage(previousVakt.barnehageId)
+    : null;
+
+  await doSync(
+    vakt,
+    ansatt ?? null,
+    barnehage ?? null,
+    previousVakt
+      ? {
+          vakt: previousVakt,
+          ansatt: previousAnsatt ?? null,
+          barnehage: previousBarnehage ?? null,
+        }
+      : undefined,
+  );
+}
+
+async function withSheetWriterLock<T>(work: () => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("SELECT pg_advisory_lock($1)", [SHEET_WRITER_LOCK_KEY]);
+    return await work();
+  } finally {
+    try {
+      await client.query("SELECT pg_advisory_unlock($1)", [SHEET_WRITER_LOCK_KEY]);
+    } finally {
+      client.release();
+    }
+  }
+}
+
+async function drainDueJobs(): Promise<void> {
+  while (true) {
+    const processed = await withSheetWriterLock(async () => {
+      const job = await claimNextJob();
+      if (!job) return false;
+      try {
+        await processJob(job);
+        await completeJob(job);
+      } catch (error) {
+        await retryJob(job, error);
+      }
+      return true;
+    });
+    if (!processed) return;
+  }
+}
+
+function kickWorker(): void {
+  if (workerPromise) return;
+  workerPromise = drainDueJobs()
+    .catch((error) => console.error("[SheetSync] Arbeiderfeil:", error))
+    .finally(() => {
+      workerPromise = null;
+    });
+}
+
+export function wakeSheetSyncWorker(): void {
+  if (!sheetSyncRuntimeEnabled()) return;
+  kickWorker();
+}
+
+export async function queueVaktSync(vaktId: string, previousVakt?: Vakt): Promise<void> {
+  await persistJob("sync", vaktId, previousVakt);
+  kickWorker();
+}
+
+export async function removeVaktRowFromSheet(
+  vaktId: string,
+  deletedVakt?: Vakt,
+): Promise<void> {
+  await persistJob("delete", vaktId, deletedVakt);
+  kickWorker();
+}
+
+export async function reconcileRecentVakterToSheet(): Promise<void> {
+  if (reconciliationPromise) return reconciliationPromise;
+  reconciliationPromise = (async () => {
+    const sheets = await getUncachableGoogleSheetClient();
+    const [sheetResult, allVakter] = await Promise.all([
+      sheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: READ_RANGE,
+      }),
+      storage.getVakter(),
+    ]);
+    const rows: string[][] = sheetResult.data.values || [];
+    const missingIds = findMissingRecentVaktIds(allVakter, rows, new Date());
+    for (const vaktId of missingIds) {
+      await persistJob("sync", vaktId, undefined, true);
+    }
+    if (missingIds.length) {
+      console.warn(
+        `[SheetSync] Kontroll fant ${missingIds.length} nylige vakter uten arkrad`,
+      );
+      kickWorker();
+    }
+  })()
+    .catch((error) =>
+      console.error("[SheetSync] Kontroll av nylige vakter feilet:", error),
+    )
+    .finally(() => {
+      reconciliationPromise = null;
+    });
+  return reconciliationPromise;
+}
+
+export function startSheetSyncWorker(): void {
+  if (workerStarted) return;
+  workerStarted = true;
+  if (!sheetSyncRuntimeEnabled()) {
+    console.log(
+      "[SheetSync] Utviklingssynk er deaktivert; sett ENABLE_DEV_SHEET_SYNC=true med eget DEV_VAKT_SHEET_ID for testark",
+    );
+    return;
+  }
+  if (!SPREADSHEET_ID) {
+    throw new Error("[SheetSync] VAKT_SHEET_ID mangler i produksjonsmiljøet");
+  }
+  kickWorker();
+  if (process.env.NODE_ENV === "production") {
+    void reconcileRecentVakterToSheet();
+  }
+  const workerTimer = setInterval(kickWorker, WORKER_INTERVAL_MS);
+  const reconcileTimer =
+    process.env.NODE_ENV === "production"
+      ? setInterval(
+          () => void reconcileRecentVakterToSheet(),
+          RECONCILE_INTERVAL_MS,
+        )
+      : null;
+  workerTimer.unref();
+  reconcileTimer?.unref();
+  console.log("[SheetSync] Varig synkarbeider startet");
 }
 
 async function doSync(
@@ -327,7 +619,12 @@ async function doSync(
   console.log(`[SheetSync] Rad ${rowNum} synket for vakt ${vakt.id} (${values[1]} ${values[4]})`);
 }
 
-async function doRemove(vaktId: string, deletedValues?: (string | number)[]): Promise<void> {
+async function doRemove(
+  vaktId: string,
+  deletedValues?: (string | number)[],
+  legacyResolved = false,
+  markResolved?: () => Promise<void>,
+): Promise<void> {
   const sheets = await getUncachableGoogleSheetClient();
   const gridId = await getSheetGridId(sheets);
   const res = await sheets.spreadsheets.values.get({
@@ -336,6 +633,7 @@ async function doRemove(vaktId: string, deletedValues?: (string | number)[]): Pr
   });
   const rows: string[][] = res.data.values || [];
   let rowIdx = rows.findIndex((r) => r[ID_COL_INDEX] === vaktId);
+  if (rowIdx === -1 && legacyResolved) return;
   if (rowIdx === -1 && deletedValues) {
     const legacyMatch = findLegacyRowMatch(rows, [deletedValues]);
     if (legacyMatch.kind === "ambiguous") {
@@ -344,9 +642,24 @@ async function doRemove(vaktId: string, deletedValues?: (string | number)[]): Pr
         `Tvetydige historiske rader (${rowNumbers}) ved sletting av vakt ${vaktId}; ingen rad ble slettet`,
       );
     }
-    if (legacyMatch.kind === "match") rowIdx = legacyMatch.rowIndex;
+    if (legacyMatch.kind === "match") {
+      rowIdx = legacyMatch.rowIndex;
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        requestBody: {
+          valueInputOption: "RAW",
+          data: [
+            { range: `${SHEET_NAME}!P${rowIdx + 1}`, values: [[vaktId]] },
+          ],
+        },
+      });
+    }
   }
-  if (rowIdx === -1) return;
+  if (rowIdx === -1) {
+    await markResolved?.();
+    return;
+  }
+  await markResolved?.();
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SPREADSHEET_ID,
     requestBody: {

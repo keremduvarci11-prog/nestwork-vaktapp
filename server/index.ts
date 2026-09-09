@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { seedDatabase } from "./seed";
 import { startCronJobs } from "./cronJobs";
 import { syncProductionData } from "./syncProdData";
+import { startSheetSyncWorker } from "./sheetSync";
 import { runMigrations } from "./migrations";
 
 process.on('uncaughtException', (err) => {
@@ -107,6 +108,7 @@ app.use((req, res, next) => {
     await registerRoutes(httpServer, app);
     console.log('[Startup] Step 4: startCronJobs...');
     startCronJobs();
+    startSheetSyncWorker();
   } catch (err: any) {
     console.error('[FATAL STARTUP ERROR]', err.message);
     console.error('[FATAL STARTUP STACK]', err.stack);
