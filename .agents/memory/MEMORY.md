@@ -1,3 +1,4 @@
 - [Codemagic/GitHub sync](codemagic-github-sync.md) — mobile builds clone GitHub main; push from Replit first, and lockfile firewall URLs break npm ci outside Replit.
 - [Vaktlogg Google Sheet](vaktlogg-sheet.md) — original-arkets ID, VAKT_SHEET_ID, og regel om datosortering i ukeblokk.
 - [Automatisk pausefratrekk](automatisk-pausefratrekk.md) — vakter på minst 5,5 timer trekkes alltid 30 minutter; kortere vakter har ingen pause.
+- [Scheduled delivery](scheduled-delivery.md) — exact-time messaging needs an always-on runtime; distinguish drafts, activation, delivery and device push.

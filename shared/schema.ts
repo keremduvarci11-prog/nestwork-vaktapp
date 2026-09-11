@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, date, time, decimal, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, date, time, decimal, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -83,7 +83,10 @@ export const meldinger = pgTable("meldinger", {
   lastSeenByAdmin: timestamp("last_seen_by_admin"),
   lastActivityAt: timestamp("last_activity_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+  scheduledMessageId: varchar("scheduled_message_id"),
+}, (table) => ({
+  scheduledMessageUnique: uniqueIndex("meldinger_scheduled_message_unique").on(table.scheduledMessageId),
+}));
 
 export const samtaleMeldinger = pgTable("samtale_meldinger", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -171,10 +174,35 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+/**
+ * Durable outbox for admin-to-employee messages. `scheduledFor` is stored as
+ * an absolute instant (UTC) while `timezone` preserves the timezone shown to
+ * the admin when the schedule was created.
+ */
+export const scheduledMeldinger = pgTable("scheduled_meldinger", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fromUserId: varchar("from_user_id").notNull(),
+  toUserId: varchar("to_user_id").notNull(),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+  timezone: text("timezone").notNull().default("Europe/Oslo"),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  lastError: text("last_error"),
+  meldingId: varchar("melding_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+}, (table) => ({
+  dueIndex: index("scheduled_meldinger_due_idx").on(table.status, table.nextAttemptAt, table.scheduledFor),
+}));
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertBarnehageSchema = createInsertSchema(barnehager).omit({ id: true });
 export const insertVaktSchema = createInsertSchema(vakter).omit({ id: true, createdAt: true });
-export const insertMeldingSchema = createInsertSchema(meldinger).omit({ id: true, createdAt: true }).extend({
+export const insertMeldingSchema = createInsertSchema(meldinger).omit({ id: true, createdAt: true, scheduledMessageId: true }).extend({
   fromUserId: z.string().optional(),
 });
 export const insertSamtaleMeldingSchema = createInsertSchema(samtaleMeldinger).omit({ id: true, createdAt: true });
@@ -187,6 +215,19 @@ export const insertBlockedDateSchema = createInsertSchema(blockedDates).omit({ c
 export const insertPersonalreglerGodkjenningSchema = createInsertSchema(personalreglerGodkjenning).omit({ id: true, acceptedAt: true });
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
 export const insertLonnsslippSchema = createInsertSchema(lonnsslipper).omit({ id: true, opplastetAt: true });
+export const insertScheduledMeldingSchema = createInsertSchema(scheduledMeldinger).omit({
+  id: true,
+  status: true,
+  attempts: true,
+  nextAttemptAt: true,
+  lastError: true,
+  meldingId: true,
+  createdAt: true,
+  sentAt: true,
+  cancelledAt: true,
+}).extend({
+  timezone: z.literal("Europe/Oslo"),
+});
 
 export type InsertPersonalreglerGodkjenning = z.infer<typeof insertPersonalreglerGodkjenningSchema>;
 export type PersonalreglerGodkjenning = typeof personalreglerGodkjenning.$inferSelect;
@@ -214,3 +255,5 @@ export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertLonnsslipp = z.infer<typeof insertLonnsslippSchema>;
 export type Lonnsslipp = typeof lonnsslipper.$inferSelect;
+export type InsertScheduledMelding = z.infer<typeof insertScheduledMeldingSchema>;
+export type ScheduledMelding = typeof scheduledMeldinger.$inferSelect;

@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
-  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning, lonnsslipper,
+  users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning, lonnsslipper, scheduledMeldinger,
   type User, type InsertUser,
   type Barnehage, type InsertBarnehage,
   type Vakt, type InsertVakt,
@@ -15,6 +15,7 @@ import {
   type PushSubscription, type InsertPushSubscription,
   type PersonalreglerGodkjenning,
   type Lonnsslipp, type InsertLonnsslipp,
+  type ScheduledMelding, type InsertScheduledMelding,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -55,6 +56,10 @@ export interface IStorage {
   markSeenByUser(id: string): Promise<void>;
   markSeenByAdmin(id: string): Promise<void>;
   updateMeldingActivity(id: string, markUnreadForAdmin: boolean): Promise<void>;
+
+  getScheduledMeldinger(): Promise<ScheduledMelding[]>;
+  createScheduledMelding(data: InsertScheduledMelding, requestId: string): Promise<ScheduledMelding>;
+  cancelScheduledMelding(id: string): Promise<ScheduledMelding | undefined>;
 
   getSamtaleMeldinger(meldingId: string): Promise<SamtaleMelding[]>;
   createSamtaleMelding(m: InsertSamtaleMelding): Promise<SamtaleMelding>;
@@ -301,6 +306,39 @@ export class DatabaseStorage implements IStorage {
         ...(markUnreadForAdmin ? { lastSeenByAdmin: null, read: false } : {}),
       })
       .where(eq(meldinger.id, id));
+  }
+
+  async getScheduledMeldinger(): Promise<ScheduledMelding[]> {
+    return db
+      .select()
+      .from(scheduledMeldinger)
+      .orderBy(desc(scheduledMeldinger.scheduledFor), desc(scheduledMeldinger.createdAt));
+  }
+
+  async createScheduledMelding(data: InsertScheduledMelding, requestId: string): Promise<ScheduledMelding> {
+    const [created] = await db.insert(scheduledMeldinger).values({ ...data, id: requestId })
+      .onConflictDoNothing({ target: scheduledMeldinger.id }).returning();
+    if (created) return created;
+    const [existing] = await db.select().from(scheduledMeldinger).where(eq(scheduledMeldinger.id, requestId));
+    if (!existing || existing.fromUserId !== data.fromUserId ||
+        existing.toUserId !== data.toUserId || existing.subject !== data.subject ||
+        existing.message !== data.message ||
+        existing.scheduledFor.getTime() !== new Date(data.scheduledFor).getTime()) {
+      throw new Error("SCHEDULE_REQUEST_CONFLICT");
+    }
+    return existing;
+  }
+
+  async cancelScheduledMelding(id: string): Promise<ScheduledMelding | undefined> {
+    const [cancelled] = await db
+      .update(scheduledMeldinger)
+      .set({ status: "cancelled", cancelledAt: new Date() })
+      .where(and(
+        eq(scheduledMeldinger.id, id),
+        or(eq(scheduledMeldinger.status, "pending"), eq(scheduledMeldinger.status, "error")),
+      ))
+      .returning();
+    return cancelled;
   }
 
   async getSamtaleMeldinger(meldingId: string): Promise<SamtaleMelding[]> {

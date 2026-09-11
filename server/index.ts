@@ -7,6 +7,7 @@ import { startCronJobs } from "./cronJobs";
 import { syncProductionData } from "./syncProdData";
 import { startSheetSyncWorker } from "./sheetSync";
 import { runMigrations } from "./migrations";
+import { startScheduledMessagingWorker } from "./scheduledMessaging";
 
 process.on('uncaughtException', (err) => {
   console.error('[FATAL] Uncaught exception:', err.message);
@@ -108,6 +109,7 @@ app.use((req, res, next) => {
     await registerRoutes(httpServer, app);
     console.log('[Startup] Step 4: startCronJobs...');
     startCronJobs();
+    startScheduledMessagingWorker();
     startSheetSyncWorker();
   } catch (err: any) {
     console.error('[FATAL STARTUP ERROR]', err.message);

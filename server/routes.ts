@@ -13,6 +13,7 @@ import { getSpreadsheetUrl } from "./googleSheets";
 import { wakeSheetSyncWorker } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
+import { SCHEDULED_MESSAGING_TIMEZONE } from "./scheduledMessaging";
 
 const JWT_SECRET = process.env.SESSION_SECRET || "nestwork-secret-key";
 
@@ -1154,6 +1155,83 @@ export async function registerRoutes(
     }
 
     res.json(created);
+  });
+
+  // ===== Planlagte admin-meldinger =====
+  // The queue stores an absolute instant, but the UI and API always make the
+  // displayed timezone explicit so DST conversions cannot be implicit.
+  app.get("/api/admin/scheduled-meldinger", requireAdmin, async (_req, res) => {
+    const scheduled = await storage.getScheduledMeldinger();
+    res.json(scheduled);
+  });
+
+  app.post("/api/admin/scheduled-meldinger", requireAdmin, async (req, res) => {
+    const { toUserId, subject, message, scheduledFor, timezone, requestId } = req.body || {};
+    if (typeof requestId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+      return res.status(400).json({ message: "Ugyldig forespørsels-ID" });
+    }
+    if (
+      typeof toUserId !== "string" ||
+      typeof subject !== "string" ||
+      typeof message !== "string" ||
+      typeof scheduledFor !== "string" ||
+      timezone !== SCHEDULED_MESSAGING_TIMEZONE
+    ) {
+      return res.status(400).json({
+        message: `Mottaker, emne, melding, tidspunkt og tidssone ${SCHEDULED_MESSAGING_TIMEZONE} er påkrevd`,
+      });
+    }
+
+    const due = new Date(scheduledFor);
+    if (
+      Number.isNaN(due.getTime()) ||
+      !/(?:[zZ]|[+-]\d{2}:\d{2})$/.test(scheduledFor)
+    ) {
+      return res.status(400).json({ message: "Tidspunkt må være gyldig ISO-tid med tidssone" });
+    }
+    if (due.getTime() <= Date.now()) {
+      return res.status(400).json({ message: "Tidspunktet må være i fremtiden" });
+    }
+    const cleanSubject = subject.trim();
+    const cleanMessage = message.trim();
+    if (!cleanSubject || !cleanMessage) {
+      return res.status(400).json({ message: "Emne og melding kan ikke være tomt" });
+    }
+    if (cleanSubject.length > 200 || cleanMessage.length > 20_000) {
+      return res.status(400).json({ message: "Emne eller melding er for lang" });
+    }
+
+    const recipient = await storage.getUser(toUserId);
+    if (!recipient || recipient.role !== "ansatt" || recipient.status === "Deaktivert") {
+      return res.status(400).json({ message: "Ugyldig eller deaktivert ansatt" });
+    }
+
+    try {
+    const created = await storage.createScheduledMelding({
+      fromUserId: getUserIdFromRequest(req)!,
+      toUserId,
+      subject: cleanSubject,
+      message: cleanMessage,
+      scheduledFor: due,
+      timezone: SCHEDULED_MESSAGING_TIMEZONE,
+    }, requestId);
+    res.status(201).json(created);
+    } catch (error) {
+      if (error instanceof Error && error.message === "SCHEDULE_REQUEST_CONFLICT") {
+        return res.status(409).json({ message: "Denne forespørselen er allerede brukt til en annen melding" });
+      }
+      throw error;
+    }
+  });
+
+  app.delete("/api/admin/scheduled-meldinger/:id", requireAdmin, async (req, res) => {
+    const id = asString(req.params.id);
+    const cancelled = await storage.cancelScheduledMelding(id);
+    if (cancelled) return res.json(cancelled);
+
+    const existing = (await storage.getScheduledMeldinger()).find((item) => item.id === id);
+    if (!existing) return res.status(404).json({ message: "Planlagt melding ikke funnet" });
+    return res.status(409).json({ message: "Meldingen er allerede levert eller kansellert" });
   });
 
   app.patch("/api/meldinger/:id/read", requireAdmin, async (req, res) => {

@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Mail, MailOpen, AlertCircle, Send, Lock, ArrowLeft, User, Trash2, RotateCcw, Plus, Search, ChevronDown } from "lucide-react";
 import type { Melding, User as UserType, SamtaleMelding } from "@shared/schema";
+import { ScheduledMessageComposer } from "@/components/admin/scheduled-message-composer";
 
 function isAdminMessage(fromUserId: string, adminIds: Set<string>) {
   return fromUserId === "admin" || adminIds.has(fromUserId);
@@ -429,6 +430,8 @@ export default function AdminMeldinger() {
           Ny melding
         </Button>
       </div>
+
+      <ScheduledMessageComposer users={users || []} />
 
       {isLoading ? (
         <div className="space-y-3">

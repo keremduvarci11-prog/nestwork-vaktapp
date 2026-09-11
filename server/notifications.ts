@@ -84,15 +84,12 @@ async function sendApns(deviceToken: string, title: string, body: string, link?:
   }
 }
 
-export async function sendNotification(userId: string, title: string, message: string, type: string = "info", link?: string) {
-  await storage.createVarsel({ userId, title, message, type, read: false, link: link || null });
-
+export async function sendPushNotificationOnly(userId: string, title: string, message: string, link?: string) {
   try {
     const subs = await storage.getPushSubscriptions(userId);
-    console.log(`[Push] Sending to user ${userId}: ${subs.length} subscription(s) found. Title: "${title}"`);
+    console.log(`[Push] Sending push to user ${userId}: ${subs.length} subscription(s) found. Title: "${title}"`);
 
     if (subs.length === 0) {
-      console.log(`[Push] No push subscriptions for user ${userId} - notification saved as varsel only`);
       return;
     }
 
@@ -134,8 +131,16 @@ export async function sendNotification(userId: string, title: string, message: s
       }
     }
   } catch (err) {
-    console.error("[Push] Error in sendNotification:", err);
+    console.error("[Push] Error in sendPushNotificationOnly:", err);
   }
+}
+
+export async function sendNotification(userId: string, title: string, message: string, type: string = "info", link?: string) {
+  // The in-app notification is persisted before push, while callers that only
+  // need a push (for example scheduled messages after due delivery) can use
+  // sendPushNotificationOnly without creating a visible varsel.
+  await storage.createVarsel({ userId, title, message, type, read: false, link: link || null });
+  await sendPushNotificationOnly(userId, title, message, link);
 }
 
 const TEST_USERNAMES = (process.env.TEST_USERNAMES || "amandafrederich")
