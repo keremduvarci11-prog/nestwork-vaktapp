@@ -8,6 +8,7 @@ import {
   mergeExistingRowValues,
   shouldFailClosedMissingSheetRow,
   coalescePendingSyncPayload,
+  buildSheetSyncCellRequests,
 } from "./sheetSync";
 
 function makeVakt(id: string, createdAt: Date): Vakt {
@@ -102,4 +103,22 @@ test("paid-hours corrections preserve manual payment and invoice columns", () =>
     ["37", "Synne", "Løvstakken", "Kommentar", "11.09.2026",
       "08:00", "16:00", 7.5, "Testvakt", "manuell faktura", "Ja", "KTV"],
   );
+});
+
+test("unchanged manual formula columns are absent from atomic cell writes", () => {
+  const current = makeVakt("formula-safe", new Date("2026-09-10T11:00:00Z"));
+  const requests = buildSheetSyncCellRequests(
+    7,
+    12,
+    ["37", "Synne", "Løvstakken", "Kommentar", "11.09.2026", "08:00", "16:00", 7.5, "Testvakt", "rendered formula", "Ja", "KTV"],
+    true,
+    current,
+    current,
+    current.id,
+  );
+  assert.deepEqual(
+    requests.map((request) => request.updateCells.range.startColumnIndex),
+    [0, 15],
+  );
+  assert.equal(requests[1].updateCells.rows[0].values[0].userEnteredValue.stringValue, current.id);
 });

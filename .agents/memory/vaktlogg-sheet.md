@@ -3,13 +3,21 @@ name: Vaktlogg write policy
 description: Durable rules for when shifts may write to the billing sheet and how legacy rows are identified
 ---
 
-## Create once, then update in place
+## Create once, then update the same linked row
 
 A shift may create a billing-sheet row only once, when the shift is created. Admin changes to billing-relevant shift data, such as employee assignment, client, date, times, description, payment flag, or shift code, may update that same linked row. Approving an interested employee must replace the green available row with that employee on the same row and turn it yellow; rejecting/removing the assignment must update it back to green. Deleting a shift may remove it. Hour submission, hour approval, and status-only events must never trigger sheet synchronization.
 
 **Why:** Re-syncing hour lifecycle events caused historical shifts to appear again as billing duplicates, while legitimate admin corrections still need to be reflected in place.
 
 **How to apply:** New lifecycle endpoints must leave the sheet untouched unless they create a shift, delete its linked row, or explicitly edit billing-relevant row content. Updates must locate the existing row by shift ID and fail closed rather than append when identity is ambiguous.
+
+## Row identity does not mean a fixed row number
+
+Keep the same shift ID and full row contents, but reposition that row when its date group changes. Scope ordering to its ISO week and year; never globally sort historical/manual rows. Preserve manual formulas by leaving their cells out of value writes.
+
+**Why:** Updating a linked row at its old address can leave an earlier date among later dates. Copying displayed values destroys formulas. Separate movement and value writes can leave retries addressing the wrong row or creating duplicates after a lost response.
+
+**How to apply:** Plan movement against the current snapshot, and submit structural changes, app-owned values and ID together atomically. Google Sheets move destinations use pre-removal coordinates, while the subsequent value writes use final coordinates; downward moves require particular care. Re-read IDs on every retry.
 
 ## Time corrections must sync
 

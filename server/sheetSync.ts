@@ -10,6 +10,10 @@ import { pool } from "./db";
 import type { Vakt, User, Barnehage } from "@shared/schema";
 import { calculatePaidHours } from "@shared/shiftHours";
 import { findLegacyRowMatch } from "./sheetRowMatching";
+import {
+  planSheetPlacement,
+  sheetPlacementRequest,
+} from "./sheetOrder";
 
 // Produksjon og utvikling må aldri dele arkmål ved et uhell.
 const SPREADSHEET_ID =
@@ -95,16 +99,33 @@ function buildRowValues(vakt: Vakt, ansatt: User | null, barnehage: Barnehage | 
   ];
 }
 
-async function getSheetGridId(sheets: any): Promise<number> {
+async function getSheetGridInfo(
+  sheets: any,
+): Promise<{ sheetId: number; rowCount?: number }> {
   const meta = await sheets.spreadsheets.get({
     spreadsheetId: SPREADSHEET_ID,
     fields: "sheets.properties",
   });
   const sheet = meta.data.sheets?.find((s: any) => s.properties?.title === SHEET_NAME);
-  return sheet?.properties?.sheetId ?? 0;
+  if (!sheet || !Number.isInteger(sheet.properties?.sheetId)) {
+    throw new Error(`[SheetSync] Fant ikke arket ${SHEET_NAME}; ingen rader ble endret`);
+  }
+  return {
+    sheetId: sheet.properties.sheetId,
+    rowCount: sheet?.properties?.gridProperties?.rowCount,
+  };
 }
 
-function cellFormatRequests(gridId: number, rowIdx: number, vakt: Vakt): any[] {
+async function getSheetGridId(sheets: any): Promise<number> {
+  return (await getSheetGridInfo(sheets)).sheetId;
+}
+
+function cellFormatRequests(
+  gridId: number,
+  rowIdx: number,
+  vakt: Vakt,
+  preserveManualFormatting = false,
+): any[] {
   const style = rowStyle(vakt);
   const requests: any[] = [
     // A–H: radfarge etter status (Uke t.o.m. Timer)
@@ -120,19 +141,21 @@ function cellFormatRequests(gridId: number, rowIdx: number, vakt: Vakt): any[] {
         fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.foregroundColor",
       },
     },
-    // I–J og M–P: nøytral formatering (hvit bakgrunn, svart tekst)
-    ...[[8, 10], [12, 16]].map(([start, end]) => ({
-      repeatCell: {
-        range: { sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: start, endColumnIndex: end },
-        cell: {
-          userEnteredFormat: {
-            backgroundColor: COLORS.white,
-            textFormat: { foregroundColor: COLORS.black },
+    ...(preserveManualFormatting
+      ? []
+      : // I–J og M–P: nøytral formatering (hvit bakgrunn, svart tekst)
+        [[8, 10], [12, 16]].map(([start, end]) => ({
+          repeatCell: {
+            range: { sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: start, endColumnIndex: end },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: COLORS.white,
+                textFormat: { foregroundColor: COLORS.black },
+              },
+            },
+            fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.foregroundColor",
           },
-        },
-        fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.foregroundColor",
-      },
-    })),
+        }))),
     // K (Har vi betalt?): rød med hvit tekst når "Nei"
     {
       repeatCell: {
@@ -165,11 +188,89 @@ function cellFormatRequests(gridId: number, rowIdx: number, vakt: Vakt): any[] {
   const borderRange = (start: number, end: number) => ({
     sheetId: gridId, startRowIndex: rowIdx, endRowIndex: rowIdx + 1, startColumnIndex: start, endColumnIndex: end,
   });
-  requests.push(
-    { updateBorders: { range: borderRange(0, 8), top: solid, bottom: solid, left: solid, right: solid, innerVertical: solid } },
-    { updateBorders: { range: borderRange(8, 10), top: none, bottom: none, innerVertical: none } },
-    { updateBorders: { range: borderRange(10, 12), top: solid, bottom: solid, left: solid, right: solid, innerVertical: solid } },
-  );
+  requests.push({
+    updateBorders: {
+      range: borderRange(0, 8),
+      top: solid,
+      bottom: solid,
+      left: solid,
+      right: solid,
+      innerVertical: solid,
+    },
+  });
+  if (!preserveManualFormatting) {
+    requests.push({
+      updateBorders: { range: borderRange(8, 10), top: none, bottom: none, innerVertical: none },
+    });
+  }
+  requests.push({
+    updateBorders: {
+      range: borderRange(10, 12),
+      top: solid,
+      bottom: solid,
+      left: solid,
+      right: solid,
+      innerVertical: solid,
+    },
+  });
+  return requests;
+}
+
+function enteredValue(value: string | number): Record<string, string | number> {
+  return typeof value === "number" ? { numberValue: value } : { stringValue: value };
+}
+
+function cellValueRequest(
+  gridId: number,
+  rowIdx: number,
+  startColumnIndex: number,
+  values: readonly (string | number)[],
+): any {
+  return {
+    updateCells: {
+      range: {
+        sheetId: gridId,
+        startRowIndex: rowIdx,
+        endRowIndex: rowIdx + 1,
+        startColumnIndex,
+        endColumnIndex: startColumnIndex + values.length,
+      },
+      rows: [{ values: values.map((value) => ({ userEnteredValue: enteredValue(value) })) }],
+      fields: "userEnteredValue",
+    },
+  };
+}
+
+/**
+ * Produces only the cell writes needed for a sync.  Kept separate from the
+ * Sheets client so request construction can be tested with a mock and so
+ * unchanged manual/formula columns are visibly absent from the request.
+ */
+export function buildSheetSyncCellRequests(
+  gridId: number,
+  rowIdx: number,
+  valuesToWrite: readonly (string | number)[],
+  existingRow: boolean,
+  current: Pick<Vakt, "provetime" | "lonnUtbetalt" | "vikarkode">,
+  previous: Pick<Vakt, "provetime" | "lonnUtbetalt" | "vikarkode"> | undefined,
+  vaktId: string,
+): any[] {
+  const requests: any[] = [];
+  if (existingRow) {
+    requests.push(cellValueRequest(gridId, rowIdx, 0, valuesToWrite.slice(0, 8)));
+    if (!previous || previous.provetime !== current.provetime) {
+      requests.push(cellValueRequest(gridId, rowIdx, 8, [valuesToWrite[8]]));
+    }
+    if (!previous || previous.lonnUtbetalt !== current.lonnUtbetalt) {
+      requests.push(cellValueRequest(gridId, rowIdx, 10, [valuesToWrite[10]]));
+    }
+    if (!previous || previous.vikarkode !== current.vikarkode) {
+      requests.push(cellValueRequest(gridId, rowIdx, 11, [valuesToWrite[11]]));
+    }
+  } else {
+    requests.push(cellValueRequest(gridId, rowIdx, 0, valuesToWrite));
+  }
+  requests.push(cellValueRequest(gridId, rowIdx, ID_COL_INDEX, [vaktId]));
   return requests;
 }
 
@@ -551,7 +652,8 @@ async function doSync(
   previous?: { vakt: Vakt; ansatt: User | null; barnehage: Barnehage | null },
 ): Promise<void> {
   const sheets = await getUncachableGoogleSheetClient();
-  const gridId = await getSheetGridId(sheets);
+  const gridInfo = await getSheetGridInfo(sheets);
+  const gridId = gridInfo.sheetId;
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
@@ -560,10 +662,12 @@ async function doSync(
   const rows: string[][] = res.data.values || [];
 
   const values = buildRowValues(vakt, ansatt, barnehage);
-  const uke = isoWeek(vakt.dato);
 
-  // Finn eksisterende rad for denne vakten (kolonne P)
-  let rowIdx = rows.findIndex((r) => r[ID_COL_INDEX] === vakt.id);
+  // Finn eksisterende rad for denne vakten (kolonne P). Trimming makes a
+  // retry safe even when Sheets has returned a technically formatted ID.
+  let rowIdx = rows.findIndex(
+    (r) => String(r[ID_COL_INDEX] ?? "").trim() === vakt.id,
+  );
   let existingRow = rowIdx !== -1;
 
   if (rowIdx === -1) {
@@ -588,80 +692,60 @@ async function doSync(
     }
   }
 
-  if (rowIdx === -1) {
-    // An update with a previous snapshot is expected to target an existing
-    // row. Never append a duplicate when that row disappeared in the sheet.
-    if (shouldFailClosedMissingSheetRow(rowIdx, Boolean(previous))) {
-      throw new Error(
-        `Mangler eksisterende arkrad for vakt ${vakt.id}; ingen ny rad ble opprettet`,
-      );
-    }
-    // Ny rad. Plasser den sortert på dato INNE i riktig ukeblokk:
-    // rett etter siste eksisterende rad med samme eller tidligere dato,
-    // slik at alle vakter på samme dag ligger samlet.
-    let lastNonEmpty = 0;
-    rows.forEach((r, i) => {
-      if (r.some((c) => String(c).trim() !== "")) lastNonEmpty = i;
-    });
-    let firstWeekRow = -1;
-    let lastWeekRow = -1;
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() === String(uke)) {
-        if (firstWeekRow === -1) firstWeekRow = i;
-        lastWeekRow = i;
-      }
-    }
-
-    if (lastWeekRow !== -1) {
-      // Finn riktig plass i ukeblokken: etter siste rad med dato <= vaktens dato
-      const newDateKey = vakt.dato; // yyyy-mm-dd sorterer riktig
-      rowIdx = firstWeekRow; // default: øverst i blokken
-      for (let i = firstWeekRow; i <= lastWeekRow; i++) {
-        const dateCell = String(rows[i]?.[4] || "").trim(); // dd.mm.yyyy
-        const parts = dateCell.split(".");
-        const key = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : "";
-        if (key && key <= newDateKey) rowIdx = i + 1;
-      }
-      // Sett alltid inn en ny rad slik at rader under skyves ned
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
-        requestBody: {
-          requests: [{
-            insertDimension: {
-              range: { sheetId: gridId, dimension: "ROWS", startIndex: rowIdx, endIndex: rowIdx + 1 },
-              inheritFromBefore: rowIdx > firstWeekRow,
-            },
-          }],
-        },
-      });
-    } else {
-      // Ny uke → nederst, med én blank rad mellom ukene
-      rowIdx = lastNonEmpty + 2;
-    }
+  // An update with a previous snapshot is expected to target an existing row.
+  // Never append a duplicate when that row disappeared in the sheet.
+  if (rowIdx === -1 && shouldFailClosedMissingSheetRow(rowIdx, Boolean(previous))) {
+    throw new Error(
+      `Mangler eksisterende arkrad for vakt ${vakt.id}; ingen ny rad ble opprettet`,
+    );
   }
 
-  const rowNum = rowIdx + 1;
-  const existingValues = existingRow ? rows[rowIdx] : undefined;
+  const placement = planSheetPlacement(rows, vakt.dato, rowIdx, {
+    gridRowCount: gridInfo.rowCount,
+  });
+  if (placement.kind === "error") {
+    throw new Error(
+      `Kunne ikke plassere vakt ${vakt.id} i vaktloggen: ${placement.reason}`,
+    );
+  }
+  const sourceRowIdx = rowIdx;
+  rowIdx = placement.finalRowIndex;
+  const existingValues = existingRow ? rows[sourceRowIdx] : undefined;
   const valuesToWrite = existingValues
     ? mergeExistingRowValues(existingValues, values, vakt, previous?.vakt)
     : values;
-  // Skriv verdier og ID-kolonnen i samme kall (atomisk nok til at raden
-  // aldri blir stående uten ID-merke)
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId: SPREADSHEET_ID,
-    requestBody: {
-      valueInputOption: "RAW",
-      data: [
-        { range: `${SHEET_NAME}!A${rowNum}:L${rowNum}`, values: [valuesToWrite] },
-        { range: `${SHEET_NAME}!P${rowNum}`, values: [[vakt.id]] },
-      ],
-    },
-  });
+
+  // Structural movement, values, ID, and formatting are deliberately sent as
+  // one Sheets batch. If the response is lost, the next attempt sees the ID
+  // in its new row and performs an idempotent update rather than inserting a
+  // duplicate. Existing manual columns are addressed selectively so formulas
+  // are never rewritten as rendered values.
+  const requests: any[] = [];
+  const structuralRequest = sheetPlacementRequest(placement, gridId);
+  if (Array.isArray(structuralRequest)) {
+    requests.push(...structuralRequest);
+  } else if (structuralRequest) {
+    requests.push(structuralRequest);
+  }
+  requests.push(
+    ...buildSheetSyncCellRequests(
+      gridId,
+      rowIdx,
+      valuesToWrite,
+      existingRow,
+      vakt,
+      previous?.vakt,
+      vakt.id,
+    ),
+  );
+  requests.push(...cellFormatRequests(gridId, rowIdx, vakt, existingRow));
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SPREADSHEET_ID,
-    requestBody: { requests: cellFormatRequests(gridId, rowIdx, vakt) },
+    requestBody: { requests },
   });
-  console.log(`[SheetSync] Rad ${rowNum} synket for vakt ${vakt.id} (${values[1]} ${values[4]})`);
+  console.log(
+    `[SheetSync] Rad ${rowIdx + 1} synket for vakt ${vakt.id} (${values[1]} ${values[4]})`,
+  );
 }
 
 /**
