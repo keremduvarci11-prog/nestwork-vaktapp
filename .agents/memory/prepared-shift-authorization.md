@@ -3,11 +3,11 @@ name: Prepared shift authorization
 description: Operational boundary between preparing a shift batch and performing live assignments
 ---
 
-Prepare requested shift batches for the user's authenticated admin confirmation. Do not use stored admin credentials, direct production SQL, scripts, or an API bypass to perform live assignments.
+Respect any explicit in-app confirmation boundary on a prepared shift batch. A later explicit user instruction to perform registration through the ordinary administrator login supersedes that boundary for the authorized operation; do not require another manual form.
 
-**Why:** Preparing code is not evidence that an employee received a shift or that a billing row exists. The approved workflow reserves live creation for explicit in-app review and confirmation by the user.
+**Why:** The user explicitly authorized delegated administrator registration after an earlier plan reserved creation for manual confirmation. Authenticated app administration is not direct production SQL or an authentication bypass. Preparing code still does not prove assignment, notification delivery, or a billing row.
 
-**How to apply:** Report code readiness, publication, confirmed app assignments, notification delivery, and verified sheet rows separately. If publication or confirmation remains pending, say so and defer live read-back until it occurs. A test with isolated data or intercepted browser responses never proves live delivery.
+**How to apply:** Follow the latest authorized date and details, check targeted duplicates/conflicts, then use the app's normal protected endpoints. Keep credentials runtime-only; never bypass authentication or production SQL restrictions. Report confirmed assignments, in-app notifications, device delivery, and verified sheet rows separately. Do not generalize authorization for one operation to unrelated batches. A test with isolated data never proves live delivery.
 
 Completed preparation cards should disappear based on server-confirmed completion, not a browser-local dismissal flag.
 
