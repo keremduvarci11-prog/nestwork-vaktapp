@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, X, UserCheck, Coffee, Clock } from "lucide-react";
 import type { Barnehage, User } from "@shared/schema";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
+import { Week39Plan } from "@/components/admin/week39-plan";
 
 export default function NyVakt() {
   const { toast } = useToast();
@@ -112,6 +113,9 @@ export default function NyVakt() {
         <h1 className="text-xl font-bold">Legg ut ny vakt</h1>
         <p className="text-sm text-muted-foreground mt-1">Opprett en ny vakt for ansatte</p>
       </div>
+
+      <Week39Plan />
+      <Week39Plan employee="sultan" />
 
       <Card>
         <CardContent className="p-4">

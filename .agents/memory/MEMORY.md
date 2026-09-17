@@ -2,3 +2,4 @@
 - [Vaktlogg Google Sheet](vaktlogg-sheet.md) — original-arkets ID, VAKT_SHEET_ID, og regel om datosortering i ukeblokk.
 - [Automatisk pausefratrekk](automatisk-pausefratrekk.md) — standardtrekk fra 5,5 timer; eksplisitte avtaler på enkeltvakter går foran uten å endre klokkeslett.
 - [Scheduled delivery](scheduled-delivery.md) — exact-time messaging needs an always-on runtime; distinguish drafts, activation, delivery and device push.
+- [Prepared shift authorization](prepared-shift-authorization.md) — live batches require user admin confirmation; distinguish code readiness, assignments, notifications and verified sheet rows.

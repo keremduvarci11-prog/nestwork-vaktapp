@@ -20,6 +20,7 @@ import { wakeSheetSyncWorker } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 import { SCHEDULED_MESSAGING_TIMEZONE } from "./scheduledMessaging";
+import { registerWeek39Routes } from "./week39";
 
 const JWT_SECRET = process.env.SESSION_SECRET || "nestwork-secret-key";
 
@@ -1851,6 +1852,9 @@ export async function registerRoutes(
       acceptedAt: row.acceptedAt?.toISOString() || null,
     });
   });
+
+  // Fixed, read-only preview + explicitly confirmed week 39 plan.
+  registerWeek39Routes(app, requireAdmin);
 
   return httpServer;
 }
