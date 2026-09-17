@@ -121,7 +121,7 @@ export default function LonnTimer() {
 
   const totals = useMemo(() => {
     const totalHours = monthVakter.reduce(
-      (sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid),
+      (sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid, v),
       0,
     );
     const grossPay = totalHours * timelonn;
@@ -307,7 +307,7 @@ export default function LonnTimer() {
         doc.addPage();
         y = margin;
       }
-      const hours = calculatePaidHours(v.startTid, v.sluttTid);
+      const hours = calculatePaidHours(v.startTid, v.sluttTid, v);
       const amount = hours * timelonn;
       const d = new Date(v.dato + "T00:00:00");
       const dateStr = d.toLocaleDateString("nb-NO", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -315,16 +315,42 @@ export default function LonnTimer() {
       const bhTrim = bhName.length > 24 ? bhName.slice(0, 22) + ".." : bhName;
       doc.text(dateStr, margin, y);
       doc.text(bhTrim, margin + 70, y);
-      doc.text(`${v.startTid?.slice(0, 5)}-${v.sluttTid?.slice(0, 5)}${shouldDeductPause(v.startTid, v.sluttTid) ? "*" : ""}`, margin + 220, y);
+      const timeMarker = v.avtalteBetalteTimer !== null && v.avtalteBetalteTimer !== undefined
+        ? "‡"
+        : v.betaltPause
+          ? "†"
+          : shouldDeductPause(v.startTid, v.sluttTid, v)
+            ? "*"
+            : "";
+      doc.text(`${v.startTid?.slice(0, 5)}-${v.sluttTid?.slice(0, 5)}${timeMarker}`, margin + 220, y);
       doc.text(hours.toFixed(2), margin + 300, y);
       doc.text(`${formatNok(amount)} kr`, margin + 360, y);
       y += 14;
     });
-    if (monthVakter.some((v) => shouldDeductPause(v.startTid, v.sluttTid))) {
+    if (monthVakter.some((v) => shouldDeductPause(v.startTid, v.sluttTid, v))) {
       y += 4;
       doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
       doc.text("* 30 min ubetalt pause trukket", margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+    }
+    if (monthVakter.some((v) =>
+      v.betaltPause &&
+      (v.avtalteBetalteTimer === null || v.avtalteBetalteTimer === undefined)
+    )) {
+      y += 12;
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.text("† Betalt pause – ingen pausetrekk", margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+    }
+    if (monthVakter.some((v) => v.avtalteBetalteTimer !== null && v.avtalteBetalteTimer !== undefined)) {
+      y += 12;
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.text("‡ Avtalte betalte timer", margin, y);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
     }
@@ -485,7 +511,7 @@ export default function LonnTimer() {
               <h2 className="text-sm font-semibold mb-3">Vakter denne måneden</h2>
               <div className="space-y-2">
                 {monthVakter.map((v) => {
-                  const hours = calculatePaidHours(v.startTid, v.sluttTid);
+                  const hours = calculatePaidHours(v.startTid, v.sluttTid, v);
                   const date = new Date(v.dato + "T00:00:00");
                   const submittable = canSubmit(v);
                   const isPending = submitTimer.isPending && submitTimer.variables === v.id;
@@ -511,7 +537,13 @@ export default function LonnTimer() {
                               )}
                               <p className="text-xs text-muted-foreground">
                                 {v.startTid?.slice(0, 5)} - {v.sluttTid?.slice(0, 5)}
-                                {shouldDeductPause(v.startTid, v.sluttTid) ? " (30m pause)" : ""}
+                                {v.avtalteBetalteTimer !== null && v.avtalteBetalteTimer !== undefined
+                                  ? " (avtalte betalte timer)"
+                                  : shouldDeductPause(v.startTid, v.sluttTid, v)
+                                    ? " (30m ubetalt pause)"
+                                    : v.betaltPause
+                                      ? " (betalt pause)"
+                                      : ""}
                               </p>
                             </div>
                           </div>

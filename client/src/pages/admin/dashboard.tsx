@@ -80,7 +80,10 @@ export default function AdminDashboard() {
   const tildelteVakter = useMemo(() => vakter?.filter((v) => isVaktActive(v) && v.status === "tildelt") || [], [vakter, tick]);
   const weekVakter = vakter?.filter((v) => v.dato >= weekStart && v.dato <= weekEnd && v.status === "godkjent") || [];
 
-  const weekHours = weekVakter.reduce((sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid), 0);
+  const weekHours = weekVakter.reduce(
+    (sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid, v),
+    0,
+  );
 
   const bhMap = new Map(barnehager?.map((b) => [b.id, b]) || []);
   const userMap = new Map(users?.map((u) => [u.id, u]) || []);

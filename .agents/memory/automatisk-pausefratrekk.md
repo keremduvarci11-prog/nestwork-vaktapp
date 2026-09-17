@@ -3,8 +3,8 @@ name: Automatisk pausefratrekk
 description: Fast lønnsregel for når ubetalt pause skal trekkes fra arbeidstiden.
 ---
 
-Vakter med varighet på minst 5,5 timer skal automatisk trekkes 30 minutter ubetalt pause. Vakter under 5,5 timer skal ikke ha pausefratrekk. Regelen gjelder uavhengig av manuelle valg ved registrering.
+Standardregelen er at vakter med varighet på minst 5,5 timer trekkes 30 minutter ubetalt pause. Vakter under 5,5 timer har ikke pausefratrekk. Et uttrykkelig, administratorregistrert unntak på den enkelte vakten for betalt pause eller avtalte betalte timer går foran standardregelen.
 
-**Why:** Brukeren betaler lønn ekskludert pause og ønsker at en vakt 08:00–15:30 alltid føres som 7,0 betalte timer, både i appen og Google-arket.
+**Why:** Brukeren ønsker automatisk ubetalt pause som standard, men har senere uttrykkelig autorisert avgrensede avtaler om betalt pause og betalte timer på eksisterende vakter. Avtalte betalte timer er ikke nødvendigvis lik faktisk varighet.
 
-**How to apply:** Bruk regelen ved all opprettelse, redigering, timerapportering, lønnsberegning, eksport og synk av vakter. Utled pause fra start- og sluttid i stedet for å stole på en avkrysningsverdi.
+**How to apply:** Bruk samme effektive regel ved redigering, timerapportering, lønnsberegning, eksport og synk. Bevar faktiske klokkeslett og eksplisitte unntak ved annen redigering. Ikke utvid et konkret unntak til andre ansatte, barnehager eller fremtidige vakter.

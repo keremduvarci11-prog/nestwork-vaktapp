@@ -64,7 +64,7 @@ Shift management application for Nestwork - a staffing agency for kindergartens 
 - CV and politiattest document upload (auth-protected)
 - Google Sheets integration: ONE persistent spreadsheet with tabs per barnehage, sorted in ascending date order. Columns: Dato, Ansatt, Ansatt-ID, Vikarkode, Start, Slutt, Timer, Pause, Region, Status, Godkjent tidspunkt, Sorteringsdato. Spreadsheet ID persisted to .spreadsheet-id file.
 - Inntjening shows NOK currency (not dollar sign)
-- 30-minute pause toggle on shifts (trekkPause) deducts from paid hours everywhere
+- Paid hours use the shared shift-hours rule: automatically deduct 30 minutes from shifts lasting at least 5.5 hours unless an administrator records a per-shift paid-break or agreed-paid-hours exception. Exceptions preserve actual start/end times and are used in payroll, exports, labels, and sheet sync. New exception columns must be applied through the development schema flow and Publish before running the updated production code.
 - Admin can search/select employee directly when creating new shift (auto-assigns as tildelt)
 - Push notifications (Web Push API with VAPID keys + service worker)
 - In-app notification system (varsler table) with bell icon in header showing unread count

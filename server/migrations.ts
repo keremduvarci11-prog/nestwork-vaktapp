@@ -117,7 +117,9 @@ export async function runMigrations() {
             OLD.lonn_utbetalt IS DISTINCT FROM NEW.lonn_utbetalt OR
             OLD.vikarkode IS DISTINCT FROM NEW.vikarkode OR
             OLD.syk_ikke_mott IS DISTINCT FROM NEW.syk_ikke_mott OR
-            OLD.provetime IS DISTINCT FROM NEW.provetime;
+            OLD.provetime IS DISTINCT FROM NEW.provetime OR
+            OLD.betalt_pause IS DISTINCT FROM NEW.betalt_pause OR
+            OLD.avtalte_betalte_timer IS DISTINCT FROM NEW.avtalte_betalte_timer;
           IF NOT relevant_change THEN
             RETURN NEW;
           END IF;
@@ -133,7 +135,10 @@ export async function runMigrations() {
             WHEN EXCLUDED.action = 'delete'
               THEN COALESCE(sheet_sync_jobs.payload, EXCLUDED.payload)
             WHEN sheet_sync_jobs.action = 'sync'
-              THEN COALESCE(sheet_sync_jobs.payload, EXCLUDED.payload)
+              THEN CASE
+                WHEN sheet_sync_jobs.payload IS NULL THEN NULL
+                ELSE sheet_sync_jobs.payload
+              END
             ELSE EXCLUDED.payload
           END,
           version = sheet_sync_jobs.version + 1,

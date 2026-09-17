@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Check, X, Calendar, Clock, Building2, User, AlertCircle, Users, Send, CheckCircle2 } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType, VaktInteresse } from "@shared/schema";
+import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 
 export default function GodkjennVakter() {
   const { toast } = useToast();
@@ -153,7 +154,18 @@ export default function GodkjennVakter() {
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}</span>
+                        <span>
+                          {vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}
+                          {" · "}
+                          {calculatePaidHours(vakt.startTid, vakt.sluttTid, vakt).toFixed(1)} betalte timer
+                          {vakt.avtalteBetalteTimer !== null && vakt.avtalteBetalteTimer !== undefined
+                            ? " · avtalte betalte timer"
+                            : shouldDeductPause(vakt.startTid, vakt.sluttTid, vakt)
+                              ? " · 30m ubetalt pause"
+                              : vakt.betaltPause
+                                ? " · betalt pause"
+                                : ""}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Building2 className="w-3.5 h-3.5" />

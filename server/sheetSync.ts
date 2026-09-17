@@ -52,7 +52,11 @@ function formatTid(t: string | null): string {
 }
 
 function beregnTimer(vakt: Vakt): number {
-  const timer = calculatePaidHours(vakt.startTid || "", vakt.sluttTid || "");
+  const timer = calculatePaidHours(
+    vakt.startTid || "",
+    vakt.sluttTid || "",
+    vakt,
+  );
   return Math.round(timer * 100) / 100;
 }
 
@@ -210,6 +214,28 @@ export function sheetSyncOperationForJob(
   return shiftExists ? "sync" : "none";
 }
 
+export function shouldFailClosedMissingSheetRow(
+  rowIndex: number,
+  hasPreviousSnapshot: boolean,
+): boolean {
+  return rowIndex === -1 && hasPreviousSnapshot;
+}
+
+/**
+ * An INSERT outbox job intentionally has a NULL payload: it means the shift
+ * did not have an older row snapshot and may append its first sheet row. If an
+ * UPDATE arrives before that job is processed, keep that NULL intent instead
+ * of replacing it with the UPDATE's OLD snapshot. Once a job has a snapshot,
+ * the oldest snapshot remains the one needed for legacy-row matching and
+ * fail-closed updates.
+ */
+export function coalescePendingSyncPayload<T>(
+  existingPayload: T | null,
+  incomingPayload: T | null,
+): T | null {
+  return existingPayload === null ? null : existingPayload ?? incomingPayload;
+}
+
 export function findMissingRecentVaktIds(
   allVakter: Vakt[],
   rows: string[][],
@@ -253,7 +279,10 @@ async function persistJob(
        action = EXCLUDED.action,
        payload = CASE
          WHEN sheet_sync_jobs.action = 'sync' AND EXCLUDED.action = 'sync'
-           THEN COALESCE(sheet_sync_jobs.payload, EXCLUDED.payload)
+            THEN CASE
+              WHEN sheet_sync_jobs.payload IS NULL THEN NULL
+              ELSE sheet_sync_jobs.payload
+            END
          ELSE EXCLUDED.payload
        END,
        version = sheet_sync_jobs.version + 1,
@@ -296,22 +325,25 @@ async function claimNextJob(): Promise<SheetSyncJob | null> {
 
 function normalizeVaktPayload(payload: Record<string, any> | null): Vakt | null {
   if (!payload) return null;
-  if (payload.barnehageId !== undefined) return payload as Vakt;
   return {
     ...payload,
-    barnehageId: payload.barnehage_id,
-    ansattId: payload.ansatt_id,
-    startTid: payload.start_tid,
-    sluttTid: payload.slutt_tid,
-    trekkPause: payload.trekk_pause,
-    timerInnsendt: payload.timer_innsendt,
-    timerInnsendtAt: payload.timer_innsendt_at,
-    timerGodkjent: payload.timer_godkjent,
-    timerGodkjentAt: payload.timer_godkjent_at,
-    barnehageInformert: payload.barnehage_informert,
-    sykIkkeMott: payload.syk_ikke_mott,
-    lonnUtbetalt: payload.lonn_utbetalt,
-    createdAt: payload.created_at,
+    barnehageId: payload.barnehageId ?? payload.barnehage_id,
+    ansattId: payload.ansattId ?? payload.ansatt_id,
+    startTid: payload.startTid ?? payload.start_tid,
+    sluttTid: payload.sluttTid ?? payload.slutt_tid,
+    trekkPause: payload.trekkPause ?? payload.trekk_pause,
+    betaltPause: payload.betaltPause ?? payload.betalt_pause ?? false,
+    avtalteBetalteTimer: payload.avtalteBetalteTimer ?? payload.avtalte_betalte_timer ?? null,
+    timerInnsendt: payload.timerInnsendt ?? payload.timer_innsendt,
+    timerInnsendtAt: payload.timerInnsendtAt ?? payload.timer_innsendt_at,
+    timerGodkjent: payload.timerGodkjent ?? payload.timer_godkjent,
+    timerGodkjentAt: payload.timerGodkjentAt ?? payload.timer_godkjent_at,
+    barnehageInformert: payload.barnehageInformert ?? payload.barnehage_informert,
+    sykIkkeMott: payload.sykIkkeMott ?? payload.syk_ikke_mott,
+    lonnUtbetalt: payload.lonnUtbetalt ?? payload.lonn_utbetalt,
+    provetime: payload.provetime,
+    fakturert: payload.fakturert,
+    createdAt: payload.createdAt ?? payload.created_at,
   } as Vakt;
 }
 
@@ -532,6 +564,7 @@ async function doSync(
 
   // Finn eksisterende rad for denne vakten (kolonne P)
   let rowIdx = rows.findIndex((r) => r[ID_COL_INDEX] === vakt.id);
+  let existingRow = rowIdx !== -1;
 
   if (rowIdx === -1) {
     const legacyMatch = findLegacyRowMatch(
@@ -548,6 +581,7 @@ async function doSync(
     }
     if (legacyMatch.kind === "match") {
       rowIdx = legacyMatch.rowIndex;
+      existingRow = true;
       console.log(
         `[SheetSync] Overtar historisk rad ${rowIdx + 1} for vakt ${vakt.id}`,
       );
@@ -555,6 +589,13 @@ async function doSync(
   }
 
   if (rowIdx === -1) {
+    // An update with a previous snapshot is expected to target an existing
+    // row. Never append a duplicate when that row disappeared in the sheet.
+    if (shouldFailClosedMissingSheetRow(rowIdx, Boolean(previous))) {
+      throw new Error(
+        `Mangler eksisterende arkrad for vakt ${vakt.id}; ingen ny rad ble opprettet`,
+      );
+    }
     // Ny rad. Plasser den sortert på dato INNE i riktig ukeblokk:
     // rett etter siste eksisterende rad med samme eller tidligere dato,
     // slik at alle vakter på samme dag ligger samlet.
@@ -600,6 +641,10 @@ async function doSync(
   }
 
   const rowNum = rowIdx + 1;
+  const existingValues = existingRow ? rows[rowIdx] : undefined;
+  const valuesToWrite = existingValues
+    ? mergeExistingRowValues(existingValues, values, vakt, previous?.vakt)
+    : values;
   // Skriv verdier og ID-kolonnen i samme kall (atomisk nok til at raden
   // aldri blir stående uten ID-merke)
   await sheets.spreadsheets.values.batchUpdate({
@@ -607,7 +652,7 @@ async function doSync(
     requestBody: {
       valueInputOption: "RAW",
       data: [
-        { range: `${SHEET_NAME}!A${rowNum}:L${rowNum}`, values: [values] },
+        { range: `${SHEET_NAME}!A${rowNum}:L${rowNum}`, values: [valuesToWrite] },
         { range: `${SHEET_NAME}!P${rowNum}`, values: [[vakt.id]] },
       ],
     },
@@ -617,6 +662,33 @@ async function doSync(
     requestBody: { requests: cellFormatRequests(gridId, rowIdx, vakt) },
   });
   console.log(`[SheetSync] Rad ${rowNum} synket for vakt ${vakt.id} (${values[1]} ${values[4]})`);
+}
+
+/**
+ * Keep manually maintained payment/invoice columns intact when a correction
+ * only changes paid-hours inputs. Columns I/J/K/L are selectively updated
+ * when their corresponding app field changed; J is always sheet-owned.
+ */
+export function mergeExistingRowValues(
+  existing: readonly unknown[],
+  desired: readonly (string | number)[],
+  current: Vakt,
+  previous?: Vakt,
+): (string | number)[] {
+  const merged: (string | number)[] = Array.from({ length: 12 }, (_, index) => {
+    const value = existing[index];
+    return value === null || value === undefined ? "" : String(value);
+  });
+  for (let index = 0; index < 8; index++) {
+    merged[index] = desired[index] ?? "";
+  }
+
+  const changed = <K extends keyof Vakt>(field: K): boolean =>
+    !previous || previous[field] !== current[field];
+  if (changed("provetime")) merged[8] = desired[8] ?? "";
+  if (changed("lonnUtbetalt")) merged[10] = desired[10] ?? "";
+  if (changed("vikarkode")) merged[11] = desired[11] ?? "";
+  return merged;
 }
 
 async function doRemove(

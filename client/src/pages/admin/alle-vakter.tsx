@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus, Coffee, CheckCircle2 } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
-import { shouldDeductPause } from "@shared/shiftHours";
+import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   ledig: { label: "Ledig", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
@@ -44,7 +44,16 @@ function EditVaktForm({
   const [beskrivelse, setBeskrivelse] = useState(vakt.beskrivelse || "");
   const [status, setStatus] = useState(vakt.status);
   const [ansattId, setAnsattId] = useState(vakt.ansattId || "");
-  const automaticPause = shouldDeductPause(startTid, sluttTid);
+  const [betaltPause, setBetaltPause] = useState(vakt.betaltPause ?? false);
+  const [avtalteBetalteTimer, setAvtalteBetalteTimer] = useState(
+    vakt.avtalteBetalteTimer?.toString() ?? "",
+  );
+  const paidHoursOptions = {
+    betaltPause,
+    avtalteBetalteTimer: avtalteBetalteTimer || null,
+  };
+  const automaticPause = shouldDeductPause(startTid, sluttTid, paidHoursOptions);
+  const paidHours = calculatePaidHours(startTid, sluttTid, paidHoursOptions);
   const [barnehageInformert, setBarnehageInformert] = useState(vakt.barnehageInformert || false);
   const [provetime, setProvetime] = useState(vakt.provetime || false);
   const [sykIkkeMott, setSykIkkeMott] = useState(vakt.sykIkkeMott || false);
@@ -70,6 +79,8 @@ function EditVaktForm({
         sykIkkeMott,
         fakturert,
         lonnUtbetalt,
+        betaltPause,
+        avtalteBetalteTimer: avtalteBetalteTimer || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
@@ -173,11 +184,49 @@ function EditVaktForm({
           <div className="flex items-center gap-2">
             <Coffee className="w-4 h-4 text-muted-foreground" />
             <div>
-              <p className="text-xs font-medium">Pause beregnes automatisk</p>
+              <p className="text-xs font-medium">Betalt pause og timeregistrering</p>
               <p className="text-[10px] text-muted-foreground">
-                {automaticPause ? "30 min pause trekkes" : "Ingen pause under 5,5 timer"}
+                {avtalteBetalteTimer
+                  ? `Avtalte betalte timer: ${paidHours.toFixed(2)}`
+                  : betaltPause
+                    ? "Betalt pause – ingen pausetrekk"
+                    : automaticPause
+                      ? "30 min ubetalt pause trekkes automatisk"
+                      : "Ingen automatisk pause under 5,5 timer"}
               </p>
             </div>
+          </div>
+        </div>
+
+        <div className="space-y-2 p-2.5 rounded-md bg-muted/50 border">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium">Pausen er betalt</p>
+              <p className="text-[10px] text-muted-foreground">
+                Slår av automatisk trekk for denne vakten
+              </p>
+            </div>
+            <Switch
+              checked={betaltPause}
+              onCheckedChange={setBetaltPause}
+              data-testid="edit-switch-betalt-pause"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Avtalte betalte timer (valgfritt)</label>
+            <Input
+              type="number"
+              min="0"
+              max="24"
+              step="0.01"
+              value={avtalteBetalteTimer}
+              onChange={(e) => setAvtalteBetalteTimer(e.target.value)}
+              placeholder="F.eks. 7,5"
+              data-testid="edit-input-avtalte-betalte-timer"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Brukes som total betalt tid og overstyrer automatisk pause.
+            </p>
           </div>
         </div>
 
@@ -489,9 +538,20 @@ export default function AlleVakter() {
                       <Calendar className="w-3.5 h-3.5" />
                       <span>{formatDate(vakt.dato)}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}</span>
+                       <span>
+                         {vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}
+                         {" · "}
+                          {calculatePaidHours(vakt.startTid, vakt.sluttTid, vakt).toFixed(1)} betalte timer
+                          {vakt.avtalteBetalteTimer !== null && vakt.avtalteBetalteTimer !== undefined
+                            ? " · avtalte betalte timer"
+                            : shouldDeductPause(vakt.startTid, vakt.sluttTid, vakt)
+                              ? " · 30m ubetalt pause"
+                              : vakt.betaltPause
+                                ? " · betalt pause"
+                                : ""}
+                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Building2 className="w-3.5 h-3.5" />

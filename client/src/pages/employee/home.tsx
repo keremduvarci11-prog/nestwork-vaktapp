@@ -145,7 +145,16 @@ export default function EmployeeHome() {
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{shouldDeductPause(vakt.startTid, vakt.sluttTid) ? " (30m pause)" : ""}</span>
+                      <span>
+                        {vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}
+                        {vakt.avtalteBetalteTimer !== null && vakt.avtalteBetalteTimer !== undefined
+                          ? " (avtalte betalte timer)"
+                          : shouldDeductPause(vakt.startTid, vakt.sluttTid, vakt)
+                            ? " (30m ubetalt pause)"
+                            : vakt.betaltPause
+                              ? " (betalt pause)"
+                              : ""}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
                       <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
@@ -216,7 +225,16 @@ export default function EmployeeHome() {
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}{shouldDeductPause(vakt.startTid, vakt.sluttTid) ? " (30m pause)" : ""}</span>
+                      <span>
+                        {vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}
+                        {vakt.avtalteBetalteTimer !== null && vakt.avtalteBetalteTimer !== undefined
+                          ? " (avtalte betalte timer)"
+                          : shouldDeductPause(vakt.startTid, vakt.sluttTid, vakt)
+                            ? " (30m ubetalt pause)"
+                            : vakt.betaltPause
+                              ? " (betalt pause)"
+                              : ""}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
                       <Building2 className="w-3.5 h-3.5 flex-shrink-0" />

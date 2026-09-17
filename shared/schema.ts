@@ -56,6 +56,8 @@ export const vakter = pgTable("vakter", {
   region: text("region").notNull(),
   beskrivelse: text("beskrivelse"),
   trekkPause: boolean("trekk_pause").default(false),
+  betaltPause: boolean("betalt_pause").notNull().default(false),
+  avtalteBetalteTimer: decimal("avtalte_betalte_timer", { precision: 6, scale: 2 }),
   timerInnsendt: boolean("timer_innsendt").default(false),
   timerInnsendtAt: timestamp("timer_innsendt_at"),
   timerGodkjent: boolean("timer_godkjent").default(false),
@@ -202,6 +204,38 @@ export const scheduledMeldinger = pgTable("scheduled_meldinger", {
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertBarnehageSchema = createInsertSchema(barnehager).omit({ id: true });
 export const insertVaktSchema = createInsertSchema(vakter).omit({ id: true, createdAt: true });
+
+/**
+ * Paid-break overrides are deliberately kept separate from the general shift
+ * update payload.  They are only accepted by the admin-protected shift route;
+ * employees can read the resulting values but cannot change them.
+ *
+ * Empty strings are treated as clearing the nullable agreed-hours override so
+ * the admin form can reset it without inventing a value.
+ */
+export const vaktPaidHoursPatchSchema = z.object({
+  betaltPause: z.boolean().optional(),
+  avtalteBetalteTimer: z.preprocess(
+    (value) => {
+      if (value === "" || value === undefined) return value === "" ? null : undefined;
+      if (typeof value === "string" && value.trim() !== "") {
+        const normalized = value.trim().replace(",", ".");
+        if (/^\d+(?:\.\d+)?$/.test(normalized)) return Number(normalized);
+      }
+      if (typeof value === "string" && value.trim() === "") return null;
+      return value;
+    },
+    z.number()
+      .finite()
+      .min(0)
+      .max(24)
+      .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-9, {
+        message: "Avtalte betalte timer kan ha maks to desimaler",
+      })
+      .nullable()
+      .optional(),
+  ),
+});
 export const insertMeldingSchema = createInsertSchema(meldinger).omit({ id: true, createdAt: true, scheduledMessageId: true }).extend({
   fromUserId: z.string().optional(),
 });

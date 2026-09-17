@@ -5,6 +5,9 @@ import {
   findMissingRecentVaktIds,
   sheetSyncOperationForJob,
   sheetSyncRetryDelayMs,
+  mergeExistingRowValues,
+  shouldFailClosedMissingSheetRow,
+  coalescePendingSyncPayload,
 } from "./sheetSync";
 
 function makeVakt(id: string, createdAt: Date): Vakt {
@@ -19,6 +22,8 @@ function makeVakt(id: string, createdAt: Date): Vakt {
     region: "Bergen",
     beskrivelse: null,
     vikarkode: "KTV",
+    betaltPause: false,
+    avtalteBetalteTimer: null,
     barnehageInformert: false,
     provetime: false,
     sykIkkeMott: false,
@@ -59,4 +64,42 @@ test("a stale sync job never deletes after its shift is gone", () => {
   assert.equal(sheetSyncOperationForJob("sync", false), "none");
   assert.equal(sheetSyncOperationForJob("sync", true), "sync");
   assert.equal(sheetSyncOperationForJob("delete", false), "delete");
+});
+
+test("an update with a missing sheet row fails closed instead of appending", () => {
+  assert.equal(shouldFailClosedMissingSheetRow(-1, true), true);
+  assert.equal(shouldFailClosedMissingSheetRow(-1, false), false);
+  assert.equal(shouldFailClosedMissingSheetRow(4, true), false);
+});
+
+test("an insert followed by an update keeps the pending create intent", () => {
+  const oldSnapshot = { id: "shift", avtalteBetalteTimer: null };
+  assert.equal(coalescePendingSyncPayload(null, oldSnapshot), null);
+  assert.deepEqual(
+    coalescePendingSyncPayload({ id: "shift", dato: "2026-09-11" }, oldSnapshot),
+    { id: "shift", dato: "2026-09-11" },
+  );
+});
+
+test("paid-hours corrections preserve manual payment and invoice columns", () => {
+  const previous = makeVakt("corrected", new Date("2026-09-10T11:00:00Z"));
+  const current = {
+    ...previous,
+    betaltPause: true,
+    avtalteBetalteTimer: "7.50",
+  };
+  const existing = [
+    "37", "Synne", "Løvstakken", "Kommentar", "11.09.2026",
+    "08:00", "16:00", "7", "Testvakt", "manuell faktura", "Ja", "KTV",
+  ];
+  const desired = [
+    "37", "Synne", "Løvstakken", "Kommentar", "11.09.2026",
+    "08:00", "16:00", 7.5, "", "", "Nei", "KTV",
+  ];
+
+  assert.deepEqual(
+    mergeExistingRowValues(existing, desired, current, previous),
+    ["37", "Synne", "Løvstakken", "Kommentar", "11.09.2026",
+      "08:00", "16:00", 7.5, "Testvakt", "manuell faktura", "Ja", "KTV"],
+  );
 });

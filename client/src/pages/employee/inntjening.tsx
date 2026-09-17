@@ -24,7 +24,10 @@ export default function Inntjening() {
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear && v.status === "godkjent" && v.dato <= todayStr;
   })?.sort((a, b) => a.dato.localeCompare(b.dato)) || [];
 
-  const totalHours = monthVakter.reduce((sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid), 0);
+  const totalHours = monthVakter.reduce(
+    (sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid, v),
+    0,
+  );
   const totalEarnings = totalHours * timelonn;
 
   const todayFormatted = today.toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
@@ -90,7 +93,7 @@ export default function Inntjening() {
               <h2 className="text-sm font-semibold mb-3">Fullforte vakter denne maneden</h2>
               <div className="space-y-2">
                 {monthVakter.map((v) => {
-                  const hours = calculatePaidHours(v.startTid, v.sluttTid);
+                  const hours = calculatePaidHours(v.startTid, v.sluttTid, v);
                   const date = new Date(v.dato + "T00:00:00");
                   return (
                     <div key={v.id} className="flex items-center justify-between py-2 border-b last:border-0" data-testid={`row-vakt-${v.id}`}>
@@ -100,7 +103,13 @@ export default function Inntjening() {
                           <p className="text-sm font-medium">{date.toLocaleDateString("nb-NO", { day: "numeric", month: "short" })}</p>
                           <p className="text-xs text-muted-foreground">
                             {v.startTid?.slice(0, 5)} - {v.sluttTid?.slice(0, 5)}
-                            {shouldDeductPause(v.startTid, v.sluttTid) ? " (30m pause)" : ""}
+                            {v.avtalteBetalteTimer !== null && v.avtalteBetalteTimer !== undefined
+                              ? " (avtalte betalte timer)"
+                              : shouldDeductPause(v.startTid, v.sluttTid, v)
+                                ? " (30m ubetalt pause)"
+                                : v.betaltPause
+                                  ? " (betalt pause)"
+                                  : ""}
                           </p>
                         </div>
                       </div>

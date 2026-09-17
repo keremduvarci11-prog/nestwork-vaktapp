@@ -94,7 +94,7 @@ export default function Profil() {
       if (!v.dato || v.status !== "godkjent") return;
       const d = new Date(v.dato + "T00:00:00");
       if (d.getFullYear() !== y || d.getMonth() !== m) return;
-      totalHours += calculatePaidHours(v.startTid || "", v.sluttTid || "");
+      totalHours += calculatePaidHours(v.startTid || "", v.sluttTid || "", v);
       count += 1;
     });
     const brutto = totalHours * timelonn;

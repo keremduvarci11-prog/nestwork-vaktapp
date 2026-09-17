@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, X, UserCheck, Coffee, Clock } from "lucide-react";
@@ -22,6 +23,8 @@ export default function NyVakt() {
   const [ansattId, setAnsattId] = useState("");
   const [ansattSearch, setAnsattSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [betaltPause, setBetaltPause] = useState(false);
+  const [avtalteBetalteTimer, setAvtalteBetalteTimer] = useState("");
 
   const { data: barnehager } = useQuery<Barnehage[]>({
     queryKey: ["/api/barnehager"],
@@ -51,9 +54,15 @@ export default function NyVakt() {
   const selectedBh = barnehager?.find((b) => b.id === barnehageId);
 
   const calcHours = () => {
-    return calculatePaidHours(startTid, sluttTid);
+    return calculatePaidHours(startTid, sluttTid, {
+      betaltPause,
+      avtalteBetalteTimer: avtalteBetalteTimer || null,
+    });
   };
-  const automaticPause = shouldDeductPause(startTid, sluttTid);
+  const automaticPause = shouldDeductPause(startTid, sluttTid, {
+    betaltPause,
+    avtalteBetalteTimer: avtalteBetalteTimer || null,
+  });
 
   const createVakt = useMutation({
     mutationFn: () =>
@@ -67,6 +76,8 @@ export default function NyVakt() {
         ansattId: ansattId || null,
         region: selectedBh?.region || "",
         beskrivelse,
+        betaltPause,
+        avtalteBetalteTimer: avtalteBetalteTimer || null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
@@ -81,6 +92,8 @@ export default function NyVakt() {
       setAnsattId("");
       setAnsattSearch("");
       setShowSearch(false);
+      setBetaltPause(false);
+      setAvtalteBetalteTimer("");
     },
     onError: () => {
       toast({ title: "Feil", description: "Kunne ikke opprette vakt", variant: "destructive" });
@@ -151,16 +164,44 @@ export default function NyVakt() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
+            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 border">
               <div className="flex items-center gap-2">
                 <Coffee className="w-4 h-4 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Pause beregnes automatisk</p>
+                  <p className="text-sm font-medium">Betalt pause på denne vakten</p>
                   <p className="text-xs text-muted-foreground">
-                    {automaticPause ? "30 min ubetalt pause trekkes" : "Ingen pause for vakter under 5,5 timer"}
+                    {avtalteBetalteTimer
+                      ? `Avtalte betalte timer: ${calcHours().toFixed(2)}`
+                      : betaltPause
+                        ? "Ingen pausetrekk"
+                        : automaticPause
+                          ? "30 min ubetalt pause trekkes automatisk"
+                          : "Ingen pause for vakter under 5,5 timer"}
                   </p>
                 </div>
               </div>
+              <Switch
+                checked={betaltPause}
+                onCheckedChange={setBetaltPause}
+                data-testid="switch-betalt-pause"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Avtalte betalte timer (valgfritt)</label>
+              <Input
+                type="number"
+                min="0"
+                max="24"
+                step="0.01"
+                value={avtalteBetalteTimer}
+                onChange={(e) => setAvtalteBetalteTimer(e.target.value)}
+                placeholder="F.eks. 7,5"
+                data-testid="input-avtalte-betalte-timer"
+              />
+              <p className="text-xs text-muted-foreground">
+                Overstyrer automatisk pausetrekk for denne vakten.
+              </p>
             </div>
 
             {startTid && sluttTid && (

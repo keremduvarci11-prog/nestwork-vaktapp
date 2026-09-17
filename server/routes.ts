@@ -8,7 +8,13 @@ import fs from "fs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { storage } from "./storage";
-import { insertVaktSchema, insertMeldingSchema, insertBarnehageSchema, type Vakt } from "@shared/schema";
+import {
+  insertVaktSchema,
+  insertMeldingSchema,
+  insertBarnehageSchema,
+  vaktPaidHoursPatchSchema,
+  type Vakt,
+} from "@shared/schema";
 import { getSpreadsheetUrl } from "./googleSheets";
 import { wakeSheetSyncWorker } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
@@ -732,15 +738,31 @@ export async function registerRoutes(
     "vikarkode",
     "sykIkkeMott",
     "provetime",
+    "betaltPause",
+    "avtalteBetalteTimer",
   ]);
 
   app.post("/api/vakter", requireAdmin, async (req, res) => {
     const parsed = insertVaktSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    const paidHours = vaktPaidHoursPatchSchema.safeParse(parsed.data);
+    if (!paidHours.success) {
+      return res.status(400).json({ message: paidHours.error.message });
+    }
 
     let payload = {
       ...parsed.data,
-      trekkPause: shouldDeductPause(parsed.data.startTid, parsed.data.sluttTid),
+      betaltPause: paidHours.data.betaltPause ?? false,
+      avtalteBetalteTimer:
+        paidHours.data.avtalteBetalteTimer === null ||
+        paidHours.data.avtalteBetalteTimer === undefined
+          ? null
+          : paidHours.data.avtalteBetalteTimer.toFixed(2),
+      trekkPause: shouldDeductPause(
+        parsed.data.startTid,
+        parsed.data.sluttTid,
+        paidHours.data,
+      ),
     };
     const autoGodkjenn =
       payload.status === "tildelt" &&
@@ -794,17 +816,44 @@ export async function registerRoutes(
 
   app.patch("/api/vakter/:id", requireAdmin, async (req, res) => {
     const before = await storage.getVakt(asString(req.params.id));
+    const paidHoursPatch = vaktPaidHoursPatchSchema.safeParse(req.body ?? {});
+    if (!paidHoursPatch.success) {
+      return res.status(400).json({ message: paidHoursPatch.error.message });
+    }
     const shouldUpdateSheet = Object.keys(req.body ?? {}).some((key) =>
       sheetRowEditFields.has(key),
     );
-    const patch = { ...req.body };
+    const patch: Record<string, any> = { ...req.body };
+    if (Object.prototype.hasOwnProperty.call(paidHoursPatch.data, "betaltPause")) {
+      patch.betaltPause = paidHoursPatch.data.betaltPause;
+    }
+    if (Object.prototype.hasOwnProperty.call(paidHoursPatch.data, "avtalteBetalteTimer")) {
+      const agreedHours = paidHoursPatch.data.avtalteBetalteTimer;
+      patch.avtalteBetalteTimer = agreedHours === null || agreedHours === undefined
+        ? null
+        : agreedHours.toFixed(2);
+    }
     const effectiveStartTid = patch.startTid ?? before?.startTid ?? "";
     const effectiveSluttTid = patch.sluttTid ?? before?.sluttTid ?? "";
-    patch.trekkPause = shouldDeductPause(effectiveStartTid, effectiveSluttTid);
+    const effectiveBetaltPause = patch.betaltPause ?? before?.betaltPause ?? false;
+    const effectiveAvtalteBetalteTimer =
+      patch.avtalteBetalteTimer !== undefined
+        ? patch.avtalteBetalteTimer
+        : before?.avtalteBetalteTimer;
+    patch.trekkPause = shouldDeductPause(effectiveStartTid, effectiveSluttTid, {
+      betaltPause: effectiveBetaltPause,
+      avtalteBetalteTimer: effectiveAvtalteBetalteTimer,
+    });
     const effectiveDato = patch.dato ?? before?.dato;
     const effectiveAnsattId = patch.ansattId ?? before?.ansattId;
     const effectiveStatus = patch.status ?? before?.status;
+    const statusOrAssignmentWasEdited =
+      (Object.prototype.hasOwnProperty.call(req.body ?? {}, "status") &&
+        req.body.status !== before?.status) ||
+      (Object.prototype.hasOwnProperty.call(req.body ?? {}, "ansattId") &&
+        req.body.ansattId !== (before?.ansattId ?? null));
     if (
+      statusOrAssignmentWasEdited &&
       effectiveStatus === "tildelt" &&
       effectiveAnsattId &&
       isPastDateOslo(effectiveDato)
@@ -1447,7 +1496,7 @@ export async function registerRoutes(
       if (v.status !== "godkjent") continue;
       const d = new Date(v.dato + "T00:00:00");
       if (d.getFullYear() !== currentYear || d.getMonth() !== currentMonth) continue;
-      const h = calculatePaidHours(v.startTid || "", v.sluttTid || "");
+      const h = calculatePaidHours(v.startTid || "", v.sluttTid || "", v);
       const cur = monthAggByUser.get(v.ansattId) || { hours: 0, count: 0 };
       cur.hours += h;
       cur.count += 1;
