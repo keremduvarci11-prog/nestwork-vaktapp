@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { CreateEmployeeDialog } from "@/components/create-employee-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -986,6 +987,7 @@ export default function AnsattesOnboarding() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: employees, isLoading } = useQuery<EmployeeOnboarding[]>({
     queryKey: ["/api/admin/onboarding-overview"],
@@ -1017,8 +1019,10 @@ export default function AnsattesOnboarding() {
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-xl font-bold" data-testid="heading-ansatte">Ansatte</h1>
+        <h1 className="text-xl font-bold flex-1" data-testid="heading-ansatte">Ansatte</h1>
+        <Button onClick={() => setCreateOpen(true)} data-testid="button-create-employee">Ny ansatt</Button>
       </div>
+      {createOpen && <CreateEmployeeDialog onClose={() => setCreateOpen(false)} onSelectEmployee={openDetail} />}
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

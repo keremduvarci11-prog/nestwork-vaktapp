@@ -21,6 +21,11 @@ import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 import { SCHEDULED_MESSAGING_TIMEZONE } from "./scheduledMessaging";
 import { registerWeek39Routes } from "./week39";
+import {
+  createEmployeeUser,
+  parseCreateUserRequest,
+  UserCreationError,
+} from "./userCreation";
 
 const JWT_SECRET = process.env.SESSION_SECRET || "nestwork-secret-key";
 
@@ -374,52 +379,17 @@ export async function registerRoutes(
 
   app.post("/api/users", requireAdmin, async (req, res) => {
     try {
-      const { name, email, phone, address, region, stilling, externalId, role, username: providedUsername, password: providedPassword } = req.body;
-      if (!name || !email) {
-        return res.status(400).json({ message: "Navn og e-post må fylles ut" });
+      const created = await createEmployeeUser(parseCreateUserRequest(req.body));
+      res.status(201).json(created);
+    } catch (err: unknown) {
+      if (err instanceof UserCreationError) {
+        const response = err.existingUsers
+          ? { message: err.message, existingUsers: err.existingUsers }
+          : { message: err.message };
+        return res.status(err.status).json(response);
       }
-      const makeUsername = (n: string) => {
-        const parts = n
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .split(/[^a-z0-9]+/)
-          .filter(Boolean);
-        return `${parts[0] || ""}${parts.at(-1) || ""}`.slice(0, 20);
-      };
-      let uname = providedUsername || makeUsername(name);
-      const existing = await storage.getUserByUsername(uname);
-      if (existing) {
-        uname = uname + (externalId || Date.now().toString().slice(-4));
-      }
-      const plainPassword = providedPassword || "nestwork2026";
-      const hashed = await hashPassword(plainPassword);
-      const created = await storage.createUser({
-        username: uname,
-        password: hashed,
-        name,
-        email,
-        phone: phone || "",
-        address: address || "",
-        kontonummer: "",
-        role: role || "ansatt",
-        region: region || "Alle",
-        stilling: stilling || "Barnehageassistent",
-        timelonn: "0",
-        available: true,
-        availableWeekend: false,
-        status: "Aktiv",
-        externalId: externalId ?? null,
-      });
-      const onboardingItems = ["Bytt passord", "Last opp profilbilde", "Last opp CV", "Last opp politiattest", "Signert kontrakt"];
-      for (const item of onboardingItems) {
-        await storage.createOnboarding({ userId: created.id, item, completed: false });
-      }
-      const { password: _, ...safe } = created;
-      res.json(safe);
-    } catch (err: any) {
-      console.error("Create user error:", err);
-      res.status(500).json({ message: err.message || "Kunne ikke opprette bruker" });
+      console.error("Create user failed");
+      res.status(500).json({ message: "Kunne ikke opprette bruker" });
     }
   });
 
