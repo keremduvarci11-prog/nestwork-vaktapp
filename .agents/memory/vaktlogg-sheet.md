@@ -50,3 +50,11 @@ When the user asks to create or send shifts, treat the request as an authoritati
 **Why:** The user delegates these orders to save time; a long investigative workflow removes that value.
 
 **How to apply:** Run one targeted duplicate check for the requested employee and dates, then create immediately through the production app. Pause only for a real name/client ambiguity, an existing collision, or missing required details.
+
+## Test shifts still need the sheet's test marking
+
+A requested test shift must use the sheet's established orange marking and dedicated “Testvakt” field, even when the user chooses normal assignment, notifications and paid time reporting.
+
+**Why:** The user corrected a live test shift that had only a TEST code and comment. Normal operational behavior was not permission to omit the sheet's test designation, and completing the sync queue did not establish correct visible formatting.
+
+**How to apply:** Preserve the agreed date, hours and payment rules while applying test marking through the app's ordinary edit flow. Verify the linked sheet row's actual test label and background color, not just the application record or queue completion.
