@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { isWeek39Complete } from "@/lib/week39-status";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,20 +26,21 @@ const actions = {
 };
 
 export function Week39Plan({ employee = "synne" }: { employee?: "synne" | "sultan" }) {
+  const { toast } = useToast();
   const name = employee === "synne" ? "Synne" : "Sultan";
   const kindergarten = employee === "synne" ? "Løvstakken Barnehage" : "Hjellemarka FUS Barnehage";
   const endpoint = employee === "synne" ? "/api/admin/week39-plan" : "/api/admin/week39-plan/sultan";
   const [open, setOpen] = useState(false);
   const [vikarkode, setVikarkode] = useState("");
   const [confirmed, setConfirmed] = useState(false);
-  const [result, setResult] = useState<Week39ApplyResponse | null>(null);
+  const [applied, setApplied] = useState(false);
   const preview = useQuery<Week39PlanResponse>({
     queryKey: [endpoint, vikarkode],
     queryFn: async () => {
       const response = await apiRequest("GET", `${endpoint}${vikarkode ? `?vikarkode=${encodeURIComponent(vikarkode)}` : ""}`);
       return response.json();
     },
-    enabled: open,
+    // Read-only on mount: completed plans stay hidden after reload/on another device.
     staleTime: 0,
     refetchOnWindowFocus: false,
   });
@@ -51,8 +54,12 @@ export function Week39Plan({ employee = "synne" }: { employee?: "synne" | "sulta
       return await response.json() as Week39ApplyResponse;
     },
     onSuccess: (data) => {
-      setResult(data);
+      setApplied(true);
       setConfirmed(false);
+      toast({
+        title: `${name}: ${data.message}`,
+        description: `Nye vakter: ${data.created}. Nye tildelinger: ${data.assigned}. Gjenbrukt: ${data.reused}. Du finner vaktene i vaktoversikten. Arksynk behandles av synkkøen; levering er ikke bekreftet.`,
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
       queryClient.invalidateQueries({ queryKey: [endpoint] });
     },
@@ -66,6 +73,10 @@ export function Week39Plan({ employee = "synne" }: { employee?: "synne" | "sulta
   const blocked = !data?.confirmationToken || !!data?.conflicts.length || preview.isFetching ||
     preview.isError || !vikarkode || !confirmed || submit.isPending;
 
+  // Do not briefly display completed drafts while the initial status is loading.
+  // Failed reads never count as completion; their cards remain available to retry.
+  if (applied || preview.isPending || (!preview.isError && isWeek39Complete(data))) return null;
+
   return (
     <Card data-testid={`week39-plan-${employee}`}>
       <CardContent className="p-4 space-y-4">
@@ -74,7 +85,7 @@ export function Week39Plan({ employee = "synne" }: { employee?: "synne" | "sulta
           <p className="text-sm text-muted-foreground">{kindergarten} · 21.–25. september 2026 · {employee === "synne" ? "betalt pause" : "30 min ubetalt pause"}</p>
         </div>
         {!open ? (
-          <Button type="button" variant="outline" onClick={() => setOpen(true)} data-testid="week39-open">
+          <Button type="button" variant="outline" onClick={() => { setOpen(true); preview.refetch(); }} data-testid="week39-open">
             Kontroller og vis fem vakter
           </Button>
         ) : (
@@ -137,14 +148,6 @@ export function Week39Plan({ employee = "synne" }: { employee?: "synne" | "sulta
               </>
             )}
             {submit.isError && <p role="alert" className="text-sm text-destructive">{errorMessage(submit.error)} Kontroller oversikten på nytt før du prøver igjen.</p>}
-            {result && (
-              <div role="status" className="rounded-md border p-3 text-sm space-y-1" data-testid="week39-result">
-                <p className="font-semibold">{result.message}</p>
-                <p>Nye vakter: {result.created}. Nye tildelinger: {result.assigned}. Gjenbrukt: {result.reused}.</p>
-                <p>Arksynk behandles av appens synkkø. Dette er ikke en bekreftelse på at Google-arket er oppdatert.</p>
-                <details><summary>Vakt-ID-er fra appen</summary><ul>{result.vaktIds.map((id) => <li className="break-all" key={id}>{id}</li>)}</ul></details>
-              </div>
-            )}
             <Button type="button" variant="ghost" disabled={submit.isPending || preview.isFetching}
               onClick={() => { setConfirmed(false); preview.refetch(); }} data-testid="week39-refresh">
               Kontroller på nytt
