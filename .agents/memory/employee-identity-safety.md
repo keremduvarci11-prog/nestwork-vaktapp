@@ -11,6 +11,12 @@ Treat normalized email and employee number as identity collisions during account
 
 ## Authorized account provisioning
 
+Leave optional employee numbers blank when the user did not supply them, unless an explicit numbering rule has been agreed.
+
+**Why:** Imported or test identifiers may lie outside the ordinary employee-number sequence. Taking the largest existing identifier and adding one can assign unintended business identifiers.
+
+**How to apply:** Do not infer a numbering policy from the highest stored value. Missing optional identifiers must not block creation, and email/username collision checks still apply.
+
 Do not replace an explicit request to create an employee with a form the user must fill out merely because production SQL tools are read-only. First determine whether the app's ordinary, authorized administrator interface can perform the requested operation.
 
 **Why:** Direct database access and authenticated app administration are different capabilities. Treating the SQL limitation as a blanket inability to create accounts caused unnecessary manual work even though legitimate app administration was available.
