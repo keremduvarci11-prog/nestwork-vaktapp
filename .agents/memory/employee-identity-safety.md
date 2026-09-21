@@ -22,3 +22,11 @@ Do not replace an explicit request to create an employee with a form the user mu
 **Why:** Direct database access and authenticated app administration are different capabilities. Treating the SQL limitation as a blanket inability to create accounts caused unnecessary manual work even though legitimate app administration was available.
 
 **How to apply:** Verify the published target and existing administrator access using runtime-only secret handling, then check identity collisions before an explicitly authorized operation. Never bypass authentication or production SQL restrictions. Obtain a missing initial password through the secure secrets form rather than chat, verify the persisted account and onboarding, and distinguish successful account creation/login from delivery of credentials or an invitation.
+
+## Unconfirmed hourly pay
+
+A stored zero hourly rate is not sufficient evidence that unpaid work was agreed.
+
+**Why:** The user has requested account creation before pay is settled, while the existing registration flow requires a numeric rate. A disclosed temporary zero can therefore represent unresolved pay rather than a final agreement.
+
+**How to apply:** Do not silently default missing pay to zero. Distinguish explicitly deferred pay from an agreed rate, disclose any temporary numeric placeholder, and require clarification before relying on it for payroll. Do not bulk-reinterpret all existing zero rates without review.
