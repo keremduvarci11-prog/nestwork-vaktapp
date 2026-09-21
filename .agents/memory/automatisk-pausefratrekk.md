@@ -1,10 +1,16 @@
 ---
 name: Automatisk pausefratrekk
-description: Fast lønnsregel for når ubetalt pause skal trekkes fra arbeidstiden.
+description: Betalt pause fra uke 37 i 2026, med to barnehageunntak og eldre standardregel.
 ---
 
-Standardregelen er at vakter med varighet på minst 5,5 timer trekkes 30 minutter ubetalt pause. Vakter under 5,5 timer har ikke pausefratrekk. Et uttrykkelig, administratorregistrert unntak på den enkelte vakten for betalt pause eller avtalte betalte timer går foran standardregelen.
+Fra 2026-09-07 (uke 37) skal ansatte ha betalt pause ved alle barnehager unntatt Espira Kuventræ Barnehage og Espira Ulvenvatnet. Unntakene beholder tidligere regler til brukeren uttrykkelig bekrefter endring. Regelen gjelder allerede registrerte vakter og fremtidige vakter.
 
-**Why:** Brukeren ønsker automatisk ubetalt pause som standard, men har senere uttrykkelig autorisert avgrensede avtaler om betalt pause og betalte timer på eksisterende vakter. Avtalte betalte timer er ikke nødvendigvis lik faktisk varighet.
+**Why:** Brukeren korrigerte 2026-09-21 den tidligere generelle regelen om ubetalt pause og opplyste at betalt pause er bekreftet hos barnehagene, bortsett fra de to navngitte unntakene.
 
-**How to apply:** Bruk samme effektive regel ved redigering, timerapportering, lønnsberegning, eksport og synk. Bevar faktiske klokkeslett og eksplisitte unntak ved annen redigering. Ikke utvid et konkret unntak til andre ansatte, barnehager eller fremtidige vakter.
+**How to apply:** Bevar faktiske klokkeslett, særskilt avtalte betalte timer og godkjennings-/utbetalingsstatus. Skill en autorisert forretningsregel fra bekreftet implementering og datakorrigering; les faktisk kode og lagrede verdier før du sier at regelen er aktiv. Brukeren vil selv korrigere arket, så avklar eventuell automatisk arksynk før masseendringer i appen.
+
+Før denne datoen og ved de to unntatte barnehagene gjelder eldre standard: minst 5,5 timers varighet gir 30 minutter ubetalt pause, med mindre en eksplisitt avtale om betalt pause eller betalte timer går foran.
+
+**Why:** Den nye regelen er datobegrenset og gjør ikke eldre eller særskilte avtaler ugyldige.
+
+**How to apply:** Ikke endre eldre vakter eller unntatte barnehager som del av denne korreksjonen. Bruk samme effektive beregning i ansattvisning, timerapportering og lønn.
