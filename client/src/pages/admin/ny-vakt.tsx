@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, X, UserCheck, Coffee, Clock } from "lucide-react";
 import type { Barnehage, User } from "@shared/schema";
-import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
+import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak } from "@shared/shiftHours";
 import { Week39Plan } from "@/components/admin/week39-plan";
 
 export default function NyVakt() {
@@ -26,6 +26,8 @@ export default function NyVakt() {
   const [showSearch, setShowSearch] = useState(false);
   const [betaltPause, setBetaltPause] = useState(false);
   const [avtalteBetalteTimer, setAvtalteBetalteTimer] = useState("");
+  const policyPaidBreak = hasPolicyPaidBreak(dato, barnehageId);
+  const effectiveBetaltPause = policyPaidBreak || betaltPause;
 
   const { data: barnehager } = useQuery<Barnehage[]>({
     queryKey: ["/api/barnehager"],
@@ -56,12 +58,12 @@ export default function NyVakt() {
 
   const calcHours = () => {
     return calculatePaidHours(startTid, sluttTid, {
-      betaltPause,
+      betaltPause: effectiveBetaltPause,
       avtalteBetalteTimer: avtalteBetalteTimer || null,
     });
   };
   const automaticPause = shouldDeductPause(startTid, sluttTid, {
-    betaltPause,
+    betaltPause: effectiveBetaltPause,
     avtalteBetalteTimer: avtalteBetalteTimer || null,
   });
 
@@ -77,7 +79,7 @@ export default function NyVakt() {
         ansattId: ansattId || null,
         region: selectedBh?.region || "",
         beskrivelse,
-        betaltPause,
+        betaltPause: effectiveBetaltPause,
         avtalteBetalteTimer: avtalteBetalteTimer || null,
       }),
     onSuccess: () => {
@@ -176,7 +178,7 @@ export default function NyVakt() {
                   <p className="text-xs text-muted-foreground">
                     {avtalteBetalteTimer
                       ? `Avtalte betalte timer: ${calcHours().toFixed(2)}`
-                      : betaltPause
+                      : effectiveBetaltPause
                         ? "Ingen pausetrekk"
                         : automaticPause
                           ? "30 min ubetalt pause trekkes automatisk"
@@ -185,11 +187,15 @@ export default function NyVakt() {
                 </div>
               </div>
               <Switch
-                checked={betaltPause}
+                checked={effectiveBetaltPause}
+                disabled={policyPaidBreak}
                 onCheckedChange={setBetaltPause}
                 data-testid="switch-betalt-pause"
               />
             </div>
+            {policyPaidBreak && (
+              <p className="text-xs text-muted-foreground">Betalt pause gjelder ved denne barnehagen fra 07.09.2026.</p>
+            )}
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Avtalte betalte timer (valgfritt)</label>

@@ -239,14 +239,14 @@ test("week 39 transaction rolls back and concurrent retries reuse", {
     assert.equal(notificationCalls.length, 6);
 
     const sultanPreview = await previewWeek39Plan("synthetic-admin", "KTV", deps, SULTAN_WEEK39);
-    assert.equal(sultanPreview.totalPaidHours, 35);
-    assert.equal(sultanPreview.betaltPause, false);
+    assert.equal(sultanPreview.totalPaidHours, 37.5);
+    assert.equal(sultanPreview.betaltPause, true);
     const sultanResult = await applyWeek39Plan("synthetic-admin", "KTV", sultanPreview.confirmationToken!, deps, SULTAN_WEEK39);
     assert.ok("created" in sultanResult);
     assert.equal(sultanResult.created, 5);
     assert.equal(await countShifts(), 10);
     const sultanRows = (await pool.query(`SELECT * FROM "${schema}".vakter WHERE ansatt_id=$1`, [SULTAN_WEEK39.employeeId])).rows;
-    assert.equal(sultanRows.every((r) => r.start_tid === "07:45:00" && r.slutt_tid === "15:15:00" && !r.betalt_pause && r.trekk_pause && r.avtalte_betalte_timer === null && r.status === "tildelt"), true);
+    assert.equal(sultanRows.every((r) => r.start_tid === "07:45:00" && r.slutt_tid === "15:15:00" && r.betalt_pause && !r.trekk_pause && r.avtalte_betalte_timer === null && r.status === "tildelt"), true);
     assert.equal(notificationCalls.length, 11);
     assert.equal((await pool.query(`SELECT count(*)::int AS count FROM "${schema}".sheet_sync_jobs`)).rows[0].count, 10);
 

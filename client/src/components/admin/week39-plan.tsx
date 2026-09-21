@@ -82,7 +82,7 @@ export function Week39Plan({ employee = "synne" }: { employee?: "synne" | "sulta
       <CardContent className="p-4 space-y-4">
         <div>
           <h2 className="font-semibold">Klargjort: {name} – uke 39</h2>
-          <p className="text-sm text-muted-foreground">{kindergarten} · 21.–25. september 2026 · {employee === "synne" ? "betalt pause" : "30 min ubetalt pause"}</p>
+          <p className="text-sm text-muted-foreground">{kindergarten} · 21.–25. september 2026 · betalt pause</p>
         </div>
         {!open ? (
           <Button type="button" variant="outline" onClick={() => { setOpen(true); preview.refetch(); }} data-testid="week39-open">

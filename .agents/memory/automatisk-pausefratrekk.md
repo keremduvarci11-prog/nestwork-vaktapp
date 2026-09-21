@@ -7,7 +7,7 @@ Fra 2026-09-07 (uke 37) skal ansatte ha betalt pause ved alle barnehager unntatt
 
 **Why:** Brukeren korrigerte 2026-09-21 den tidligere generelle regelen om ubetalt pause og opplyste at betalt pause er bekreftet hos barnehagene, bortsett fra de to navngitte unntakene.
 
-**How to apply:** Bevar faktiske klokkeslett, særskilt avtalte betalte timer og godkjennings-/utbetalingsstatus. Skill en autorisert forretningsregel fra bekreftet implementering og datakorrigering; les faktisk kode og lagrede verdier før du sier at regelen er aktiv. Brukeren vil selv korrigere arket, så avklar eventuell automatisk arksynk før masseendringer i appen.
+**How to apply:** Bevar faktiske klokkeslett, særskilt avtalte betalte timer og godkjennings-/utbetalingsstatus. Skill en autorisert forretningsregel fra bekreftet implementering og datakorrigering; les faktisk kode og lagrede verdier før du sier at regelen er aktiv. Brukeren godkjente også vanlig automatisk arksynk for denne korreksjonen, selv om uke 37–38 allerede var rettet manuelt. Bevar manuelle arkfelt og samme radidentitet.
 
 Før denne datoen og ved de to unntatte barnehagene gjelder eldre standard: minst 5,5 timers varighet gir 30 minutter ubetalt pause, med mindre en eksplisitt avtale om betalt pause eller betalte timer går foran.
 

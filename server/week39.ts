@@ -4,7 +4,7 @@ import type { PoolClient, QueryResultRow } from "pg";
 import { pool } from "./db";
 import { notifyUser } from "./notifications";
 import { wakeSheetSyncWorker } from "./sheetSync";
-import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
+import { calculatePaidHours, shiftPaidTerms } from "@shared/shiftHours";
 import {
   SYNNE_WEEK39,
   SULTAN_WEEK39,
@@ -403,6 +403,10 @@ export async function applyWeek39Plan(
           notificationRows.push(row);
           continue;
         }
+        const paidTerms = shiftPaidTerms({
+          ...row, barnehageId: config.kindergartenId,
+          betaltPause: config.betaltPause, avtalteBetalteTimer: config.agreedHours,
+        });
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO vakter
              (barnehage_id, dato, start_tid, slutt_tid, vikarkode, status,
@@ -411,9 +415,8 @@ export async function applyWeek39Plan(
                     $6, $7, NULL, $8, $9, $10)
            RETURNING id`,
           [config.kindergartenId, row.dato, row.startTid, row.sluttTid, code,
-            config.employeeId, config.region, shouldDeductPause(row.startTid, row.sluttTid, {
-              betaltPause: config.betaltPause, avtalteBetalteTimer: config.agreedHours,
-            }), config.betaltPause, config.agreedHours],
+            config.employeeId, config.region, paidTerms.trekkPause,
+            paidTerms.betaltPause, config.agreedHours],
         );
         created += 1;
         assigned += 1;

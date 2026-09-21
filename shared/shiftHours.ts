@@ -1,6 +1,39 @@
 export const AUTOMATIC_PAUSE_THRESHOLD_MINUTES = 5.5 * 60;
 export const UNPAID_PAUSE_MINUTES = 30;
 
+export const PAID_BREAK_EFFECTIVE_DATE = "2026-09-07";
+export const PAID_BREAK_EXEMPT_KINDERGARTEN_IDS = [
+  "99caabb6-6068-42e4-8aad-defadbb578f2",
+  "58d81ed1-e4fb-49ee-8fa3-e5bccdcddea6",
+] as const;
+
+/** Date-only comparisons: the shift's date, not today's date, controls policy. */
+export function hasPolicyPaidBreak(dato: string, barnehageId: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dato) &&
+    dato >= PAID_BREAK_EFFECTIVE_DATE &&
+    !!barnehageId &&
+    !PAID_BREAK_EXEMPT_KINDERGARTEN_IDS.some((id) => id === barnehageId);
+}
+
+interface ShiftPaidTerms extends ShiftHoursOptions {
+  dato: string;
+  barnehageId: string;
+  startTid: string;
+  sluttTid: string;
+}
+
+/** Persist these terms on writes; accounting readers keep using stored values.
+ * Never clear an existing explicit paid-break agreement outside policy scope.
+ */
+export function shiftPaidTerms(shift: ShiftPaidTerms) {
+  const betaltPause = hasPolicyPaidBreak(shift.dato, shift.barnehageId) ||
+    shift.betaltPause === true;
+  return {
+    betaltPause,
+    trekkPause: shouldDeductPause(shift.startTid, shift.sluttTid, { ...shift, betaltPause }),
+  };
+}
+
 export interface ShiftHoursOptions {
   /**
    * An explicit paid break disables the otherwise automatic unpaid-break rule.

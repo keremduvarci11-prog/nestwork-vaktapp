@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasPolicyPaidBreak } from "./shiftHours";
 
 export const WEEK39_EMPLOYEE_ID = "3b74c685-a5fa-4d82-a823-04c1aa339430";
 export const WEEK39_EMPLOYEE_NAME = "Synne Heimli Van Der Meeren";
@@ -52,9 +53,9 @@ export const SULTAN_WEEK39: Week39Draft = {
   kindergartenId: "e9f276ce-dc0c-4a7b-a774-f83eec94e7db",
   kindergartenName: "Hjellemarka Fus Barnehage",
   region: "Os",
-  betaltPause: false,
+  betaltPause: hasPolicyPaidBreak(WEEK39_ROWS[0].dato, "e9f276ce-dc0c-4a7b-a774-f83eec94e7db"),
   agreedHours: null,
-  paidHours: 7,
+  paidHours: hasPolicyPaidBreak(WEEK39_ROWS[0].dato, "e9f276ce-dc0c-4a7b-a774-f83eec94e7db") ? 7.5 : 7,
   rows: WEEK39_ROWS.map(({ dato }) => ({ dato, startTid: "07:45", sluttTid: "15:15" })),
 };
 

@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { matchesRegions } from "@shared/regions";
+import { hasPolicyPaidBreak, shiftPaidTerms } from "@shared/shiftHours";
 import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
   users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning, lonnsslipper, scheduledMeldinger,
@@ -200,13 +201,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createVakt(v: InsertVakt): Promise<Vakt> {
-    const [created] = await db.insert(vakter).values(v).returning();
+    const [created] = await db.insert(vakter).values({ ...v, ...shiftPaidTerms(v) }).returning();
     return created;
   }
 
   async updateVakt(id: string, data: Partial<InsertVakt>): Promise<Vakt | undefined> {
-    const [updated] = await db.update(vakter).set(data).where(eq(vakter.id, id)).returning();
-    return updated;
+    return db.transaction(async (tx) => {
+      const [before] = await tx.select().from(vakter).where(eq(vakter.id, id)).for("update");
+      if (!before) return undefined;
+      const effective = { ...before, ...data };
+      const termsEdited = ["dato", "barnehageId", "startTid", "sluttTid", "betaltPause", "avtalteBetalteTimer"]
+        .some((key) => Object.prototype.hasOwnProperty.call(data, key));
+      // Merge under a row lock so date/client edits and legacy false payloads
+      // cannot bypass policy or overwrite concurrent paid-hours agreements.
+      const [updated] = await tx.update(vakter)
+        .set({
+          ...data,
+          ...(termsEdited || hasPolicyPaidBreak(effective.dato, effective.barnehageId)
+            ? shiftPaidTerms(effective) : {}),
+        })
+        .where(eq(vakter.id, id)).returning();
+      return updated;
+    });
   }
 
   async markVaktTimerInnsendt(id: string): Promise<Vakt | undefined> {

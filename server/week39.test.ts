@@ -96,11 +96,11 @@ test("confirmation payload is strict and requires explicit confirmation", () => 
   }).success, false);
 });
 
-test("Sultan uses ordinary pause rules and the five requested times", () => {
+test("Sultan uses effective paid-break policy and the five requested times", () => {
   const plan = evaluateWeek39Rows([], "KTV", [], SULTAN_WEEK39);
   assert.equal(plan.rows.length, 5);
-  assert.equal(plan.rows.every((row) => row.startTid === "07:45" && row.sluttTid === "15:15" && row.paidHours === 7), true);
-  assert.equal(plan.rows.reduce((sum, row) => sum + row.paidHours, 0), 35);
+  assert.equal(plan.rows.every((row) => row.startTid === "07:45" && row.sluttTid === "15:15" && row.paidHours === 7.5), true);
+  assert.equal(plan.rows.reduce((sum, row) => sum + row.paidHours, 0), 37.5);
 });
 
 test("unpaid terms, duplicate rows and another assignee are conflicts", () => {

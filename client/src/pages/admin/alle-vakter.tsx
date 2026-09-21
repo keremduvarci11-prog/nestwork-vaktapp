@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus, Coffee, CheckCircle2 } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
-import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
+import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak } from "@shared/shiftHours";
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   ledig: { label: "Ledig", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
@@ -45,11 +45,13 @@ function EditVaktForm({
   const [status, setStatus] = useState(vakt.status);
   const [ansattId, setAnsattId] = useState(vakt.ansattId || "");
   const [betaltPause, setBetaltPause] = useState(vakt.betaltPause ?? false);
+  const policyPaidBreak = hasPolicyPaidBreak(dato, barnehageId);
+  const effectiveBetaltPause = policyPaidBreak || betaltPause;
   const [avtalteBetalteTimer, setAvtalteBetalteTimer] = useState(
     vakt.avtalteBetalteTimer?.toString() ?? "",
   );
   const paidHoursOptions = {
-    betaltPause,
+    betaltPause: effectiveBetaltPause,
     avtalteBetalteTimer: avtalteBetalteTimer || null,
   };
   const automaticPause = shouldDeductPause(startTid, sluttTid, paidHoursOptions);
@@ -79,7 +81,7 @@ function EditVaktForm({
         sykIkkeMott,
         fakturert,
         lonnUtbetalt,
-        betaltPause,
+        betaltPause: effectiveBetaltPause,
         avtalteBetalteTimer: avtalteBetalteTimer || null,
       }),
     onSuccess: () => {
@@ -188,7 +190,7 @@ function EditVaktForm({
               <p className="text-[10px] text-muted-foreground">
                 {avtalteBetalteTimer
                   ? `Avtalte betalte timer: ${paidHours.toFixed(2)}`
-                  : betaltPause
+                  : effectiveBetaltPause
                     ? "Betalt pause – ingen pausetrekk"
                     : automaticPause
                       ? "30 min ubetalt pause trekkes automatisk"
@@ -203,11 +205,14 @@ function EditVaktForm({
             <div>
               <p className="text-xs font-medium">Pausen er betalt</p>
               <p className="text-[10px] text-muted-foreground">
-                Slår av automatisk trekk for denne vakten
+                {policyPaidBreak
+                  ? "Betalt pause gjelder ved denne barnehagen fra 07.09.2026"
+                  : "Slår av automatisk trekk for denne vakten"}
               </p>
             </div>
             <Switch
-              checked={betaltPause}
+              checked={effectiveBetaltPause}
+              disabled={policyPaidBreak}
               onCheckedChange={setBetaltPause}
               data-testid="edit-switch-betalt-pause"
             />
