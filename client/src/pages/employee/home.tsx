@@ -18,7 +18,8 @@ export default function EmployeeHome() {
   const [, navigate] = useLocation();
 
   const { data: vakter, isLoading: vLoading } = useQuery<Vakt[]>({
-    queryKey: ["/api/vakter", `?region=${user?.region}`],
+    queryKey: ["/api/vakter", `?region=${encodeURIComponent(user?.region ?? "")}`],
+    enabled: Boolean(user?.region),
     refetchInterval: 30000,
   });
 

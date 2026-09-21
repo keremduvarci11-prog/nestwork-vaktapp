@@ -5,3 +5,4 @@
 - [Prepared shift authorization](prepared-shift-authorization.md) — honor latest scoped admin authorization; distinguish assignments, app notifications, device push and verified sheet rows.
 - [Isolated browser tests](isolated-browser-tests.md) — block service workers before navigation so fixture-based API interception stays isolated.
 - [Employee provisioning](employee-identity-safety.md) — identity collision safety; authorized app administration differs from read-only production SQL.
+- [Multiple regions](multiple-regions.md) — one account can cover several regions; preserve legacy groups and distinguish saved membership from published matching support.

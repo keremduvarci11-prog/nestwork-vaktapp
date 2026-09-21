@@ -51,6 +51,7 @@ export function CreateEmployeeDialog({
         ...form,
         name: form.name.trim(),
         email: form.email.trim(),
+        region: form.region.trim(),
         externalId: form.externalId.trim() ? Number(form.externalId) : undefined,
         timelonn: form.timelonn.trim().replace(",", "."),
         role: "ansatt",
@@ -177,6 +178,9 @@ export function CreateEmployeeDialog({
                 <div className="space-y-2">
                   <Label htmlFor="create-employee-region">Region</Label>
                   <Input id="create-employee-region" value={form.region} onChange={e => update("region", e.target.value)} required placeholder="Kristiansand" />
+                  <p className="text-xs text-muted-foreground">
+                    Flere regioner skilles med /, for eksempel Stavanger/Os.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="create-employee-position">Stilling</Label>

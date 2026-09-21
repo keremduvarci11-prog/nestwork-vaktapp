@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { matchesRegions } from "@shared/regions";
 import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
   users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning, lonnsslipper, scheduledMeldinger,
@@ -419,11 +420,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUsersByRegion(region: string): Promise<User[]> {
-    return db.select().from(users).where(and(eq(users.region, region), eq(users.role, "ansatt")));
+    return this.getUsersByRegions([region]);
   }
 
   async getUsersByRegions(regions: string[]): Promise<User[]> {
-    return db.select().from(users).where(and(inArray(users.region, regions), eq(users.role, "ansatt")));
+    if (regions.length === 0) return [];
+    const employees = await db.select().from(users).where(eq(users.role, "ansatt"));
+    return employees.filter(user => matchesRegions(user.region, regions));
   }
 
   async getVaktInteresser(vaktId: string): Promise<VaktInteresse[]> {

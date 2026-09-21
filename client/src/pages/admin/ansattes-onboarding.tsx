@@ -612,18 +612,27 @@ function EmployeeDetailDialog({
 }) {
   const { toast } = useToast();
   const [timelonnInput, setTimelonnInput] = useState<string>("");
+  const [regionInput, setRegionInput] = useState<string>("");
+  const [regionError, setRegionError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (open && emp) {
       const initial = emp.timelonn != null ? String(emp.timelonn) : "";
       setTimelonnInput(initial);
+      setRegionInput(emp.region || "");
+      setRegionError(null);
     }
-  }, [open, emp?.userId, emp?.timelonn]);
+  }, [open, emp?.userId, emp?.timelonn, emp?.region]);
 
   const saveTimelonn = useMutation({
     mutationFn: async () => {
       if (!emp) throw new Error("Ingen ansatt valgt");
+      const region = regionInput.trim();
+      if (!region) {
+        setRegionError("Region er påkrevd");
+        throw new Error("Region er påkrevd");
+      }
       const value = timelonnInput.replace(",", ".").trim();
       const num = Number(value);
       if (!isFinite(num) || num < 0) {
@@ -631,20 +640,26 @@ function EmployeeDetailDialog({
       }
       return apiRequest("PATCH", `/api/users/${emp.userId}`, {
         timelonn: num.toFixed(2),
+        region,
       });
     },
     onSuccess: () => {
+      setRegionError(null);
       toast({
-        title: "Timelønn lagret",
-        description: `Ny timelønn for ${emp?.name} er lagret.`,
+        title: "Endringer lagret",
+        description: `Region og timelønn for ${emp?.name} er lagret.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/onboarding-overview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     },
     onError: (err: any) => {
+      const message = err?.message || "Ukjent feil";
+      if (/region/i.test(message)) {
+        setRegionError(message);
+      }
       toast({
         title: "Kunne ikke lagre",
-        description: err?.message || "Ukjent feil",
+        description: message,
         variant: "destructive",
       });
     },
@@ -711,6 +726,8 @@ function EmployeeDetailDialog({
         onOpenChange={(o) => {
           if (!o) {
             setTimelonnInput("");
+            setRegionInput("");
+            setRegionError(null);
           }
           onOpenChange(o);
         }}
@@ -829,11 +846,34 @@ function EmployeeDetailDialog({
 
             <Separator />
 
-            {/* Timelønn */}
+            {/* Region og timelønn */}
             <section>
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5" /> Timelønn
+                <Wallet className="w-3.5 h-3.5" /> Region og timelønn
               </h3>
+              <div className="space-y-1.5 mb-3">
+                <Label htmlFor="region-input">Region</Label>
+                <Input
+                  id="region-input"
+                  value={regionInput}
+                  onChange={(e) => {
+                    setRegionInput(e.target.value);
+                    if (regionError) setRegionError(null);
+                  }}
+                  required
+                  aria-invalid={!!regionError}
+                  aria-describedby={regionError ? "region-input-error region-input-help" : "region-input-help"}
+                  data-testid="input-region"
+                />
+                <p id="region-input-help" className="text-xs text-muted-foreground">
+                  Flere regioner skilles med /, for eksempel Stavanger/Os.
+                </p>
+                {regionError && (
+                  <p id="region-input-error" role="alert" className="text-xs text-destructive">
+                    {regionError}
+                  </p>
+                )}
+              </div>
               <Label htmlFor="timelonn-input" className="sr-only">
                 Timelønn (kr/t)
               </Label>

@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import apn from "@parse/node-apn";
 import { storage } from "./storage";
+import { notificationRegions } from "@shared/regions";
 
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || "";
@@ -156,13 +157,7 @@ export async function notifyRegion(
   link?: string,
   excludedUserIds: string[] = []
 ) {
-  const regionGroups: Record<string, string[]> = {
-    Bergen: ["Bergen", "Os"],
-    Os: ["Bergen", "Os"],
-    Haugesund: ["Haugesund", "Stord"],
-    Stord: ["Haugesund", "Stord"],
-  };
-  const regions = regionGroups[region] || [region];
+  const regions = notificationRegions(region);
 
   const regionUsers = await storage.getUsersByRegions(regions);
 

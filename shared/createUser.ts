@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeRegionMembership } from "./regions";
 
 const requiredText = (label: string) =>
   z.string({ required_error: `${label} må fylles ut` }).trim().min(1, `${label} må fylles ut`);
@@ -22,7 +23,8 @@ export const createUserRequestSchema = z.object({
   email: requiredText("E-post").email("E-postadressen er ugyldig"),
   phone: z.string().trim().optional().default(""),
   address: z.string().trim().optional().default(""),
-  region: requiredText("Region"),
+  region: requiredText("Region").transform(normalizeRegionMembership)
+    .refine(value => value.length > 0, "Minst én region må fylles ut"),
   stilling: requiredText("Stilling"),
   externalId: z.number().int("Ansattnummer må være et heltall").positive("Ansattnummer må være positivt").max(2147483647, "Ansattnummeret er for stort").optional(),
   timelonn: moneySchema,

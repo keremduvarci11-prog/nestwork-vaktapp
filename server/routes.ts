@@ -19,6 +19,7 @@ import { getSpreadsheetUrl } from "./googleSheets";
 import { wakeSheetSyncWorker } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
+import { normalizeRegionMembership, visibleShiftRegions } from "@shared/regions";
 import { SCHEDULED_MESSAGING_TIMEZONE } from "./scheduledMessaging";
 import { registerWeek39Routes } from "./week39";
 import {
@@ -360,6 +361,12 @@ export async function registerRoutes(
       }
     }
 
+    if ("region" in safeData) {
+      if (typeof safeData.region !== "string" || !normalizeRegionMembership(safeData.region)) {
+        return res.status(400).json({ message: "Minst én region må fylles ut" });
+      }
+      safeData.region = normalizeRegionMembership(safeData.region);
+    }
     const updated = await storage.updateUser(asString(req.params.id), safeData);
     if (!updated) return res.status(404).json({ message: "Bruker ikke funnet" });
     const { password: _, ...safeUser } = updated;
@@ -628,17 +635,10 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  const regionGroups: Record<string, string[]> = {
-    "Bergen": ["Bergen", "Os"],
-    "Os": ["Os"],
-    "Haugesund": ["Haugesund", "Stord"],
-    "Stord": ["Haugesund", "Stord"],
-  };
-
   app.get("/api/vakter", requireAuth, async (req, res) => {
     const region = asString(req.query.region);
     if (region) {
-      const regions = regionGroups[region] || [region];
+      const regions = visibleShiftRegions(region);
       const v = await storage.getVakterByRegions(regions);
       return res.json(v);
     }
