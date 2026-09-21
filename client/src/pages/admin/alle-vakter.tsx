@@ -206,7 +206,7 @@ function EditVaktForm({
               <p className="text-xs font-medium">Pausen er betalt</p>
               <p className="text-[10px] text-muted-foreground">
                 {policyPaidBreak
-                  ? "Betalt pause gjelder ved denne barnehagen fra 07.09.2026"
+                  ? "Betalt pause gjelder ved denne barnehagen fra 01.09.2026"
                   : "Slår av automatisk trekk for denne vakten"}
               </p>
             </div>

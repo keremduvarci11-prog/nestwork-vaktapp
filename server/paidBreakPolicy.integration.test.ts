@@ -20,7 +20,7 @@ test("storage create and edit enforce policy without touching unrelated shift st
     }),
   }));
   const base = {
-    dato: "2026-09-07", barnehageId: "ordinary-client", startTid: "08:00", sluttTid: "15:30",
+    dato: "2026-09-01", barnehageId: "ordinary-client", startTid: "08:00", sluttTid: "15:30",
     region: "Test", vikarkode: "TEST", status: "godkjent", betaltPause: false,
     timerInnsendt: true, timerGodkjent: true, lonnUtbetalt: true, ansattId: "test-employee",
   };
@@ -33,10 +33,10 @@ test("storage create and edit enforce policy without touching unrelated shift st
   for (const key of ["startTid", "sluttTid", "status", "ansattId", "timerInnsendt", "timerGodkjent", "lonnUtbetalt"] as const) {
     assert.equal(row[key], base[key]);
   }
-  await storage.createVakt({ ...base, dato: "2026-09-06" });
+  await storage.createVakt({ ...base, dato: "2026-08-31" });
   assert.equal(row.betaltPause, false);
   assert.equal(row.trekkPause, true);
-  await storage.updateVakt(row.id, { dato: "2026-09-07", betaltPause: false });
+  await storage.updateVakt(row.id, { dato: "2026-09-01", betaltPause: false });
   assert.equal(row.betaltPause, true);
   for (const barnehageId of PAID_BREAK_EXEMPT_KINDERGARTEN_IDS) {
     await storage.createVakt({ ...base, barnehageId });
@@ -48,7 +48,7 @@ test("storage create and edit enforce policy without touching unrelated shift st
     assert.equal(row.betaltPause, false);
     assert.equal(row.trekkPause, true);
     await storage.updateVakt(row.id, { betaltPause: true, avtalteBetalteTimer: "7.50" });
-    await storage.updateVakt(row.id, { dato: "2026-09-06" });
+    await storage.updateVakt(row.id, { dato: "2026-08-31" });
     assert.equal(row.betaltPause, true);
     assert.equal(row.avtalteBetalteTimer, "7.50");
     assert.equal(row.trekkPause, false);

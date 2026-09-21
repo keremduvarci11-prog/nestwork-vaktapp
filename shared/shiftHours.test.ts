@@ -4,12 +4,15 @@ import { vaktPaidHoursPatchSchema } from "./schema";
 import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak, shiftPaidTerms, PAID_BREAK_EXEMPT_KINDERGARTEN_IDS } from "./shiftHours";
 
 test("paid-break policy is inclusive, date-scoped and keyed by stable client IDs", () => {
-  assert.equal(hasPolicyPaidBreak("2026-09-06", "ordinary-client"), false);
+  assert.equal(hasPolicyPaidBreak("2026-08-31", "ordinary-client"), false);
+  assert.equal(hasPolicyPaidBreak("2026-09-01", "ordinary-client"), true);
+  assert.equal(hasPolicyPaidBreak("2026-09-06", "ordinary-client"), true);
   assert.equal(hasPolicyPaidBreak("2026-09-07", "ordinary-client"), true);
   assert.equal(hasPolicyPaidBreak("2027-01-01", "ordinary-client"), true);
   assert.equal(hasPolicyPaidBreak("", "ordinary-client"), false);
   assert.equal(hasPolicyPaidBreak("2026-09-07", ""), false);
   for (const barnehageId of PAID_BREAK_EXEMPT_KINDERGARTEN_IDS) {
+    assert.equal(hasPolicyPaidBreak("2026-09-01", barnehageId), false);
     assert.equal(hasPolicyPaidBreak("2026-09-07", barnehageId), false);
     const shift = { dato: "2026-09-07", barnehageId, startTid: "08:00", sluttTid: "13:30" };
     assert.deepEqual(shiftPaidTerms(shift), { betaltPause: false, trekkPause: true });
@@ -23,7 +26,7 @@ test("paid-break policy is inclusive, date-scoped and keyed by stable client IDs
 
 test("write terms override legacy false but never rewrite clock times or agreed totals", () => {
   const shift = {
-    dato: "2026-09-07", barnehageId: "ordinary-client",
+    dato: "2026-09-01", barnehageId: "ordinary-client",
     startTid: "08:30", sluttTid: "16:00",
     betaltPause: false, avtalteBetalteTimer: "7.00",
     timerGodkjent: true, lonnUtbetalt: true, status: "godkjent",
@@ -33,7 +36,7 @@ test("write terms override legacy false but never rewrite clock times or agreed 
   assert.equal(updated.trekkPause, false);
   assert.equal(calculatePaidHours(updated.startTid, updated.sluttTid, updated), 7);
   assert.deepEqual({ ...updated, betaltPause: false, trekkPause: undefined }, { ...shift, trekkPause: undefined });
-  assert.deepEqual(shiftPaidTerms({ ...shift, dato: "2026-09-06", avtalteBetalteTimer: null }), {
+  assert.deepEqual(shiftPaidTerms({ ...shift, dato: "2026-08-31", avtalteBetalteTimer: null }), {
     betaltPause: false, trekkPause: true,
   });
 });

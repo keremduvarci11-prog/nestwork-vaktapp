@@ -194,7 +194,7 @@ export default function NyVakt() {
               />
             </div>
             {policyPaidBreak && (
-              <p className="text-xs text-muted-foreground">Betalt pause gjelder ved denne barnehagen fra 07.09.2026.</p>
+              <p className="text-xs text-muted-foreground">Betalt pause gjelder ved denne barnehagen fra 01.09.2026.</p>
             )}
 
             <div className="space-y-2">

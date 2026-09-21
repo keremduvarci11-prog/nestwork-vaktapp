@@ -1,7 +1,7 @@
 export const AUTOMATIC_PAUSE_THRESHOLD_MINUTES = 5.5 * 60;
 export const UNPAID_PAUSE_MINUTES = 30;
 
-export const PAID_BREAK_EFFECTIVE_DATE = "2026-09-07";
+export const PAID_BREAK_EFFECTIVE_DATE = "2026-09-01";
 export const PAID_BREAK_EXEMPT_KINDERGARTEN_IDS = [
   "99caabb6-6068-42e4-8aad-defadbb578f2",
   "58d81ed1-e4fb-49ee-8fa3-e5bccdcddea6",
