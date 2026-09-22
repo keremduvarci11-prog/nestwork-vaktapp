@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { availabilityMonthQueryKey, canEditAvailability, nextAvailabilityStatus, saveAvailability } from "@/lib/availability";
 import { useAuth } from "@/lib/auth";
@@ -36,6 +36,9 @@ interface VaktRow {
   dato: string;
   ansattId: string | null;
 }
+type PendingAvailability = {
+  desired: "available" | "unavailable" | undefined;
+};
 
 export default function MinTilgjengelighet() {
   const { user } = useAuth();
@@ -77,31 +80,96 @@ export default function MinTilgjengelighet() {
   const mineVakter = shiftsQuery.data ?? [];
   const reads = [availabilityQuery, blockedQuery, shiftsQuery];
   const readError = reads.find((q) => q.isError)?.error;
-  const ready = !!user?.id && reads.every((q) => q.isSuccess && !q.isFetching);
-  // A ref closes the same-render double-click window before React updates isPending.
-  const writeInFlight = useRef(false);
-  const writeStatus = useMutation({
-    mutationFn: saveAvailability,
-    onSuccess: async (_response, { date }) => {
-      await queryClient.invalidateQueries({ queryKey: availabilityMonthQueryKey(date) });
-    },
-    onError: (err: any) => {
-      toast({
-        title: "Kunne ikke lagre",
-        description: err?.message || "Ukjent feil",
-        variant: "destructive",
-      });
-    },
-    onSettled: () => {
-      writeInFlight.current = false;
-    },
-  });
+  // Background refetches must not make the already-rendered calendar disappear.
+  // A calendar with an error remains visible, but editing stays disabled until
+  // the reads are healthy again.
+  const calendarReady = !!user?.id && reads.every((q) => q.isSuccess || q.data !== undefined);
+  const ready = calendarReady && !readError;
+  const [optimisticStatuses, setOptimisticStatuses] = useState<
+    Record<string, "available" | "unavailable" | null>
+  >({});
+  const pendingWrites = useRef(new Map<string, PendingAvailability>());
+  const [pendingCount, setPendingCount] = useState(0);
 
   const availMap = useMemo(() => {
     const m = new Map<string, "available" | "unavailable">();
     avail.forEach((a) => m.set(a.date, a.status));
     return m;
   }, [avail]);
+
+  const displayedAvailMap = useMemo(() => {
+    const m = new Map(availMap);
+    for (const [date, status] of Object.entries(optimisticStatuses)) {
+      if (status === null) m.delete(date);
+      else m.set(date, status);
+    }
+    return m;
+  }, [availMap, optimisticStatuses]);
+
+  const updateAvailabilityCache = (date: string, status: "available" | "unavailable" | undefined) => {
+    queryClient.setQueryData<AvailRow[]>(availabilityMonthQueryKey(date), (rows = []) => {
+      const next = rows.filter((row) => row.date !== date);
+      if (status) next.push({ date, status });
+      return next.sort((a, b) => a.date.localeCompare(b.date));
+    });
+  };
+
+  const queueAvailability = (date: string, desired: "available" | "unavailable" | undefined) => {
+    setOptimisticStatuses((current) => ({ ...current, [date]: desired ?? null }));
+    const existing = pendingWrites.current.get(date);
+    if (existing) {
+      // The current request finishes first; the newest click is then sent
+      // immediately after it. This preserves rapid same-day taps too.
+      existing.desired = desired;
+      return;
+    }
+
+    const pending: PendingAvailability = { desired };
+    pendingWrites.current.set(date, pending);
+    setPendingCount((count) => count + 1);
+
+    void (async () => {
+      try {
+        while (true) {
+          const requested = pending.desired;
+          try {
+            await saveAvailability({ date, status: requested });
+            updateAvailabilityCache(date, requested);
+          } catch (err: any) {
+            if (pending.desired === requested) {
+              setOptimisticStatuses((current) => {
+                const next = { ...current };
+                delete next[date];
+                return next;
+              });
+              toast({
+                title: "Kunne ikke lagre",
+                description: err?.message || "Ukjent feil",
+                variant: "destructive",
+              });
+              break;
+            }
+            // A newer click superseded this failed request. Try that newest
+            // intent instead of rolling the visible calendar back.
+            continue;
+          }
+
+          if (pending.desired !== requested) continue;
+          setOptimisticStatuses((current) => {
+            const next = { ...current };
+            delete next[date];
+            return next;
+          });
+          break;
+        }
+      } finally {
+        if (pendingWrites.current.get(date) === pending) {
+          pendingWrites.current.delete(date);
+          setPendingCount((count) => Math.max(0, count - 1));
+        }
+      }
+    })();
+  };
 
   const blockedMap = useMemo(() => {
     const m = new Map<string, string | null>();
@@ -139,9 +207,8 @@ export default function MinTilgjengelighet() {
   };
 
   const handleClick = (iso: string, isPast: boolean, isWeekend: boolean, isBlocked: boolean, hasShift: boolean) => {
-    if (!canEditAvailability({ ready, busy: writeInFlight.current || writeStatus.isPending, isPast, isWeekend, isBlocked, hasShift })) return;
-    writeInFlight.current = true;
-    writeStatus.mutate({ date: iso, status: nextAvailabilityStatus(availMap.get(iso)) });
+    if (!canEditAvailability({ ready, busy: false, isPast, isWeekend, isBlocked, hasShift })) return;
+    queueAvailability(iso, nextAvailabilityStatus(displayedAvailMap.get(iso)));
   };
 
   return (
@@ -184,11 +251,11 @@ export default function MinTilgjengelighet() {
                 Prøv igjen
               </Button>
             </div>
-          ) : !ready ? (
+          ) : !calendarReady ? (
             <p role="status" className="text-sm text-muted-foreground">Laster tilgjengelighet, blokkerte dager og vakter…</p>
           ) : null}
-          {writeStatus.isPending && <p role="status" className="text-sm text-muted-foreground">Lagrer…</p>}
-          {ready && <>
+          {pendingCount > 0 && <p role="status" className="text-sm text-muted-foreground min-h-5">Lagrer…</p>}
+          {calendarReady && <>
           <div className="grid grid-cols-7 gap-1 mb-1">
             {WEEKDAYS.map((d) => (
               <div key={d} className="text-[10px] text-center text-muted-foreground font-medium py-1">
@@ -209,7 +276,7 @@ export default function MinTilgjengelighet() {
               const isPast = iso < today;
               const isBlocked = blockedMap.has(iso);
               const hasShift = shiftSet.has(iso);
-              const status = availMap.get(iso);
+               const status = displayedAvailMap.get(iso);
 
               let cls = "aspect-square rounded-md flex items-center justify-center text-xs font-medium relative ";
               let testid = `day-${iso}`;
@@ -231,7 +298,7 @@ export default function MinTilgjengelighet() {
                 cls += "bg-card border border-border text-foreground hover-elevate active-elevate-2 cursor-pointer";
               }
 
-              const disabled = !canEditAvailability({ ready, busy: writeStatus.isPending, isPast, isWeekend, isBlocked, hasShift });
+               const disabled = !canEditAvailability({ ready, busy: false, isPast, isWeekend, isBlocked, hasShift });
 
               return (
                 <button
