@@ -27,6 +27,17 @@ export default function Profil() {
   const { theme, setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onError: (error: Error) => {
+      toast({
+        title: "Kunne ikke logge ut",
+        description: error.message || "Prøv igjen.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const toggleAvailability = useMutation({
     mutationFn: () =>
       apiRequest("PATCH", `/api/users/${user?.id}`, { available: !user?.available }),
@@ -354,10 +365,11 @@ export default function Profil() {
         data-testid="button-logout"
         variant="secondary"
         className="w-full"
-        onClick={logout}
+        onClick={() => logoutMutation.mutate()}
+        disabled={logoutMutation.isPending}
       >
         <LogOut className="w-4 h-4 mr-2" />
-        Logg ut
+        {logoutMutation.isPending ? "Logger ut…" : "Logg ut"}
       </Button>
 
       {cropImageSrc && (

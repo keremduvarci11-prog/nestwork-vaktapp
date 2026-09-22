@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { availabilityMonthQueryKey, canEditAvailability, nextAvailabilityStatus, saveAvailability } from "@/lib/availability";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,40 +46,44 @@ export default function MinTilgjengelighet() {
   });
   const monthKey = `${cursor.y}-${pad(cursor.m)}`;
 
-  const { data: avail = [] } = useQuery<AvailRow[]>({
+  const availabilityQuery = useQuery<AvailRow[]>({
     queryKey: ["/api/availability/me", monthKey],
     queryFn: async () => {
-      const r = await fetch(`/api/availability/me?month=${monthKey}`, { credentials: "include" });
-      if (!r.ok) throw new Error("Kunne ikke hente tilgjengelighet");
+      const r = await apiRequest("GET", `/api/availability/me?month=${monthKey}`);
       return r.json();
     },
   });
 
-  const { data: blockedRows = [] } = useQuery<BlockedRow[]>({
+  const blockedQuery = useQuery<BlockedRow[]>({
     queryKey: ["/api/blocked-dates", monthKey],
     queryFn: async () => {
-      const r = await fetch(`/api/blocked-dates?month=${monthKey}`, { credentials: "include" });
-      if (!r.ok) throw new Error("Kunne ikke hente blokkerte dager");
+      const r = await apiRequest("GET", `/api/blocked-dates?month=${monthKey}`);
       return r.json();
     },
   });
 
-  const { data: mineVakter = [] } = useQuery<VaktRow[]>({
+  const shiftsQuery = useQuery<VaktRow[]>({
     queryKey: ["/api/vakter/mine", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const r = await fetch(`/api/vakter/mine/${user.id}`, { credentials: "include" });
-      if (!r.ok) throw new Error("Kunne ikke hente vakter");
+      const r = await apiRequest("GET", `/api/vakter/mine/${user.id}`);
       return r.json();
     },
     enabled: !!user?.id,
   });
 
-  const setStatus = useMutation({
-    mutationFn: async ({ date, status }: { date: string; status: "available" | "unavailable" }) =>
-      apiRequest("PUT", "/api/availability/me", { date, status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/availability/me", monthKey] });
+  const avail = availabilityQuery.data ?? [];
+  const blockedRows = blockedQuery.data ?? [];
+  const mineVakter = shiftsQuery.data ?? [];
+  const reads = [availabilityQuery, blockedQuery, shiftsQuery];
+  const readError = reads.find((q) => q.isError)?.error;
+  const ready = !!user?.id && reads.every((q) => q.isSuccess && !q.isFetching);
+  // A ref closes the same-render double-click window before React updates isPending.
+  const writeInFlight = useRef(false);
+  const writeStatus = useMutation({
+    mutationFn: saveAvailability,
+    onSuccess: async (_response, { date }) => {
+      await queryClient.invalidateQueries({ queryKey: availabilityMonthQueryKey(date) });
     },
     onError: (err: any) => {
       toast({
@@ -87,20 +92,8 @@ export default function MinTilgjengelighet() {
         variant: "destructive",
       });
     },
-  });
-
-  const clearStatus = useMutation({
-    mutationFn: async (date: string) =>
-      apiRequest("DELETE", `/api/availability/me/${date}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/availability/me", monthKey] });
-    },
-    onError: (err: any) => {
-      toast({
-        title: "Kunne ikke nullstille",
-        description: err?.message || "Ukjent feil",
-        variant: "destructive",
-      });
+    onSettled: () => {
+      writeInFlight.current = false;
     },
   });
 
@@ -146,15 +139,9 @@ export default function MinTilgjengelighet() {
   };
 
   const handleClick = (iso: string, isPast: boolean, isWeekend: boolean, isBlocked: boolean, hasShift: boolean) => {
-    if (isBlocked || isPast || isWeekend || hasShift) return;
-    const cur = availMap.get(iso);
-    if (!cur) {
-      setStatus.mutate({ date: iso, status: "available" });
-    } else if (cur === "available") {
-      setStatus.mutate({ date: iso, status: "unavailable" });
-    } else {
-      clearStatus.mutate(iso);
-    }
+    if (!canEditAvailability({ ready, busy: writeInFlight.current || writeStatus.isPending, isPast, isWeekend, isBlocked, hasShift })) return;
+    writeInFlight.current = true;
+    writeStatus.mutate({ date: iso, status: nextAvailabilityStatus(availMap.get(iso)) });
   };
 
   return (
@@ -190,6 +177,18 @@ export default function MinTilgjengelighet() {
             </Button>
           </div>
 
+          {readError ? (
+            <div role="alert" className="space-y-2 text-sm">
+              <p>Kunne ikke hente kalenderen: {readError.message}</p>
+              <Button variant="outline" onClick={() => { void Promise.all(reads.map((q) => q.refetch())); }}>
+                Prøv igjen
+              </Button>
+            </div>
+          ) : !ready ? (
+            <p role="status" className="text-sm text-muted-foreground">Laster tilgjengelighet, blokkerte dager og vakter…</p>
+          ) : null}
+          {writeStatus.isPending && <p role="status" className="text-sm text-muted-foreground">Lagrer…</p>}
+          {ready && <>
           <div className="grid grid-cols-7 gap-1 mb-1">
             {WEEKDAYS.map((d) => (
               <div key={d} className="text-[10px] text-center text-muted-foreground font-medium py-1">
@@ -232,7 +231,7 @@ export default function MinTilgjengelighet() {
                 cls += "bg-card border border-border text-foreground hover-elevate active-elevate-2 cursor-pointer";
               }
 
-              const disabled = isPast || isWeekend || isBlocked || hasShift;
+              const disabled = !canEditAvailability({ ready, busy: writeStatus.isPending, isPast, isWeekend, isBlocked, hasShift });
 
               return (
                 <button
@@ -252,6 +251,7 @@ export default function MinTilgjengelighet() {
               );
             })}
           </div>
+          </>}
         </CardContent>
       </Card>
 

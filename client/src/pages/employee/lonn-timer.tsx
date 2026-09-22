@@ -155,11 +155,10 @@ export default function LonnTimer() {
 
   const fetchLonnsslippBlob = async () => {
     if (!user?.id || !lonnsslippForMonth) return null;
-    const res = await fetch(
+    const res = await apiRequest(
+      "GET",
       `/api/users/${user.id}/lonnsslipper/${lonnsslippForMonth.maned}/file`,
-      { credentials: "include" },
     );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     let filename = lonnsslippForMonth.filNavn || `lonnsslipp-${selectedMonth}.pdf`;
     const cd = res.headers.get("Content-Disposition") || "";

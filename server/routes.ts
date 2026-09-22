@@ -1584,31 +1584,44 @@ export async function registerRoutes(
     res.json({ key: process.env.VAPID_PUBLIC_KEY || "" });
   });
 
+  const validPushEndpoint = (endpoint: unknown): endpoint is string => {
+    if (typeof endpoint !== "string" || endpoint.length > 4096) return false;
+    if (/^apns:\/\/[a-fA-F0-9]{64}$/.test(endpoint)) return true;
+    if (/^fcm:\/\/[A-Za-z0-9_:.-]{20,4090}$/.test(endpoint)) return true;
+    try {
+      const url = new URL(endpoint);
+      return url.protocol === "https:" && !!url.hostname && !url.username && !url.password && !url.hash;
+    } catch {
+      return false;
+    }
+  };
+
   app.post("/api/push/subscribe", requireAuth, async (req, res) => {
-    const { endpoint, keys } = req.body;
-    const isNative = typeof endpoint === "string" && (endpoint.startsWith("apns://") || endpoint.startsWith("fcm://"));
-    if (!endpoint || (!isNative && (!keys?.p256dh || !keys?.auth))) {
-      console.log(`[Push] Subscribe rejected: missing fields for user ${getUserIdFromRequest(req)} (endpoint: ${endpoint?.substring(0, 30)})`);
+    const { endpoint, keys } = req.body || {};
+    if (!validPushEndpoint(endpoint) || !keys || typeof keys !== "object" || Array.isArray(keys)) {
       return res.status(400).json({ message: "Ugyldig subscription" });
     }
-    console.log(`[Push] Saving subscription for user ${getUserIdFromRequest(req)}, endpoint: ${endpoint.substring(0, 60)}...`);
+    const isNative = endpoint.startsWith("apns://") || endpoint.startsWith("fcm://");
+    const validKey = (value: unknown, size: number) =>
+      typeof value === "string" && value.length === size && /^[A-Za-z0-9_-]+={0,2}$/.test(value);
+    if (isNative ? keys.deviceToken !== endpoint.slice(endpoint.indexOf("://") + 3) :
+      !(validKey(keys.p256dh, 87) || validKey(keys.p256dh, 88)) ||
+      !(validKey(keys.auth, 22) || validKey(keys.auth, 24))) {
+      return res.status(400).json({ message: "Ugyldig subscription" });
+    }
     await storage.savePushSubscription({
       userId: getUserIdFromRequest(req)!,
       endpoint,
       p256dh: keys?.p256dh ?? keys?.deviceToken ?? "",
       auth: keys?.auth ?? keys?.deviceToken ?? "",
     });
-    const allSubs = await storage.getPushSubscriptions(getUserIdFromRequest(req)!);
-    console.log(`[Push] User ${getUserIdFromRequest(req)} now has ${allSubs.length} subscription(s)`);
     res.json({ success: true });
   });
 
   app.post("/api/push/unsubscribe", requireAuth, async (req, res) => {
-    const { endpoint } = req.body;
-    if (endpoint) {
-      console.log(`[Push] Unsubscribe requested for endpoint: ${endpoint.substring(0, 60)}...`);
-      await storage.deletePushSubscription(endpoint);
-    }
+    const { endpoint } = req.body || {};
+    if (!validPushEndpoint(endpoint)) return res.status(400).json({ message: "Ugyldig endpoint" });
+    await storage.deletePushSubscription(endpoint, getUserIdFromRequest(req)!);
     res.json({ success: true });
   });
 

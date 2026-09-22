@@ -119,11 +119,10 @@ function EmployeeAvailabilityCalendar({ userId }: { userId: string }) {
   });
   const monthKey = `${cursor.y}-${pad2(cursor.m)}`;
 
-  const { data, isLoading } = useQuery<UserAvailabilityResponse>({
+  const { data, isLoading, error, refetch } = useQuery<UserAvailabilityResponse>({
     queryKey: ["/api/admin/availability/user", userId, monthKey],
     queryFn: async () => {
-      const r = await fetch(`/api/admin/availability/user/${userId}?month=${monthKey}`, { credentials: "include" });
-      if (!r.ok) throw new Error("Kunne ikke hente data");
+      const r = await apiRequest("GET", `/api/admin/availability/user/${userId}?month=${monthKey}`);
       return r.json();
     },
   });
@@ -174,7 +173,12 @@ function EmployeeAvailabilityCalendar({ userId }: { userId: string }) {
         ))}
       </div>
 
-      {isLoading ? (
+      {error ? (
+        <div role="alert" className="text-sm">
+          <p>Kunne ikke hente tilgjengelighet: {error.message}</p>
+          <Button variant="outline" onClick={() => void refetch()}>Prøv igjen</Button>
+        </div>
+      ) : isLoading ? (
         <Skeleton className="h-32 w-full" />
       ) : (
         <div className="grid grid-cols-7 gap-0.5">
@@ -237,11 +241,7 @@ function monthKeyToLabel(key?: string) {
 
 async function downloadAuthed(url: string, suggestedName: string) {
   try {
-    const token = localStorage.getItem("token");
-    const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    const res = await fetch(url, { credentials: "include", headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res = await apiRequest("GET", url);
     const blob = await res.blob();
     let filename = suggestedName;
     const cd = res.headers.get("Content-Disposition") || "";
@@ -280,14 +280,7 @@ function buildMonthOptions(count: number = 24): { key: string; label: string }[]
 }
 
 async function fetchLonnsslippBlob(userId: string, maned: string, fallbackName: string): Promise<{ blob: Blob; filename: string } | null> {
-  const token = localStorage.getItem("token");
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`/api/users/${userId}/lonnsslipper/${maned}/file`, {
-    credentials: "include",
-    headers,
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const res = await apiRequest("GET", `/api/users/${userId}/lonnsslipper/${maned}/file`);
   const blob = await res.blob();
   let filename = fallbackName;
   const cd = res.headers.get("Content-Disposition") || "";

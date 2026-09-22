@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { apiRequest } from "./queryClient";
 import { queryClient } from "./queryClient";
 import { getAuthToken, setAuthToken, clearAuthToken } from "./token";
+import { cleanupPush, setPushUser } from "./push";
 
 type User = {
   id: string;
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const r = await fetch("/api/auth/me", { credentials: "include", headers });
       if (r.ok) {
         const u = await r.json();
+        setPushUser(u.id);
         setUser((prev) => {
           if (!prev) return u;
           // shallow compare — only update reference if something changed
@@ -76,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refetchMe]);
 
   const login = useCallback(async (username: string, password: string) => {
+    if (user) await cleanupPush();
     let res: Response;
     try {
       res = await fetch("/api/auth/login", {
@@ -99,12 +102,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (u.token) {
       setAuthToken(u.token);
     }
+    setPushUser(u.id);
     setUser(u);
     queryClient.clear();
-  }, []);
+  }, [user]);
 
   const logout = useCallback(async () => {
+    await cleanupPush();
     await apiRequest("POST", "/api/auth/logout");
+    setPushUser(null);
     clearAuthToken();
     setUser(null);
     queryClient.clear();

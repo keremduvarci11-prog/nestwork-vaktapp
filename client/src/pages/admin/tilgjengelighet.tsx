@@ -63,7 +63,7 @@ export default function AdminTilgjengelighet() {
     setSelectedDate(toIso(d));
   };
 
-  const { data, isLoading } = useQuery<ByDateResponse>({
+  const { data, isLoading, isFetching, isSuccess, error, refetch } = useQuery<ByDateResponse>({
     queryKey: ["/api/admin/availability/by-date", selectedDate],
   });
 
@@ -170,7 +170,7 @@ export default function AdminTilgjengelighet() {
                 size="sm"
                 variant="outline"
                 onClick={() => unblockMutation.mutate()}
-                disabled={unblockMutation.isPending}
+                disabled={!isSuccess || isFetching || blockMutation.isPending || unblockMutation.isPending}
                 data-testid="button-unblock-date"
               >
                 <Unlock className="w-3.5 h-3.5 mr-1.5" />
@@ -181,7 +181,7 @@ export default function AdminTilgjengelighet() {
                 size="sm"
                 variant="outline"
                 onClick={() => blockMutation.mutate()}
-                disabled={blockMutation.isPending}
+                disabled={!isSuccess || isFetching || blockMutation.isPending || unblockMutation.isPending}
                 data-testid="button-block-date"
               >
                 <Lock className="w-3.5 h-3.5 mr-1.5" />
@@ -190,7 +190,7 @@ export default function AdminTilgjengelighet() {
             )}
           </div>
 
-          {!isBlocked && !isLoading && sorted.length > 0 && (
+          {!isBlocked && isSuccess && sorted.length > 0 && (
             <div className="flex items-center justify-center gap-3 mt-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-500" />
@@ -208,7 +208,14 @@ export default function AdminTilgjengelighet() {
       </Card>
 
       {/* Innhold */}
-      {isBlocked ? (
+      {error ? (
+        <Card>
+          <CardContent className="py-6 space-y-2" role="alert">
+            <p>Kunne ikke hente tilgjengelighet: {error.message}</p>
+            <Button variant="outline" onClick={() => void refetch()}>Prøv igjen</Button>
+          </CardContent>
+        </Card>
+      ) : isBlocked ? (
         <Card data-testid="card-blocked-banner">
           <CardContent className="py-10 text-center">
             <Lock className="w-10 h-10 mx-auto text-muted-foreground mb-3" />

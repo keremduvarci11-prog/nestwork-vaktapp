@@ -82,7 +82,7 @@ export interface IStorage {
 
   getPushSubscriptions(userId: string): Promise<PushSubscription[]>;
   savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription>;
-  deletePushSubscription(endpoint: string): Promise<void>;
+  deletePushSubscription(endpoint: string, userId: string): Promise<void>;
   getUsersByRegion(region: string): Promise<User[]>;
   getUsersByRegions(regions: string[]): Promise<User[]>;
 
@@ -426,13 +426,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription> {
-    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
-    const [created] = await db.insert(pushSubscriptions).values(sub).returning();
-    return created;
+    // Endpoint ownership follows this device, not every device of either user.
+    // Serialize concurrent registrations without requiring a schema migration.
+    return db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sub.endpoint}))`);
+      await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
+      const [created] = await tx.insert(pushSubscriptions).values(sub).returning();
+      return created;
+    });
   }
 
-  async deletePushSubscription(endpoint: string): Promise<void> {
-    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  async deletePushSubscription(endpoint: string, userId: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(and(
+      eq(pushSubscriptions.endpoint, endpoint),
+      eq(pushSubscriptions.userId, userId),
+    ));
   }
 
   async getUsersByRegion(region: string): Promise<User[]> {

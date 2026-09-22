@@ -102,7 +102,7 @@ export async function sendPushNotificationOnly(userId: string, title: string, me
         const result = await sendApns(deviceToken, title, message, link);
         if (result.expired) {
           console.log(`[Push] APNS token expired - removing endpoint`);
-          await storage.deletePushSubscription(endpoint);
+          await storage.deletePushSubscription(endpoint, userId);
         }
         continue;
       }
@@ -127,7 +127,7 @@ export async function sendPushNotificationOnly(userId: string, title: string, me
         console.error(`[Push] WEB FAILED: status=${err.statusCode}, endpoint=${sub.endpoint.substring(0, 60)}...`);
         if (err.statusCode === 410 || err.statusCode === 404) {
           console.log(`[Push] Subscription expired (${err.statusCode}) - removing endpoint`);
-          await storage.deletePushSubscription(sub.endpoint);
+          await storage.deletePushSubscription(sub.endpoint, userId);
         }
       }
     }

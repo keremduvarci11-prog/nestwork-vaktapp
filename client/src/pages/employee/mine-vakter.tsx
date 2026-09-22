@@ -29,8 +29,7 @@ export default function MineVakter() {
 
   const addToCalendar = async (vaktId: string) => {
     try {
-      const res = await fetch(`/api/vakter/${vaktId}/kalender`, { credentials: "include" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await apiRequest("GET", `/api/vakter/${vaktId}/kalender`);
       const ics = await res.text();
 
       const { Capacitor } = await import("@capacitor/core");
