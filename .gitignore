@@ -6,3 +6,4 @@ vite.config.ts.*
 *.tar.gz
 android/app/google-services.json
 android/app/google-services.json.tmp
+**/*firebase-adminsdk*.json
