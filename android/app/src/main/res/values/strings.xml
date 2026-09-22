@@ -4,4 +4,6 @@
     <string name="title_activity_main">Nestwork</string>
     <string name="package_name">no.nestwork.vaktapp</string>
     <string name="custom_url_scheme">no.nestwork.vaktapp</string>
+    <string name="notification_channel_name">Nestwork-oppdateringer</string>
+    <string name="notification_channel_description">Varsler om vakter og andre oppdateringer</string>
 </resources>

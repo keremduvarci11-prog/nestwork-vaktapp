@@ -6,12 +6,17 @@ let generation = 0;
 let registeredUser: string | null = null;
 let pending: Promise<void> | null = null;
 let stopping = false;
+let nativePushUnavailable = false;
+let nativeTokenHandler: ((token: string) => void) | null = null;
+let nativeErrorHandler: ((error: unknown) => void) | null = null;
 
 // Auth calls this before rendering the signed-in application.
 export function setPushUser(id: string | null) {
   if (userId !== id) {
     generation++;
     registeredUser = null;
+    nativeTokenHandler = null;
+    nativeErrorHandler = null;
     userId = id;
   }
 }
@@ -40,37 +45,57 @@ async function registerPush(requestPermission: boolean): Promise<void> {
   const epoch = generation;
   const current = () => generation === epoch && userId === owner && !stopping;
   const save = async (endpoint: string, keys: Record<string, string>) => {
+    if (!current()) return;
     // Remember even an ambiguous network failure so logout can detach it.
     localStorage.setItem(ENDPOINT_KEY, endpoint);
-    if (!current()) return;
     await apiRequest("POST", "/api/push/subscribe", { endpoint, keys });
     if (current()) registeredUser = owner;
   };
   const operation = async () => {
-    if (getPlatform() === "android") return; // FCM is not configured.
-    if (getPlatform() === "ios") {
+    const platform = getPlatform();
+    if (platform === "ios" || platform === "android") {
+      if (nativePushUnavailable) return;
+      const capacitor = (window as any).Capacitor;
+      if (capacitor?.isPluginAvailable?.("PushNotifications") === false) {
+        // Older Android binaries load the current remote web bundle but do not
+        // contain the native plugin. Avoid repeated import/register failures;
+        // push becomes available after installing the new native binary.
+        nativePushUnavailable = true;
+        return;
+      }
       const { PushNotifications } = await import("@capacitor/push-notifications");
       await installNativeListeners();
       let permission = await PushNotifications.checkPermissions();
       if (permission.receive !== "granted") permission = await PushNotifications.requestPermissions();
       if (!current() || permission.receive !== "granted") return;
-      const handles: Array<{ remove: () => Promise<void> }> = [];
       let timer: ReturnType<typeof setTimeout> | undefined;
+      let initialTokenHandler: ((token: string) => void) | null = null;
+      let initialErrorHandler: ((error: unknown) => void) | null = null;
       try {
         const token = await new Promise<string>((resolve, reject) => {
           timer = setTimeout(() => reject(new Error("Push-registrering tok for lang tid. Prøv igjen.")), 15000);
-          void (async () => {
-            handles.push(await PushNotifications.addListener("registration", token => resolve(token.value)));
-            handles.push(await PushNotifications.addListener("registrationError", () =>
-              reject(new Error("Kunne ikke registrere push-varsler. Prøv igjen."))));
-            await PushNotifications.register();
-          })().catch(reject);
+          initialTokenHandler = resolve;
+          initialErrorHandler = () => reject(new Error("Kunne ikke registrere push-varsler. Prøv igjen."));
+          nativeTokenHandler = initialTokenHandler;
+          nativeErrorHandler = initialErrorHandler;
+          void PushNotifications.register().catch(reject);
         });
         if (!token) throw new Error("Push-registrering mangler enhetstoken.");
-        await save(`apns://${token}`, { deviceToken: token });
+        const endpointFor = (value: string) => `${platform === "android" ? "fcm" : "apns"}://${value}`;
+        await save(endpointFor(token), { deviceToken: token });
+        // Firebase/APNs can rotate a token while the app is running. Keep the
+        // single native listener attached and update only the current account.
+        nativeTokenHandler = value => {
+          if (!value || !current()) return;
+          void save(endpointFor(value), { deviceToken: value }).catch(error =>
+            console.error("[Push] Kunne ikke lagre oppdatert enhetstoken:", error));
+        };
+        nativeErrorHandler = error =>
+          console.error("[Push] Native tokenoppdatering feilet:", error);
       } finally {
         clearTimeout(timer);
-        await Promise.all(handles.map(handle => handle.remove()));
+        if (nativeTokenHandler === initialTokenHandler) nativeTokenHandler = null;
+        if (nativeErrorHandler === initialErrorHandler) nativeErrorHandler = null;
       }
       return;
     }
@@ -104,7 +129,23 @@ async function registerPush(requestPermission: boolean): Promise<void> {
 
 let foregroundListener: Promise<unknown> | null = null;
 let actionListener: Promise<unknown> | null = null;
+let registrationListener: Promise<unknown> | null = null;
+let registrationErrorListener: Promise<unknown> | null = null;
 async function installNativeListeners() {
+  if (!registrationListener) {
+    registrationListener = import("@capacitor/push-notifications").then(({ PushNotifications }) =>
+      PushNotifications.addListener("registration", token => nativeTokenHandler?.(token.value))).catch(error => {
+        registrationListener = null;
+        throw error;
+      });
+  }
+  if (!registrationErrorListener) {
+    registrationErrorListener = import("@capacitor/push-notifications").then(({ PushNotifications }) =>
+      PushNotifications.addListener("registrationError", error => nativeErrorHandler?.(error))).catch(error => {
+        registrationErrorListener = null;
+        throw error;
+      });
+  }
   if (!foregroundListener) {
     foregroundListener = import("@capacitor/push-notifications").then(({ PushNotifications }) =>
       PushNotifications.addListener("pushNotificationReceived", () => {
@@ -138,7 +179,7 @@ async function installNativeListeners() {
         throw error;
       });
   }
-  await Promise.all([foregroundListener, actionListener]);
+  await Promise.all([registrationListener, registrationErrorListener, foregroundListener, actionListener]);
 }
 
 // Must finish with the OLD account's credentials, before clearing auth or logging
@@ -147,6 +188,8 @@ export async function cleanupPush(): Promise<void> {
   stopping = true;
   generation++;
   registeredUser = null;
+  nativeTokenHandler = null;
+  nativeErrorHandler = null;
   try {
     await pending?.catch(() => undefined);
     let endpoint = localStorage.getItem(ENDPOINT_KEY);

@@ -2,6 +2,7 @@ import webpush from "web-push";
 import apn from "@parse/node-apn";
 import { storage } from "./storage";
 import { notificationRegions } from "@shared/regions";
+import { sendFcm } from "./fcm";
 
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || "";
@@ -45,7 +46,7 @@ if (APNS_AUTH_KEY && APNS_KEY_ID && APNS_TEAM_ID && APNS_BUNDLE_ID) {
     });
     console.log("[Push] APNS provider configured successfully (bundle:", APNS_BUNDLE_ID + ", keyId:", APNS_KEY_ID + ", teamId:", APNS_TEAM_ID + ")");
   } catch (err) {
-    console.error("[Push] APNS provider failed to initialize:", err);
+    console.error("[Push] APNS provider failed to initialize");
   }
 } else {
   console.warn("[Push] WARNING: APNS env vars not set - native iOS push disabled");
@@ -67,20 +68,20 @@ async function sendApns(deviceToken: string, title: string, body: string, link?:
   try {
     const result = await apnProvider.send(note, deviceToken);
     if (result.sent.length > 0) {
-      console.log(`[Push] APNS SUCCESS: ${deviceToken.substring(0, 16)}...`);
+      console.log("[Push] APNS SUCCESS");
       return { ok: true, expired: false };
     }
     if (result.failed.length > 0) {
       const f = result.failed[0];
       const reason = (f.response as any)?.reason || f.error?.message || "unknown";
       const status = f.status;
-      console.error(`[Push] APNS FAILED: status=${status}, reason=${reason}, token=${deviceToken.substring(0, 16)}...`);
+      console.error(`[Push] APNS FAILED: status=${status}, reason=${reason}`);
       const expired = reason === "Unregistered" || reason === "BadDeviceToken" || status === 410;
       return { ok: false, expired };
     }
     return { ok: false, expired: false };
-  } catch (err: any) {
-    console.error("[Push] APNS error:", err.message);
+  } catch {
+    console.error("[Push] APNS error");
     return { ok: false, expired: false };
   }
 }
@@ -88,7 +89,7 @@ async function sendApns(deviceToken: string, title: string, body: string, link?:
 export async function sendPushNotificationOnly(userId: string, title: string, message: string, link?: string) {
   try {
     const subs = await storage.getPushSubscriptions(userId);
-    console.log(`[Push] Sending push to user ${userId}: ${subs.length} subscription(s) found. Title: "${title}"`);
+    console.log(`[Push] Sending push to user ${userId}: ${subs.length} subscription(s) found`);
 
     if (subs.length === 0) {
       return;
@@ -108,7 +109,18 @@ export async function sendPushNotificationOnly(userId: string, title: string, me
       }
 
       if (endpoint.startsWith("fcm://")) {
-        console.log(`[Push] FCM endpoint not yet supported (Android), skipping`);
+        const deviceToken = endpoint.slice("fcm://".length);
+        const result = await sendFcm(deviceToken, title, message, link);
+        if (result.ok) {
+          console.log("[Push] FCM SUCCESS");
+        } else if (result.invalidToken) {
+          console.log("[Push] FCM token unregistered - removing subscription");
+          await storage.deletePushSubscription(endpoint, userId);
+        } else if (result.reason !== "missing_config") {
+          console.error(
+            `[Push] FCM FAILED${result.status ? `: status=${result.status}` : ""}`,
+          );
+        }
         continue;
       }
 
@@ -122,9 +134,9 @@ export async function sendPushNotificationOnly(userId: string, title: string, me
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           JSON.stringify({ title, body: message, url: link || "/" })
         );
-        console.log(`[Push] WEB SUCCESS: Sent to ${sub.endpoint.substring(0, 60)}...`);
+        console.log("[Push] WEB SUCCESS");
       } catch (err: any) {
-        console.error(`[Push] WEB FAILED: status=${err.statusCode}, endpoint=${sub.endpoint.substring(0, 60)}...`);
+        console.error(`[Push] WEB FAILED: status=${err.statusCode}`);
         if (err.statusCode === 410 || err.statusCode === 404) {
           console.log(`[Push] Subscription expired (${err.statusCode}) - removing endpoint`);
           await storage.deletePushSubscription(sub.endpoint, userId);

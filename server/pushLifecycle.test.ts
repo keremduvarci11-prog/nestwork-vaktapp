@@ -11,6 +11,7 @@ async function pushHarness(platform = "ios") {
   let permission = "granted";
   let fail = false;
   let nativeError = false;
+  let pluginAvailable = true;
   let registrations = 0;
   let webUnsubscribes = 0;
   const local = new Map();
@@ -26,7 +27,10 @@ async function pushHarness(platform = "ios") {
   const context = vm.createContext({
     setTimeout, clearTimeout, console, URL,
     window: {
-      Capacitor: { getPlatform: () => platform }, PushManager: {},
+      Capacitor: {
+        getPlatform: () => platform,
+        isPluginAvailable: () => pluginAvailable,
+      }, PushManager: {},
       location: { href: "capacitor://localhost/", assign: (path: string) => navigations.push(path) },
     },
     navigator: { serviceWorker: {
@@ -86,6 +90,7 @@ async function pushHarness(platform = "ios") {
     permission: (value: string) => { permission = value; },
     fail: (value: boolean) => { fail = value; },
     nativeError: (value: boolean) => { nativeError = value; },
+    pluginAvailable: (value: boolean) => { pluginAvailable = value; },
   };
 }
 
@@ -151,6 +156,41 @@ test("native taps navigate only safe local paths with one listener across accoun
   assert.equal(h.listeners.get("pushNotificationReceived")?.size, 1);
   tap("/profil");
   assert.deepEqual(h.navigations, ["/mine-vakter?tab=active#vakt", "/varsler", "/profil"]);
+});
+
+test("Android permission denial is retryable and registration uses only the FCM token route", async () => {
+  const h = await pushHarness("android");
+  h.push.setPushUser("android-account");
+  h.permission("denied");
+  await h.push.initPush();
+  assert.equal(h.registrations(), 0);
+  assert.equal(h.calls.length, 0);
+
+  h.permission("granted");
+  await h.push.initPush();
+  assert.equal(h.registrations(), 1);
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.calls[0].url, "/api/push/subscribe");
+  assert.equal(h.calls[0].body.endpoint, `fcm://${"a".repeat(64)}`);
+  assert.equal(h.calls[0].body.keys.deviceToken, "a".repeat(64));
+  assert.equal(h.calls[0].body.endpoint.startsWith("apns://"), false);
+
+  for (const callback of h.listeners.get("registration") || []) {
+    callback({ value: "b".repeat(64) });
+  }
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(h.calls.at(-1)?.body.endpoint, `fcm://${"b".repeat(64)}`);
+});
+
+test("old Android binaries without the native push plugin skip registration safely", async () => {
+  const h = await pushHarness("android");
+  h.pluginAvailable(false);
+  h.push.setPushUser("android-account");
+  await h.push.initPush();
+  await h.push.subscribeToPush();
+  assert.equal(h.registrations(), 0);
+  assert.equal(h.calls.length, 0);
+  assert.equal(h.listeners.size, 0);
 });
 
 test("profile logout failure is caught by mutation and surfaced as a retryable toast", async () => {
@@ -234,6 +274,12 @@ test("push routes validate malformed input and scope unsubscribe to authenticate
   const endpoint = `apns://${"a".repeat(64)}`;
   assert.equal(await request("subscribe", { endpoint, keys: { deviceToken: "a".repeat(64) } }), 200);
   assert.equal(saved[0].userId, "owner-a");
+  const fcmEndpoint = `fcm://${"f".repeat(64)}`;
+  assert.equal(await request("subscribe", {
+    endpoint: fcmEndpoint,
+    keys: { deviceToken: "f".repeat(64) },
+  }), 200);
+  assert.equal(saved[1].endpoint, fcmEndpoint);
   assert.equal(await request("subscribe", {
     endpoint: "https://push.example/synthetic",
     keys: { p256dh: "a".repeat(87), auth: "b".repeat(22) },
