@@ -10,12 +10,13 @@ Notifications. Pakkenavnet er `no.nestwork.vaktapp`, endepunkter lagres som
 2. Registrer en Android-app med nøyaktig pakkenavn
    `no.nestwork.vaktapp`.
 3. Last ned Firebase-filen `google-services.json`.
-4. Legg filen lokalt/igjennom den sikre CI-konfigurasjonen på
-   `android/app/google-services.json`.
+4. Legg Android-konfigurasjonen på `android/app/google-services.json`.
 5. Kjør Capacitor-synkronisering når web/native-avhengigheter oppdateres.
 
 `google-services.json` er prosjektspesifikk konfigurasjon og skal ikke
-oppdiktes. Den finnes med hensikt ikke i dette repositoriet. En release-bygg
+oppdiktes. Denne filen inneholder offentlige appidentifikatorer og følger
+repositoriet. Den må ikke forveksles med den private Admin SDK-nøkkelen.
+Et release-bygg
 feiler med en tydelig melding dersom filen mangler. En ny Android-binær må
 bygges og publiseres etter at filen er lagt inn; eldre binærer inneholder ikke
 FCM-oppsettet. Det fjernlastede webgrensesnittet oppdager eldre Android-binærer
@@ -24,24 +25,14 @@ uten plugin og hopper over registreringen uten gjentatte native feil.
 ### Codemagic
 
 Codemagic bygger fra GitHub `main`, ikke direkte fra Replit. Endringene må
-derfor synkroniseres til den grenen før en bygg startes. Legg
-`google-services.json` inn som den krypterte Codemagic-variabelen
-`ANDROID_GOOGLE_SERVICES_JSON_BASE64`. Android-workflowen har et obligatorisk
-steg før `npx cap sync android` som dekoder verdien uten å skrive den til
-loggen:
+derfor synkroniseres til den grenen før et bygg startes. Workflowen bruker
+Android-konfigurasjonen fra repositoriet. Ingen ekstra Codemagic-hemmelighet
+er nødvendig. Variabelen `ANDROID_GOOGLE_SERVICES_JSON_BASE64` kan fortsatt
+brukes som en eksplisitt overstyring for andre byggmiljøer.
 
-```sh
-test -n "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" || {
-  echo "Missing ANDROID_GOOGLE_SERVICES_JSON_BASE64" >&2
-  exit 1
-}
-printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" |
-  base64 --decode > android/app/google-services.json
-test -s android/app/google-services.json
-```
-
-Hemmeligheten må gjøres tilgjengelig for `android-release`-workflowen. Steget
-stanser workflowen ved manglende, ugyldig eller tom verdi. Gradle stanser både
+Før Capacitor-synkronisering validerer workflowen filen uten å skrive
+innholdet til loggen. Manglende/ugyldig fil, feil pakkenavn eller en
+service-account-fil stanser bygget. Gradle stanser både
 `bundleRelease` og `assembleRelease` dersom filen mangler. Når filen finnes,
 kjører Google Services-pluginen og avviser konfigurasjon som ikke inneholder en
 klient for pakken `no.nestwork.vaktapp`.

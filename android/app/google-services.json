@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "954746821244",
+    "project_id": "nestwork-a587d",
+    "storage_bucket": "nestwork-a587d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:954746821244:android:6b2a8f38fa7752468bc7f9",
+        "android_client_info": {
+          "package_name": "no.nestwork.vaktapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxp5s8KcwsSUpIulbakJ2RKFDfgEY9HhM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -36,26 +36,33 @@ workflows:
         script: npm run build
       - name: Configure Firebase Android
         script: |
-          # Keep the protected value out of command traces and fail before
-          # Capacitor/Gradle can produce an Android release without FCM.
+          # Firebase's Android config contains public app identifiers, not
+          # server credentials. Use the checked-in config unless CI overrides it.
           set +x
           umask 077
-          if [ -z "${ANDROID_GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
-            echo "Missing required protected variable ANDROID_GOOGLE_SERVICES_JSON_BASE64" >&2
-            exit 1
-          fi
           mkdir -p android/app
-          if ! printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json.tmp; then
-            rm -f android/app/google-services.json.tmp
-            echo "ANDROID_GOOGLE_SERVICES_JSON_BASE64 is not valid base64" >&2
-            exit 1
+          if [ -n "${ANDROID_GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+            if ! printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json.tmp; then
+              rm -f android/app/google-services.json.tmp
+              echo "ANDROID_GOOGLE_SERVICES_JSON_BASE64 is not valid base64" >&2
+              exit 1
+            fi
+            mv android/app/google-services.json.tmp android/app/google-services.json
           fi
-          if [ ! -s android/app/google-services.json.tmp ]; then
-            rm -f android/app/google-services.json.tmp
-            echo "Decoded google-services.json is empty" >&2
-            exit 1
-          fi
-          mv android/app/google-services.json.tmp android/app/google-services.json
+          node <<'NODE'
+          const fs = require("node:fs");
+          try {
+            const config = JSON.parse(fs.readFileSync("android/app/google-services.json", "utf8"));
+            if (config.private_key || config.type === "service_account") throw new Error();
+            const client = config.client?.find(c => c.client_info?.android_client_info?.package_name === process.env.PACKAGE_NAME);
+            if (!config.project_info?.project_id || !config.project_info?.project_number ||
+                !client?.client_info?.mobilesdk_app_id || !client.api_key?.some(k => k.current_key)) throw new Error();
+            console.log("Firebase Android configuration verified.");
+          } catch {
+            console.error("Missing or invalid Android Firebase config. Use google-services.json, never a server service-account key.");
+            process.exit(1);
+          }
+          NODE
       - name: Sync Capacitor
         script: npx cap sync android
       - name: Set Android SDK location

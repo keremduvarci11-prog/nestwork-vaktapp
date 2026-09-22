@@ -15,4 +15,10 @@ The mobile (Android/iOS) builds run on Codemagic, cloning `github.com/keremduvar
 
 **How to apply:** Preserve compatibility with older Android binaries while preparing the new release. Require Firebase configuration from the same project for client and server, and verify physical-device delivery before describing Android push as operational. Native configuration/plugin changes require a new Android binary; do not confuse passing web builds with native verification.
 
+The Firebase Android client configuration may travel with the repository; private Firebase Admin SDK credentials must never do so.
+
+**Why:** Firebase documents the Android configuration as non-secret project identifiers. Requiring a second CI secret for this public configuration added unnecessary setup steps. The service-account key, unlike the Android configuration, authorizes server operations and must remain in Secrets.
+
+**How to apply:** Keep CI validation strict for missing configuration, wrong package names, and accidentally supplied service-account files. Never copy the server credential into an Android build, Git, logs, or downloadable assets.
+
 **Why:** Google Play rejected the app for startup crashes (Firebase auto-init without config); Codemagic builds repeatedly failed at "Build web assets" because GitHub main was a stale diverged copy missing files, then because of the firewall URLs in the lockfile.
