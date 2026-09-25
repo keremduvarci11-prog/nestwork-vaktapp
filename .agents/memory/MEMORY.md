@@ -8,3 +8,4 @@
 - [Employee provisioning](employee-identity-safety.md) — identity collision safety; authorized app administration differs from read-only production SQL.
 - [Multiple regions](multiple-regions.md) — one account can cover several regions; preserve legacy groups and distinguish saved membership from published matching support.
 - [Availability calendar performance](availability-calendar-performance.md) — keep the calendar mounted and queue only same-date writes so rapid multi-day marking stays responsive.
+- [API log privacy](api-log-privacy.md) — never include response bodies in production request logs; login responses carry active tokens and employee endpoints carry sensitive data.

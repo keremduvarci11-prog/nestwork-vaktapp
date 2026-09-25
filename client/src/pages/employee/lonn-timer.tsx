@@ -77,7 +77,7 @@ export default function LonnTimer() {
     queryKey: ["/api/barnehager"],
   });
 
-  const { data: lonnsslipper } = useQuery<LonnsslippMeta[]>({
+  const { data: lonnsslipper, isLoading: slipsLoading, isError: slipsError, refetch: refetchSlips } = useQuery<LonnsslippMeta[]>({
     queryKey: ["/api/users", user?.id, "lonnsslipper"],
     enabled: !!user?.id,
   });
@@ -153,14 +153,14 @@ export default function LonnTimer() {
 
   const lonnsslippForMonth = (lonnsslipper || []).find((l) => l.maned === selectedMonth);
 
-  const fetchLonnsslippBlob = async () => {
-    if (!user?.id || !lonnsslippForMonth) return null;
+  const fetchLonnsslippBlob = async (slip: LonnsslippMeta) => {
+    if (!user?.id) return null;
     const res = await apiRequest(
       "GET",
-      `/api/users/${user.id}/lonnsslipper/${lonnsslippForMonth.maned}/file`,
+      `/api/users/${user.id}/lonnsslipper/${slip.maned}/file`,
     );
     const blob = await res.blob();
-    let filename = lonnsslippForMonth.filNavn || `lonnsslipp-${selectedMonth}.pdf`;
+    let filename = slip.filNavn || `lonnsslipp-${slip.maned}.pdf`;
     const cd = res.headers.get("Content-Disposition") || "";
     const cdMatch = cd.match(/filename="?([^";]+)"?/i);
     if (cdMatch) filename = cdMatch[1];
@@ -179,9 +179,9 @@ export default function LonnTimer() {
       reader.readAsDataURL(blob);
     });
 
-  const openLonnsslipp = async () => {
+  const openLonnsslipp = async (slip: LonnsslippMeta) => {
     try {
-      const result = await fetchLonnsslippBlob();
+      const result = await fetchLonnsslippBlob(slip);
       if (!result) return;
       const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
       const objectUrl = URL.createObjectURL(pdfBlob);
@@ -204,10 +204,10 @@ export default function LonnTimer() {
   const ensurePdfExt = (name: string) =>
     /\.pdf$/i.test(name) ? name : `${name.replace(/\.[^.]+$/, "")}.pdf`;
 
-  const downloadLonnsslipp = async () => {
-    if (!user?.id || !lonnsslippForMonth) return;
+  const downloadLonnsslipp = async (slip: LonnsslippMeta) => {
+    if (!user?.id) return;
     try {
-      const result = await fetchLonnsslippBlob();
+      const result = await fetchLonnsslippBlob(slip);
       if (!result) return;
       const filename = ensurePdfExt(result.filename);
       const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
@@ -422,7 +422,7 @@ export default function LonnTimer() {
         <Button
           variant="outline"
           size="icon"
-          onClick={downloadLonnsslipp}
+          onClick={() => lonnsslippForMonth && downloadLonnsslipp(lonnsslippForMonth)}
           disabled={!lonnsslippForMonth}
           data-testid="button-download-lonnsslipp-icon"
           title={lonnsslippForMonth ? "Last ned lønnsslipp" : "Ingen lønnsslipp for denne måneden"}
@@ -444,7 +444,7 @@ export default function LonnTimer() {
             </div>
             <Button
               size="sm"
-              onClick={openLonnsslipp}
+              onClick={() => openLonnsslipp(lonnsslippForMonth)}
               data-testid="button-open-lonnsslipp"
             >
               <Eye className="w-3.5 h-3.5 mr-1.5" />
@@ -453,6 +453,46 @@ export default function LonnTimer() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <h2 className="text-sm font-semibold">Tidligere lønnsslipper</h2>
+          {slipsLoading ? (
+            <Skeleton className="h-16 w-full" />
+          ) : slipsError ? (
+            <div className="text-sm text-destructive">
+              Kunne ikke hente lønnsslipper.{" "}
+              <Button variant="ghost" className="p-0 h-auto underline" onClick={() => refetchSlips()}>
+                Prøv igjen
+              </Button>
+            </div>
+          ) : !lonnsslipper?.length ? (
+            <p className="text-sm text-muted-foreground">Ingen lønnsslipper er lastet opp for deg ennå.</p>
+          ) : (
+            <div className="space-y-2">
+              {lonnsslipper.map((slip) => {
+                const [year, month] = slip.maned.split("-").map(Number);
+                return (
+                  <div key={slip.id} className="flex flex-wrap items-center justify-between gap-2 border rounded-md p-3" data-testid={`row-employee-lonnsslipp-${slip.maned}`}>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm">{MONTH_NAMES[month - 1]} {year}</p>
+                      <p className="text-xs text-muted-foreground break-all">{slip.filNavn}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => openLonnsslipp(slip)} data-testid={`button-open-employee-lonnsslipp-${slip.maned}`}>
+                        <Eye className="w-4 h-4 mr-1" /> Åpne
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => downloadLonnsslipp(slip)} data-testid={`button-download-employee-lonnsslipp-${slip.maned}`}>
+                        <Download className="w-4 h-4 mr-1" /> Last ned
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <div className="space-y-3">
