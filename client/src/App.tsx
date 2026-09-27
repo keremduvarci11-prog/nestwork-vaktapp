@@ -44,7 +44,7 @@ function AppContent() {
     refetchInterval: 15000,
   });
 
-  const { data: personalreglerStatus, isLoading: personalreglerLoading } = useQuery<{ accepted: boolean }>({
+  const { data: personalreglerStatus, isLoading: personalreglerLoading, isError: personalreglerError, refetch: refetchPersonalregler } = useQuery<{ accepted: boolean }>({
     queryKey: ["/api/personalregler/status"],
     enabled: !!user && user.role !== "admin",
   });
@@ -88,6 +88,23 @@ function AppContent() {
 
   const isAdmin = user.role === "admin";
   const varselCount = unreadVarsler?.count || 0;
+
+  if (!isAdmin && (personalreglerLoading || personalreglerError || !personalreglerStatus)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">
+        {personalreglerLoading ? (
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        ) : (
+          <>
+            <p>Kunne ikke kontrollere om personalreglene er godtatt. Prøv igjen.</p>
+            <button type="button" className="underline text-primary" onClick={() => refetchPersonalregler()}>
+              Prøv igjen
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   if (!isAdmin && !personalreglerLoading && personalreglerStatus && !personalreglerStatus.accepted) {
     return (

@@ -561,14 +561,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPersonalreglerGodkjenning(userId: string, versionId: number): Promise<PersonalreglerGodkjenning> {
-    const [row] = await db
+    const [inserted] = await db
       .insert(personalreglerGodkjenning)
       .values({ userId, versionId })
-      .onConflictDoUpdate({
-        target: [personalreglerGodkjenning.userId, personalreglerGodkjenning.versionId],
-        set: { acceptedAt: sql`now()` },
-      })
+      .onConflictDoNothing({ target: [personalreglerGodkjenning.userId, personalreglerGodkjenning.versionId] })
       .returning();
+    const row = inserted ?? await this.getPersonalreglerGodkjenning(userId, versionId);
+    if (!row) throw new Error("Kunne ikke hente personalregler-godkjenning");
     return row;
   }
 

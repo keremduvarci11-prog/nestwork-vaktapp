@@ -1827,6 +1827,18 @@ export async function registerRoutes(
     });
   });
 
+  app.get("/api/admin/users/:id/personalregler/status", requireAdmin, async (req, res) => {
+    const userId = asString(req.params.id);
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== "ansatt") return res.status(404).json({ message: "Ansatt ikke funnet" });
+    const row = await storage.getPersonalreglerGodkjenning(userId, PERSONALREGLER_VERSION);
+    res.json({
+      accepted: !!row,
+      acceptedAt: row?.acceptedAt?.toISOString() || null,
+      currentVersion: PERSONALREGLER_VERSION,
+    });
+  });
+
   app.post("/api/personalregler/accept", requireAuth, async (req, res) => {
     const userId = getUserIdFromRequest(req)!;
     const row = await storage.createPersonalreglerGodkjenning(userId, PERSONALREGLER_VERSION);

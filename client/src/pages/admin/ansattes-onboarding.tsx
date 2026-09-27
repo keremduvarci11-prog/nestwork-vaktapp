@@ -608,6 +608,14 @@ function EmployeeDetailDialog({
   const [regionInput, setRegionInput] = useState<string>("");
   const [regionError, setRegionError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { data: rulesStatus, isLoading: rulesLoading, isError: rulesError, refetch: refetchRules } = useQuery<{
+    accepted: boolean;
+    acceptedAt: string | null;
+    currentVersion: number;
+  }>({
+    queryKey: ["/api/admin/users", emp?.userId, "personalregler/status"],
+    enabled: open && !!emp?.userId,
+  });
 
   useEffect(() => {
     if (open && emp) {
@@ -928,6 +936,34 @@ function EmployeeDetailDialog({
               <p className="text-[10px] text-muted-foreground mt-1.5">
                 Estimat oppdateres automatisk hver gang en vakt blir godkjent.
               </p>
+            </section>
+
+            <Separator />
+
+            <section data-testid="section-employee-personalregler">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5" /> Personalregler
+              </h3>
+              {rulesLoading ? (
+                <Skeleton className="h-5 w-44" />
+              ) : rulesError ? (
+                <p className="text-sm text-destructive">
+                  Kunne ikke hente signeringsstatus.{" "}
+                  <Button variant="ghost" className="p-0 h-auto underline" onClick={() => refetchRules()}>Prøv igjen</Button>
+                </p>
+              ) : rulesStatus?.accepted && rulesStatus.acceptedAt ? (
+                <p className="text-sm" data-testid="text-employee-personalregler-signed">
+                  Godkjent {new Intl.DateTimeFormat("nb-NO", {
+                    dateStyle: "long",
+                    timeStyle: "short",
+                    timeZone: "Europe/Oslo",
+                  }).format(new Date(rulesStatus.acceptedAt))} (norsk tid)
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid="text-employee-personalregler-pending">
+                  Ikke godkjent ennå
+                </p>
+              )}
             </section>
 
             <Separator />
