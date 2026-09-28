@@ -431,7 +431,15 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  app.post("/api/users/:id/profile-image", requireAuth, upload.single("image"), async (req, res) => {
+  app.post("/api/users/:id/profile-image", requireAuth, (req, res, next) => {
+    upload.single("image")(req, res, (error) => {
+      if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({ message: "Bildet er for stort. Velg et mindre bilde (maks 2 MB)." });
+      }
+      if (error) return next(error);
+      next();
+    });
+  }, async (req, res) => {
     if (getUserIdFromRequest(req) !== asString(req.params.id)) {
       return res.status(403).json({ message: "Ingen tilgang" });
     }

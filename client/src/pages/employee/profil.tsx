@@ -12,6 +12,7 @@ import { Link } from "wouter";
 import logoSrc from "@assets/nestwork_logo_centered.png";
 import { useTheme } from "@/components/theme-provider";
 import { ImageCropper } from "@/components/image-cropper";
+import { getAuthToken } from "@/lib/token";
 import type { Vakt } from "@shared/schema";
 import { calculatePaidHours } from "@shared/shiftHours";
 
@@ -53,20 +54,25 @@ export default function Profil() {
     mutationFn: async (blob: Blob) => {
       const formData = new FormData();
       formData.append("image", blob, "profile.jpg");
+      const token = getAuthToken();
       const res = await fetch(`/api/users/${user?.id}/profile-image`, {
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
-      if (!res.ok) throw new Error("Opplasting feilet");
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.message || "Kunne ikke laste opp bildet. Prøv et annet bilde.");
+      }
       return res.json();
     },
     onSuccess: () => {
       toast({ title: "Profilbilde oppdatert" });
       window.location.reload();
     },
-    onError: () => {
-      toast({ title: "Feil", description: "Kunne ikke laste opp bilde", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Feil", description: error.message, variant: "destructive" });
     },
   });
 

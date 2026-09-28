@@ -20,9 +20,13 @@ async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
   });
 
   const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d")!;
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Kunne ikke behandle bildet på denne enheten.");
+  // Phone photos can be thousands of pixels wide. Upload a profile-sized JPEG
+  // instead of the full-resolution crop, which exceeds the server's 2 MB limit.
+  const scale = Math.min(1, 768 / Math.max(pixelCrop.width, pixelCrop.height));
+  canvas.width = Math.max(1, Math.round(pixelCrop.width * scale));
+  canvas.height = Math.max(1, Math.round(pixelCrop.height * scale));
 
   ctx.drawImage(
     image,
@@ -32,18 +36,18 @@ async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
     pixelCrop.height,
     0,
     0,
-    pixelCrop.width,
-    pixelCrop.height
+    canvas.width,
+    canvas.height
   );
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
         if (blob) resolve(blob);
-        else reject(new Error("Canvas toBlob failed"));
+        else reject(new Error("Kunne ikke lagre det beskårne bildet."));
       },
       "image/jpeg",
-      0.9
+      0.82
     );
   });
 }
@@ -52,6 +56,8 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel }: ImageCroppe
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const onCropChange = useCallback((location: { x: number; y: number }) => {
     setCrop(location);
@@ -66,9 +72,17 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel }: ImageCroppe
   }, []);
 
   const handleSave = async () => {
-    if (!croppedAreaPixels) return;
-    const blob = await getCroppedImg(imageSrc, croppedAreaPixels);
-    onCropComplete(blob);
+    if (!croppedAreaPixels || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const blob = await getCroppedImg(imageSrc, croppedAreaPixels);
+      onCropComplete(blob);
+    } catch {
+      setError("Kunne ikke behandle bildet. Prøv et annet bilde i JPG- eller PNG-format.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -78,7 +92,7 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel }: ImageCroppe
           <X className="w-5 h-5" />
         </Button>
         <p className="text-white text-sm font-medium">Juster bildet</p>
-        <Button variant="ghost" size="sm" onClick={handleSave} className="text-white hover:bg-white/20" data-testid="button-crop-save">
+        <Button variant="ghost" size="sm" onClick={handleSave} disabled={!croppedAreaPixels || saving} className="text-white hover:bg-white/20" data-testid="button-crop-save">
           <Check className="w-5 h-5" />
         </Button>
       </div>
@@ -99,6 +113,7 @@ export function ImageCropper({ imageSrc, onCropComplete, onCancel }: ImageCroppe
         />
       </div>
 
+      {error && <p role="alert" className="bg-black/60 px-4 py-2 text-center text-sm text-white">{error}</p>}
       <div className="flex items-center justify-center gap-4 p-4 bg-black/60">
         <Button
           variant="ghost"

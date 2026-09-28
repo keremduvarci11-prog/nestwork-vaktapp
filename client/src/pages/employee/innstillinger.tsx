@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Camera, Save, Eye, EyeOff, FileText, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
 import { ImageCropper } from "@/components/image-cropper";
+import { getAuthToken } from "@/lib/token";
 
 export default function Innstillinger() {
   const { user } = useAuth();
@@ -74,14 +75,16 @@ export default function Innstillinger() {
     mutationFn: async (blob: Blob) => {
       const formData = new FormData();
       formData.append("image", blob, "profile.jpg");
+      const token = getAuthToken();
       const res = await fetch(`/api/users/${user?.id}/profile-image`, {
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message);
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Kunne ikke laste opp bildet. Prøv et annet bilde.");
       }
       return res.json();
     },
@@ -89,8 +92,8 @@ export default function Innstillinger() {
       toast({ title: "Profilbilde oppdatert" });
       window.location.reload();
     },
-    onError: () => {
-      toast({ title: "Feil", description: "Kunne ikke laste opp bilde", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Feil", description: error.message, variant: "destructive" });
     },
   });
 
