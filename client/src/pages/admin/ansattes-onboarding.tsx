@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { getAuthToken } from "@/lib/token";
 import { useToast } from "@/hooks/use-toast";
 import { CreateEmployeeDialog } from "@/components/create-employee-dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -375,10 +376,12 @@ function LonnsslippSection({ userId, userName }: { userId: string; userName: str
       const fd = new FormData();
       fd.append("file", file);
       fd.append("maned", selectedManed);
+      const token = getAuthToken();
       const res = await fetch(`/api/users/${userId}/lonnsslipper`, {
         method: "POST",
         body: fd,
         credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -407,9 +410,11 @@ function LonnsslippSection({ userId, userName }: { userId: string; userName: str
 
   const deleteMutation = useMutation({
     mutationFn: async (maned: string) => {
+      const token = getAuthToken();
       const res = await fetch(`/api/users/${userId}/lonnsslipper/${maned}`, {
         method: "DELETE",
         credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

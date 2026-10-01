@@ -67,7 +67,7 @@ export default function LonnTimer() {
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   const [selectedMonth, setSelectedMonth] = useState<string>(todayKey);
-  const [pdfViewer, setPdfViewer] = useState<{ url: string; name: string } | null>(null);
+  const [pdfViewer, setPdfViewer] = useState<{ url: string; name: string; slip: LonnsslippMeta } | null>(null);
 
   const { data: vakter, isLoading } = useQuery<Vakt[]>({
     queryKey: ["/api/vakter/mine", user?.id],
@@ -185,7 +185,7 @@ export default function LonnTimer() {
       if (!result) return;
       const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
       const objectUrl = URL.createObjectURL(pdfBlob);
-      setPdfViewer({ url: objectUrl, name: result.filename });
+      setPdfViewer({ url: objectUrl, name: result.filename, slip });
     } catch (e) {
       console.error("Open lonnsslipp failed:", e);
       toast({
@@ -663,6 +663,17 @@ export default function LonnTimer() {
             <DialogTitle className="text-base truncate pr-8" data-testid="text-pdf-viewer-title">
               {pdfViewer?.name || "Lønnsslipp"}
             </DialogTitle>
+            {pdfViewer && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() => void downloadLonnsslipp(pdfViewer.slip)}
+              >
+                Last ned / del PDF
+              </Button>
+            )}
           </DialogHeader>
           {pdfViewer && (
             <iframe
