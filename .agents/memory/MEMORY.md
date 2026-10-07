@@ -10,3 +10,4 @@
 - [Availability calendar performance](availability-calendar-performance.md) — keep the calendar mounted and queue only same-date writes so rapid multi-day marking stays responsive.
 - [API log privacy](api-log-privacy.md) — never include response bodies in production request logs; login responses carry active tokens and employee endpoints carry sensitive data.
 - [Personal rules consent](personal-rules-consent.md) — retain the first signed timestamp; do not re-prompt signed employees or bypass consent when status checks fail.
+- [Barnehagenavn](kindergarten-name-ambiguity.md) — Rakkerungan Barnehagedrift og Gårdbarnehage er ulike; ikke avgjør forkortede navn ut fra tidligere vakter.
