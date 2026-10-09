@@ -51,6 +51,14 @@ When the user asks to create or send shifts, treat the request as an authoritati
 
 **How to apply:** Run one targeted duplicate check for the requested employee and dates, then create immediately through the production app. Pause only for a real name/client ambiguity, an existing collision, or missing required details.
 
+## Separate staffing orders may have identical shifts
+
+When the user asks for another staffing order, create its full requested set of vacancies in addition to earlier orders. Matching kindergarten, date, hours and code alone is not evidence of a duplicate vacancy.
+
+**Why:** The user corrected a full-week vacancy order that incorrectly reused earlier vacancies on matching days. The new order required another worker for each weekday, not merely filling gaps in the existing schedule.
+
+**How to apply:** Distinguish retries of the same order from separate orders. If the current order was partially created, keep its known created shifts and add only its remaining days; do not reuse shifts from earlier orders. Preserve already assigned employees and the older vacancies.
+
 ## Test shifts still need the sheet's test marking
 
 A requested test shift must use the sheet's established orange marking and dedicated “Testvakt” field, even when the user chooses normal assignment, notifications and paid time reporting.
