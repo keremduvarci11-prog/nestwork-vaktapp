@@ -44,10 +44,13 @@ export default function EmployeeHome() {
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vakter/mine"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vakt-interesser"] });
-      toast({ title: "Interesse registrert!", description: "Venter på godkjenning fra admin." });
+      toast({
+        title: "Forespørsel sendt – vakten er ikke tildelt deg",
+        description: "Vent på bekreftelse fra Nestwork. Ikke møt opp før vakten er tildelt deg og bekreftet.",
+      });
     },
     onError: () => {
-      toast({ title: "Feil", description: "Kunne ikke melde interesse", variant: "destructive" });
+      toast({ title: "Forespørselen kunne ikke sendes", description: "Oppdater listen – vakten kan allerede være tildelt.", variant: "destructive" });
     },
   });
 
@@ -258,6 +261,9 @@ export default function EmployeeHome() {
                     <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{vakt.beskrivelse}</p>
                   )}
 
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Dette er en forespørsel, ikke en bekreftet vakt. Ikke møt opp før du har fått vakten tildelt og bekreftet.
+                  </p>
                   {harMeldtInteresse ? (
                     <Button
                       data-testid={`button-interesse-sendt-${vakt.id}`}
@@ -266,7 +272,7 @@ export default function EmployeeHome() {
                       disabled
                     >
                       <HandMetal className="w-4 h-4 mr-1.5" />
-                      Interesse sendt — venter på svar
+                      Forespørsel sendt — avventer svar
                     </Button>
                   ) : (
                     <Button
@@ -275,7 +281,7 @@ export default function EmployeeHome() {
                       onClick={() => taVaktMutation.mutate(vakt.id)}
                       disabled={taVaktMutation.isPending}
                     >
-                      TA VAKT
+                      Send forespørsel om vakten
                     </Button>
                   )}
                 </CardContent>

@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { matchesRegions } from "@shared/regions";
 import { hasPolicyPaidBreak, shiftPaidTerms } from "@shared/shiftHours";
+import { persistUnsuccessfulRequestNotices, ShiftRequestError } from "./shiftRequestResolution";
 import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
   users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning, lonnsslipper, scheduledMeldinger,
@@ -206,9 +207,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateVakt(id: string, data: Partial<InsertVakt>): Promise<Vakt | undefined> {
-    return db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const [before] = await tx.select().from(vakter).where(eq(vakter.id, id)).for("update");
-      if (!before) return undefined;
+      if (!before) return { updated: undefined, notices: [] };
       const effective = { ...before, ...data };
       const termsEdited = ["dato", "barnehageId", "startTid", "sluttTid", "betaltPause", "avtalteBetalteTimer"]
         .some((key) => Object.prototype.hasOwnProperty.call(data, key));
@@ -221,8 +222,19 @@ export class DatabaseStorage implements IStorage {
             ? shiftPaidTerms(effective) : {}),
         })
         .where(eq(vakter.id, id)).returning();
-      return updated;
+      const notices = await persistUnsuccessfulRequestNotices(tx, before, updated);
+      return { updated, notices };
     });
+    // The app notices are already durable. Push is best-effort and must not
+    // create a second visible notification or hold up the assignment response.
+    if (result.notices.length) {
+      void import("./notifications").then(async ({ sendPushNotificationOnly }) => {
+        await Promise.allSettled(result.notices.map(notice =>
+          sendPushNotificationOnly(notice.userId, notice.title, notice.message, notice.link || "/"),
+        ));
+      }).catch(() => console.error("[Notify] Kunne ikke sende push for avslåtte vaktforespørsler"));
+    }
+    return result.updated;
   }
 
   async markVaktTimerInnsendt(id: string): Promise<Vakt | undefined> {
@@ -462,8 +474,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createVaktInteresse(data: InsertVaktInteresse): Promise<VaktInteresse> {
-    const [created] = await db.insert(vaktInteresser).values(data).returning();
-    return created;
+    return db.transaction(async tx => {
+      // Use the same lock as assignment, so a request cannot be recorded after
+      // an administrator has assigned the shift and notified the other applicants.
+      const [shift] = await tx.select().from(vakter).where(eq(vakter.id, data.vaktId)).for("update");
+      if (!shift) throw new ShiftRequestError(404, "Vakt ikke funnet");
+      if (shift.status !== "ledig" || shift.ansattId) {
+        throw new ShiftRequestError(409, "Vakten er ikke lenger ledig");
+      }
+      const existing = await tx.select().from(vaktInteresser).where(and(
+        eq(vaktInteresser.vaktId, data.vaktId), eq(vaktInteresser.ansattId, data.ansattId),
+      ));
+      if (existing.length) throw new ShiftRequestError(409, "Du har allerede sendt en forespørsel om denne vakten");
+      const [created] = await tx.insert(vaktInteresser).values(data).returning();
+      return created;
+    });
   }
 
   async deleteVaktInteresser(vaktId: string): Promise<void> {

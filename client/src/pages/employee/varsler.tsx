@@ -114,7 +114,7 @@ export default function Varsler() {
                       <p className={`text-sm ${!v.read ? "font-semibold" : "font-medium"}`}>{v.title}</p>
                       {!v.read && <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{v.message}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap break-words">{v.message}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">{time}</p>
                   </div>
                 </CardContent>

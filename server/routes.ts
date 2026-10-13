@@ -8,6 +8,7 @@ import fs from "fs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { storage } from "./storage";
+import { ShiftRequestError } from "./shiftRequestResolution";
 import {
   insertVaktSchema,
   insertMeldingSchema,
@@ -896,10 +897,16 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Du har allerede meldt interesse for denne vakten" });
     }
 
-    const interesse = await storage.createVaktInteresse({
-      vaktId: asString(req.params.id),
-      ansattId: getUserIdFromRequest(req)!,
-    });
+    let interesse;
+    try {
+      interesse = await storage.createVaktInteresse({
+        vaktId: asString(req.params.id),
+        ansattId: getUserIdFromRequest(req)!,
+      });
+    } catch (err) {
+      if (err instanceof ShiftRequestError) return res.status(err.status).json({ message: err.message });
+      throw err;
+    }
     res.json(interesse);
 
     (async () => {
