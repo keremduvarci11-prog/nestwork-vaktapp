@@ -20,6 +20,7 @@ import { getSpreadsheetUrl } from "./googleSheets";
 import { wakeSheetSyncWorker } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
+import { calculateShiftPay, normalizeShiftPayPatch } from "@shared/shiftPay";
 import { normalizeRegionMembership, visibleShiftRegions } from "@shared/regions";
 import { SCHEDULED_MESSAGING_TIMEZONE } from "./scheduledMessaging";
 import { registerWeek39Routes } from "./week39";
@@ -723,7 +724,13 @@ export async function registerRoutes(
   ]);
 
   app.post("/api/vakter", requireAdmin, async (req, res) => {
-    const parsed = insertVaktSchema.safeParse(req.body);
+    let normalizedBody;
+    try {
+      normalizedBody = normalizeShiftPayPatch(undefined, req.body ?? {});
+    } catch (error) {
+      return res.status(400).json({ message: (error as Error).message });
+    }
+    const parsed = insertVaktSchema.safeParse(normalizedBody);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const paidHours = vaktPaidHoursPatchSchema.safeParse(parsed.data);
     if (!paidHours.success) {
@@ -796,12 +803,17 @@ export async function registerRoutes(
 
   app.patch("/api/vakter/:id", requireAdmin, async (req, res) => {
     const before = await storage.getVakt(asString(req.params.id));
+    try {
+      normalizeShiftPayPatch(before, req.body ?? {});
+    } catch (error) {
+      return res.status(400).json({ message: (error as Error).message });
+    }
     const paidHoursPatch = vaktPaidHoursPatchSchema.safeParse(req.body ?? {});
     if (!paidHoursPatch.success) {
       return res.status(400).json({ message: paidHoursPatch.error.message });
     }
     const shouldUpdateSheet = Object.keys(req.body ?? {}).some((key) =>
-      sheetRowEditFields.has(key),
+      sheetRowEditFields.has(key) || key === "avtalteTimelonn",
     );
     const patch: Record<string, any> = { ...req.body };
     if (Object.prototype.hasOwnProperty.call(paidHoursPatch.data, "betaltPause")) {
@@ -1476,15 +1488,17 @@ export async function registerRoutes(
     const currentMonth = now.getMonth(); // 0-indexed
     const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
 
-    const monthAggByUser = new Map<string, { hours: number; count: number }>();
+    const payByUser = new Map(allUsers.map(u => [u.id, u.timelonn]));
+    const monthAggByUser = new Map<string, { hours: number; count: number; pay: number }>();
     for (const v of allVakter) {
       if (!v.ansattId || !v.dato) continue;
       if (v.status !== "godkjent") continue;
       const d = new Date(v.dato + "T00:00:00");
       if (d.getFullYear() !== currentYear || d.getMonth() !== currentMonth) continue;
       const h = calculatePaidHours(v.startTid || "", v.sluttTid || "", v);
-      const cur = monthAggByUser.get(v.ansattId) || { hours: 0, count: 0 };
+      const cur = monthAggByUser.get(v.ansattId) || { hours: 0, count: 0, pay: 0 };
       cur.hours += h;
+      cur.pay += calculateShiftPay(v, payByUser.get(v.ansattId) ?? 0);
       cur.count += 1;
       monthAggByUser.set(v.ansattId, cur);
     }
@@ -1495,9 +1509,8 @@ export async function registerRoutes(
         const totalCount = items.length;
         const completedCount = items.filter((i) => i.completed).length;
         const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-        const agg = monthAggByUser.get(u.id) || { hours: 0, count: 0 };
-        const tl = parseFloat(u.timelonn || "0") || 0;
-        const bruttoThisMonth = Math.round(agg.hours * tl * 100) / 100;
+        const agg = monthAggByUser.get(u.id) || { hours: 0, count: 0, pay: 0 };
+        const bruttoThisMonth = Math.round(agg.pay * 100) / 100;
         const { password: _, ...safeUser } = u;
         return {
           userId: u.id,

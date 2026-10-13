@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { matchesRegions } from "@shared/regions";
 import { hasPolicyPaidBreak, shiftPaidTerms } from "@shared/shiftHours";
+import { normalizeShiftPayPatch, type HourlyRatePatch } from "@shared/shiftPay";
 import { persistUnsuccessfulRequestNotices, ShiftRequestError } from "./shiftRequestResolution";
 import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
@@ -41,7 +42,7 @@ export interface IStorage {
   getVakterByAnsatt(ansattId: string): Promise<Vakt[]>;
   getVakt(id: string): Promise<Vakt | undefined>;
   createVakt(v: InsertVakt): Promise<Vakt>;
-  updateVakt(id: string, data: Partial<InsertVakt>): Promise<Vakt | undefined>;
+  updateVakt(id: string, data: Partial<InsertVakt> & HourlyRatePatch): Promise<Vakt | undefined>;
   markVaktTimerInnsendt(id: string): Promise<Vakt | undefined>;
   markVaktTimerGodkjent(id: string): Promise<Vakt | undefined>;
   deleteVakt(id: string): Promise<boolean>;
@@ -206,10 +207,11 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateVakt(id: string, data: Partial<InsertVakt>): Promise<Vakt | undefined> {
+  async updateVakt(id: string, input: Partial<InsertVakt> & HourlyRatePatch): Promise<Vakt | undefined> {
     const result = await db.transaction(async (tx) => {
       const [before] = await tx.select().from(vakter).where(eq(vakter.id, id)).for("update");
       if (!before) return { updated: undefined, notices: [] };
+      const data = normalizeShiftPayPatch(before, input);
       const effective = { ...before, ...data };
       const termsEdited = ["dato", "barnehageId", "startTid", "sluttTid", "betaltPause", "avtalteBetalteTimer"]
         .some((key) => Object.prototype.hasOwnProperty.call(data, key));

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { calculateShiftPay, effectiveHourlyRate } from "@shared/shiftPay";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,7 +29,7 @@ export default function Inntjening() {
     (sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid, v),
     0,
   );
-  const totalEarnings = totalHours * timelonn;
+  const totalEarnings = monthVakter.reduce((sum, v) => sum + calculateShiftPay(v, timelonn), 0);
 
   const todayFormatted = today.toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
 
@@ -114,7 +115,8 @@ export default function Inntjening() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium">{(hours * timelonn).toLocaleString("nb-NO")} kr</p>
+                        <p className="text-sm font-medium">{calculateShiftPay(v, timelonn).toLocaleString("nb-NO")} kr</p>
+                        <p className="text-xs text-muted-foreground">{effectiveHourlyRate(v, timelonn).toLocaleString("nb-NO")} kr/t</p>
                         <p className="text-xs text-muted-foreground">{hours.toFixed(1)} timer</p>
                       </div>
                     </div>

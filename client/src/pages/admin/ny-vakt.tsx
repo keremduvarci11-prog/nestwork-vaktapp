@@ -21,6 +21,7 @@ export default function NyVakt() {
   const [sluttTid, setSluttTid] = useState("15:30");
   const [vikarkode, setVikarkode] = useState("");
   const [beskrivelse, setBeskrivelse] = useState("");
+  const [avtalteTimelonn, setAvtalteTimelonn] = useState("");
   const [ansattId, setAnsattId] = useState("");
   const [ansattSearch, setAnsattSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -79,10 +80,12 @@ export default function NyVakt() {
         ansattId: ansattId || null,
         region: selectedBh?.region || "",
         beskrivelse,
+        avtalteTimelonn: avtalteTimelonn || null,
         betaltPause: effectiveBetaltPause,
         avtalteBetalteTimer: avtalteBetalteTimer || null,
       }),
     onSuccess: () => {
+      setAvtalteTimelonn("");
       queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
       const msg = ansattId
         ? `Vakt opprettet og tildelt ${selectedAnsatt?.name}!`
@@ -319,6 +322,14 @@ export default function NyVakt() {
                 onChange={(e) => setBeskrivelse(e.target.value)}
                 rows={3}
               />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="new-shift-pay" className="text-sm font-medium">Avtalt timelønn for denne vakten (kr/t)</label>
+              <Input id="new-shift-pay" inputMode="decimal" value={avtalteTimelonn}
+                onChange={e => setAvtalteTimelonn(e.target.value)} placeholder="Tomt = vanlig timelønn"
+                data-testid="input-shift-pay" />
+              <p className="text-xs text-muted-foreground">Valgfri særskilt sats. Noteres også i faktureringsarket.</p>
             </div>
 
             <Button

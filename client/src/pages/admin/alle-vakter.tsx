@@ -1,3 +1,4 @@
+import { agreedHourlyRate, descriptionWithoutHourlyRate, effectiveHourlyRate } from "@shared/shiftPay";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -41,7 +42,8 @@ function EditVaktForm({
   const [startTid, setStartTid] = useState(vakt.startTid?.slice(0, 5) || "07:30");
   const [sluttTid, setSluttTid] = useState(vakt.sluttTid?.slice(0, 5) || "15:30");
   const [vikarkode, setVikarkode] = useState(vakt.vikarkode);
-  const [beskrivelse, setBeskrivelse] = useState(vakt.beskrivelse || "");
+  const [beskrivelse, setBeskrivelse] = useState(descriptionWithoutHourlyRate(vakt.beskrivelse));
+  const [avtalteTimelonn, setAvtalteTimelonn] = useState(agreedHourlyRate(vakt)?.toString() ?? "");
   const [status, setStatus] = useState(vakt.status);
   const [ansattId, setAnsattId] = useState(vakt.ansattId || "");
   const [betaltPause, setBetaltPause] = useState(vakt.betaltPause ?? false);
@@ -73,6 +75,7 @@ function EditVaktForm({
         sluttTid,
         vikarkode,
         beskrivelse,
+        avtalteTimelonn: avtalteTimelonn || null,
         status,
         region: selectedBh?.region || vakt.region,
         ansattId: ansattId || null,
@@ -89,8 +92,8 @@ function EditVaktForm({
       toast({ title: "Vakt oppdatert" });
       onSaved();
     },
-    onError: () => {
-      toast({ title: "Feil", description: "Kunne ikke oppdatere vakt", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Feil", description: error.message || "Kunne ikke oppdatere vakt", variant: "destructive" });
     },
   });
 
@@ -169,7 +172,10 @@ function EditVaktForm({
 
         <div className="space-y-2">
           <label className="text-xs font-medium">Tildelt ansatt</label>
-          <Select value={ansattId || "none"} onValueChange={(v) => setAnsattId(v === "none" ? "" : v)}>
+          <Select value={ansattId || "none"} onValueChange={(v) => {
+            setAnsattId(v === "none" ? "" : v);
+            setAvtalteTimelonn("");
+          }}>
             <SelectTrigger data-testid="edit-select-ansatt">
               <SelectValue placeholder="Ingen" />
             </SelectTrigger>
@@ -259,6 +265,13 @@ function EditVaktForm({
             rows={2}
             data-testid="edit-input-beskrivelse"
           />
+        </div>
+        <div className="space-y-2">
+          <label htmlFor="edit-shift-pay" className="text-xs font-medium">Avtalt timelønn for denne vakten (kr/t)</label>
+          <Input id="edit-shift-pay" inputMode="decimal" value={avtalteTimelonn}
+            onChange={e => setAvtalteTimelonn(e.target.value)} placeholder="Tomt = vanlig timelønn"
+            data-testid="edit-input-shift-pay" />
+          <p className="text-xs text-muted-foreground">Gjelder bare denne vakten. Noteres også i faktureringsarket. Tøm feltet for å bruke vanlig sats.</p>
         </div>
 
         <Button
@@ -563,6 +576,12 @@ export default function AlleVakter() {
                       <span>{vakt.region}</span>
                     </div>
                   </div>
+
+                  {agreedHourlyRate(vakt) !== null && (
+                    <p className="mt-2 text-sm font-semibold" data-testid={`shift-pay-${vakt.id}`}>
+                      Avtalt timelønn: {effectiveHourlyRate(vakt, emp?.timelonn ?? 0).toLocaleString("nb-NO")} kr/t · kun denne vakten
+                    </p>
+                  )}
 
                   {vakt.status === "ledig" && (
                     tildelingId === vakt.id ? (

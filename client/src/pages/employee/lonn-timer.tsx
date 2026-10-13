@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { calculateShiftPay, effectiveHourlyRate, agreedHourlyRate } from "@shared/shiftPay";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -124,7 +125,7 @@ export default function LonnTimer() {
       (sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid, v),
       0,
     );
-    const grossPay = totalHours * timelonn;
+    const grossPay = monthVakter.reduce((sum, v) => sum + calculateShiftPay(v, timelonn), 0);
     const feriepenger = grossPay * 0.12;
     return { totalHours, grossPay, feriepenger, totalWithFeriepenger: grossPay + feriepenger };
   }, [monthVakter, timelonn]);
@@ -279,7 +280,7 @@ export default function LonnTimer() {
     y += 14;
     doc.text(`Region: ${user?.region || ""}`, margin, y);
     y += 14;
-    doc.text(`Timelonn: ${formatNok(timelonn)} kr`, margin, y);
+    doc.text(`Vanlig timelonn: ${formatNok(timelonn)} kr (avtalte satser per vakt gjelder)`, margin, y);
     y += 22;
 
     doc.setFont("helvetica", "bold");
@@ -307,7 +308,7 @@ export default function LonnTimer() {
         y = margin;
       }
       const hours = calculatePaidHours(v.startTid, v.sluttTid, v);
-      const amount = hours * timelonn;
+      const amount = calculateShiftPay(v, timelonn);
       const d = new Date(v.dato + "T00:00:00");
       const dateStr = d.toLocaleDateString("nb-NO", { day: "2-digit", month: "2-digit", year: "numeric" });
       const bhName = barnehageMap.get(v.barnehageId) || "";
@@ -325,6 +326,10 @@ export default function LonnTimer() {
       doc.text(hours.toFixed(2), margin + 300, y);
       doc.text(`${formatNok(amount)} kr`, margin + 360, y);
       y += 14;
+      if (agreedHourlyRate(v) !== null) {
+        doc.text(`Avtalt timelonn for denne vakten: ${formatNok(effectiveHourlyRate(v, timelonn))} kr/t`, margin + 70, y);
+        y += 14;
+      }
     });
     if (monthVakter.some((v) => shouldDeductPause(v.startTid, v.sluttTid, v))) {
       y += 4;
@@ -588,10 +593,14 @@ export default function LonnTimer() {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="text-sm font-medium">
-                              {formatNok(hours * timelonn)} kr
+                              {formatNok(calculateShiftPay(v, timelonn))} kr
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {hours.toFixed(1)} timer
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatNok(effectiveHourlyRate(v, timelonn))} kr/t
+                              {agreedHourlyRate(v) !== null ? " · avtalt for vakten" : ""}
                             </p>
                           </div>
                         </div>

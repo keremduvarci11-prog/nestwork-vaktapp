@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, Building2, CheckCircle2, Timer, AlertCircle, UserCheck, CalendarPlus, Phone } from "lucide-react";
 import type { Vakt, Barnehage } from "@shared/schema";
 import { shouldDeductPause } from "@shared/shiftHours";
+import { agreedHourlyRate, calculateShiftPay } from "@shared/shiftPay";
 
 const statusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle2 }> = {
   tildelt: { label: "Tildelt deg", className: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200", icon: UserCheck },
@@ -191,6 +192,11 @@ export default function MineVakter() {
                       </a>
                     )}
                   </div>
+                  {agreedHourlyRate(vakt) !== null && (
+                    <p className="mt-3 text-sm font-semibold" data-testid={`shift-pay-${vakt.id}`}>
+                      Avtalt {agreedHourlyRate(vakt)?.toLocaleString("nb-NO")} kr/t · {calculateShiftPay(vakt, user?.timelonn ?? 0).toLocaleString("nb-NO")} kr for vakten
+                    </p>
+                  )}
                   <div className="flex gap-2 mt-3">
                     <Button
                       className="flex-1"
@@ -268,6 +274,11 @@ export default function MineVakter() {
                       </a>
                     )}
                   </div>
+                  {agreedHourlyRate(vakt) !== null && (
+                    <p className="mt-3 text-sm font-semibold" data-testid={`shift-pay-${vakt.id}`}>
+                      Avtalt {agreedHourlyRate(vakt)?.toLocaleString("nb-NO")} kr/t · {calculateShiftPay(vakt, user?.timelonn ?? 0).toLocaleString("nb-NO")} kr for vakten
+                    </p>
+                  )}
                   {vakt.status === "godkjent" && (
                     <Button
                       variant="outline"

@@ -1,3 +1,4 @@
+import { calculateShiftPay } from "@shared/shiftPay";
 import { useRef, useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -106,15 +107,16 @@ export default function Profil() {
     const monthLabel = `${MONTH_NAMES_NB[m]} ${y}`;
     const timelonn = parseFloat(user?.timelonn || "0") || 0;
     let totalHours = 0;
+    let brutto = 0;
     let count = 0;
     (mineVakter || []).forEach((v) => {
       if (!v.dato || v.status !== "godkjent") return;
       const d = new Date(v.dato + "T00:00:00");
       if (d.getFullYear() !== y || d.getMonth() !== m) return;
       totalHours += calculatePaidHours(v.startTid || "", v.sluttTid || "", v);
+      brutto += calculateShiftPay(v, timelonn);
       count += 1;
     });
-    const brutto = totalHours * timelonn;
     return { monthLabel, timelonn, totalHours, count, brutto };
   }, [mineVakter, user?.timelonn]);
 
