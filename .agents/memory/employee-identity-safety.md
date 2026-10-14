@@ -30,3 +30,11 @@ A stored zero hourly rate is not sufficient evidence that unpaid work was agreed
 **Why:** The user has requested account creation before pay is settled, while the existing registration flow requires a numeric rate. A disclosed temporary zero can therefore represent unresolved pay rather than a final agreement.
 
 **How to apply:** Do not silently default missing pay to zero. Distinguish explicitly deferred pay from an agreed rate, disclose any temporary numeric placeholder, and require clarification before relying on it for payroll. Do not bulk-reinterpret all existing zero rates without review.
+
+## Provisioning request timeouts
+
+After a timed-out account-creation workflow, check the live account by normalized email and name before retrying a write.
+
+**Why:** A missing HTTP response does not prove the transaction failed; retrying blindly could create a duplicate or accidentally change an existing account.
+
+**How to apply:** Bound individual network requests, verify persisted identity first, and distinguish creation from subsequent onboarding/login verification.
