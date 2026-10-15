@@ -8,7 +8,7 @@ import { Users, Calendar, Clock, TrendingUp, List } from "lucide-react";
 import { Link } from "wouter";
 import type { Vakt, Barnehage, User } from "@shared/schema";
 import { PushPermissionBanner } from "@/components/push-banner";
-import { calculatePaidHours } from "@shared/shiftHours";
+import { compareWeeklyHours } from "@shared/weeklyHours";
 
 function osloNow(): { todayIso: string; nowMinutes: number } {
   const fmt = new Intl.DateTimeFormat("en-GB", {
@@ -56,15 +56,6 @@ export default function AdminDashboard() {
   }, []);
 
   const { todayIso: today } = osloNow();
-  const now = new Date();
-  const dayOfWeek = now.getDay();
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const thisWeekStart = new Date(now);
-  thisWeekStart.setDate(now.getDate() + mondayOffset);
-  const thisWeekEnd = new Date(thisWeekStart);
-  thisWeekEnd.setDate(thisWeekStart.getDate() + 6);
-  const weekStart = thisWeekStart.toISOString().split("T")[0];
-  const weekEnd = thisWeekEnd.toISOString().split("T")[0];
 
   const activeVakter = useMemo(() => {
     const list = vakter?.filter((v) => isVaktActive(v) && (v.status === "godkjent" || v.status === "venter" || v.status === "tildelt")) || [];
@@ -78,12 +69,8 @@ export default function AdminDashboard() {
   const ledigeVakter = useMemo(() => vakter?.filter((v) => isVaktActive(v) && v.status === "ledig") || [], [vakter, tick]);
   const venterVakter = vakter?.filter((v) => v.status === "venter") || [];
   const tildelteVakter = useMemo(() => vakter?.filter((v) => isVaktActive(v) && v.status === "tildelt") || [], [vakter, tick]);
-  const weekVakter = vakter?.filter((v) => v.dato >= weekStart && v.dato <= weekEnd && v.status === "godkjent") || [];
-
-  const weekHours = weekVakter.reduce(
-    (sum, v) => sum + calculatePaidHours(v.startTid, v.sluttTid, v),
-    0,
-  );
+  const { currentHours: weekHours, percentChange } = compareWeeklyHours(vakter ?? [], today);
+  const roundedChange = percentChange === null ? null : Math.round(percentChange * 10) / 10;
 
   const bhMap = new Map(barnehager?.map((b) => [b.id, b]) || []);
   const userMap = new Map(users?.map((u) => [u.id, u]) || []);
@@ -140,6 +127,14 @@ export default function AdminDashboard() {
                   <p className="text-xs text-muted-foreground">Uketimer</p>
                 </div>
                 <p className="text-2xl font-bold">{weekHours % 1 === 0 ? weekHours : weekHours.toFixed(1)}t</p>
+                <p
+                  className={`mt-1 text-xs ${roundedChange !== null && roundedChange > 0 ? "text-green-500" : roundedChange !== null && roundedChange < 0 ? "text-red-500" : "text-muted-foreground"}`}
+                  data-testid="text-week-hours-change"
+                >
+                  {roundedChange === null
+                    ? "Ingen timer forrige uke"
+                    : `${roundedChange > 0 ? "+" : ""}${roundedChange.toLocaleString("nb-NO", { maximumFractionDigits: 1 })} % fra forrige uke`}
+                </p>
               </CardContent>
             </Card>
           </div>
