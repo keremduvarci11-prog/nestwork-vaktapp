@@ -14,3 +14,9 @@ Administrator skal også kunne finne kandidater fra dagskalenderen uten at den a
 **Why:** Brukeren opplyser at mange ansatte glemmer å sende vaktforespørsel selv om de har markert dagen som tilgjengelig. Bemanning må derfor ikke være avhengig av forespørsler alene.
 
 **How to apply:** Skill kalendermerking fra vaktforespørsel. Vis bare aktive ansatte som matcher vaktens område og ikke har overlappende oppdrag, og kontroller tilgjengeligheten på nytt ved tildeling. Tildeling fra listen krever fortsatt den ansattes vanlige godkjenning.
+
+«Godkjenn vakter» er også administratorens arbeidsflate for å bemanne ledige vakter uten søkere, ikke bare behandle innsendte forespørsler.
+
+**Why:** Brukeren presiserte at begge typer vakter og kalenderbaserte kandidater skal finnes på samme sted; støtte bare under «Ledige» var ikke tilstrekkelig.
+
+**How to apply:** Behold vakter uten forespørsler i oversikten og tilby kalenderkandidater både med og uten søkere. Ikke mist søkere som ikke har kalendermerket dagen, og skill forespørselsgodkjenning fra ny tildeling som må aksepteres.

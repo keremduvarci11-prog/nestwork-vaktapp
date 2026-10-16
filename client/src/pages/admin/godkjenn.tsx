@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Check, X, Calendar, Clock, Building2, User, AlertCircle, Users, Send, CheckCircle2 } from "lucide-react";
+import { AlertCircle, Building2, Calendar, Check, CheckCircle2, Clock, Send, Users } from "lucide-react";
+import { AvailableShiftCandidates } from "@/components/admin/available-shift-candidates";
+import { approvalOpenShifts } from "@shared/approvalShifts";
 import type { Vakt, Barnehage, User as UserType, VaktInteresse } from "@shared/schema";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 
@@ -14,16 +16,17 @@ export default function GodkjennVakter() {
   const { toast } = useToast();
   const [tab, setTab] = useState<"interesse" | "timer">("interesse");
 
-  const { data: vakter, isLoading } = useQuery<Vakt[]>({
+  const vakterQuery = useQuery<Vakt[]>({
     queryKey: ["/api/vakter"],
   });
+  const { data: vakter, isLoading, isError, refetch } = vakterQuery;
   const { data: barnehager } = useQuery<Barnehage[]>({
     queryKey: ["/api/barnehager"],
   });
   const { data: users } = useQuery<UserType[]>({
     queryKey: ["/api/users"],
   });
-  const { data: alleInteresser } = useQuery<VaktInteresse[]>({
+  const interesserQuery = useQuery<VaktInteresse[]>({
     queryKey: ["/api/vakt-interesser"],
   });
 
@@ -31,19 +34,20 @@ export default function GodkjennVakter() {
   const userMap = new Map(users?.map((u) => [u.id, u]) || []);
 
   const interesserByVakt = new Map<string, VaktInteresse[]>();
-  alleInteresser?.forEach((i) => {
-    const list = interesserByVakt.get(i.vaktId) || [];
-    list.push(i);
-    interesserByVakt.set(i.vaktId, list);
+  interesserQuery.data?.forEach((interesse) => {
+    const list = interesserByVakt.get(interesse.vaktId) || [];
+    list.push(interesse);
+    interesserByVakt.set(interesse.vaktId, list);
   });
 
-  const vakterMedInteresse = vakter?.filter(
-    (v) => v.status === "ledig" && (interesserByVakt.get(v.id)?.length || 0) > 0
-  ) || [];
-
+  const åpneVakter = approvalOpenShifts(vakter || []);
   const vakterMedTimerInnsendt = vakter?.filter(
-    (v) => v.timerInnsendt && !v.timerGodkjent
+    (vakt) => vakt.timerInnsendt && !vakt.timerGodkjent
   ) || [];
+  const antallMedInteresse = interesserQuery.data && !interesserQuery.isError
+    ? åpneVakter.filter((vakt) => (interesserByVakt.get(vakt.id)?.length || 0) > 0).length
+    : null;
+  const antallUtenInteresse = antallMedInteresse === null ? null : åpneVakter.length - antallMedInteresse;
 
   const godkjenn = useMutation({
     mutationFn: ({ vaktId, ansattId }: { vaktId: string; ansattId: string }) =>
@@ -53,14 +57,12 @@ export default function GodkjennVakter() {
       queryClient.invalidateQueries({ queryKey: ["/api/vakt-interesser"] });
       toast({ title: "Vakt godkjent og tildelt!" });
     },
-  });
-
-  const avslaa = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/vakter/${id}/avslaa`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vakt-interesser"] });
-      toast({ title: "Vakt avslått" });
+    onError: () => {
+      toast({
+        title: "Kunne ikke godkjenne vakten",
+        description: "Prøv igjen. Vakten kan allerede være tildelt.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -81,79 +83,108 @@ export default function GodkjennVakter() {
     return date.toLocaleDateString("nb-NO", { weekday: "short", day: "numeric", month: "short" });
   };
 
-  const totalPending = vakterMedInteresse.length + vakterMedTimerInnsendt.length;
-
   return (
     <div className="space-y-6">
-      <div>
+      <header>
         <h1 className="text-xl font-bold">Godkjenn</h1>
-        <p className="text-sm text-muted-foreground mt-1">{totalPending} venter på godkjenning</p>
-      </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {tab === "interesse"
+            ? isLoading
+              ? "Laster ledige vakter…"
+              : isError
+                ? "Kunne ikke hente ledige vakter"
+                : `${åpneVakter.length} ledige vakter totalt${antallMedInteresse === null ? "" : ` · ${antallMedInteresse} med forespørsler · ${antallUtenInteresse} uten forespørsler`}`
+            : `${vakterMedTimerInnsendt.length} vakter med innsendte timer`}
+        </p>
+      </header>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Godkjenningskø">
         <Button
+          type="button"
           variant={tab === "interesse" ? "default" : "outline"}
           size="sm"
           onClick={() => setTab("interesse")}
           data-testid="tab-interesse"
+          role="tab"
+          aria-selected={tab === "interesse"}
           className="w-full"
         >
-          <Users className="w-3.5 h-3.5 mr-1.5" />
-          Interesse ({vakterMedInteresse.length})
+          <Users className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+          Vakter ({isError ? "—" : åpneVakter.length})
         </Button>
         <Button
+          type="button"
           variant={tab === "timer" ? "default" : "outline"}
           size="sm"
           onClick={() => setTab("timer")}
           data-testid="tab-timer"
+          role="tab"
+          aria-selected={tab === "timer"}
           className="w-full"
         >
-          <Send className="w-3.5 h-3.5 mr-1.5" />
+          <Send className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
           Timer ({vakterMedTimerInnsendt.length})
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2].map((i) => <Skeleton key={i} className="h-40 w-full rounded-md" />)}
-        </div>
-      ) : tab === "interesse" ? (
-        vakterMedInteresse.length === 0 ? (
+      {tab === "interesse" ? (
+        isLoading ? (
+          <div className="space-y-3" aria-label="Laster ledige vakter">
+            {[1, 2].map((item) => <Skeleton key={item} className="h-48 w-full rounded-md" />)}
+          </div>
+        ) : isError ? (
+          <Card>
+            <CardContent className="flex flex-col items-center py-10 text-center">
+              <AlertCircle className="mb-3 h-10 w-10 text-destructive" aria-hidden="true" />
+              <p className="font-medium">Kunne ikke hente vaktene</p>
+              <p className="mt-1 text-sm text-muted-foreground">Listen er ikke tilgjengelig akkurat nå.</p>
+              <Button className="mt-4" variant="outline" size="sm" onClick={() => refetch()}>
+                Prøv igjen
+              </Button>
+            </CardContent>
+          </Card>
+        ) : åpneVakter.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-              <p className="font-medium">Ingen vakter venter</p>
-              <p className="text-sm text-muted-foreground mt-1">Ingen ansatte har meldt interesse enda.</p>
+              <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-muted-foreground" aria-hidden="true" />
+              <p className="font-medium">Ingen ledige vakter</p>
+              <p className="mt-1 text-sm text-muted-foreground">Alle vakter er tildelt akkurat nå.</p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
-            {vakterMedInteresse.map((vakt) => {
-              const bh = bhMap.get(vakt.barnehageId);
+            {åpneVakter.map((vakt) => {
+              const barnehage = bhMap.get(vakt.barnehageId);
               const interesser = interesserByVakt.get(vakt.id) || [];
               return (
                 <Card key={vakt.id} data-testid={`card-pending-${vakt.id}`}>
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div>
-                        <h3 className="font-semibold text-sm">{bh?.name || "Ukjent"}</h3>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-semibold">{barnehage?.name || "Ukjent barnehage"}</h2>
+                        <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                           {vakt.vikarkode}
                         </span>
                       </div>
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <Users className="w-3.5 h-3.5" />
-                        {interesser.length} interessert{interesser.length !== 1 ? "e" : ""}
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                        <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                        {interesserQuery.isLoading
+                          ? "Laster forespørsler"
+                          : interesserQuery.isError
+                            ? "Forespørsler utilgjengelige"
+                            : interesser.length > 0
+                              ? `${interesser.length} interessert${interesser.length !== 1 ? "e" : ""}`
+                              : "Ingen forespørsler"}
                       </span>
                     </div>
 
-                    <div className="space-y-2 mb-4 text-sm">
+                    <div className="mb-4 space-y-2 text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         <span>{formatDate(vakt.dato)}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="w-3.5 h-3.5" />
+                      <div className="flex items-start gap-2 text-muted-foreground">
+                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         <span>
                           {vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}
                           {" · "}
@@ -168,40 +199,84 @@ export default function GodkjennVakter() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Building2 className="w-3.5 h-3.5" />
+                        <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         <span>{vakt.region}</span>
                       </div>
                     </div>
 
-                    <div className="border-t pt-3 space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Interesserte ansatte</p>
-                      {interesser.map((interesse) => {
-                        const emp = userMap.get(interesse.ansattId);
-                        return (
-                          <div key={interesse.id} className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <Avatar className="w-7 h-7 flex-shrink-0">
-                                {emp?.profileImage && <AvatarImage src={emp.profileImage} alt={emp?.name} />}
-                                <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
-                                  {emp?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm font-medium truncate">{emp?.name || "Ukjent"}</span>
-                              <span className="text-xs text-muted-foreground">({emp?.stilling})</span>
-                            </div>
-                            <Button
-                              data-testid={`button-godkjenn-${vakt.id}-${interesse.ansattId}`}
-                              size="sm"
-                              onClick={() => godkjenn.mutate({ vaktId: vakt.id, ansattId: interesse.ansattId })}
-                              disabled={godkjenn.isPending}
+                    {interesserQuery.isLoading ? (
+                      <div className="space-y-2 border-t pt-3" aria-label="Laster forespørsler">
+                        <Skeleton className="h-4 w-36" />
+                        <Skeleton className="h-11 w-full" />
+                      </div>
+                    ) : interesserQuery.isError ? (
+                      <div className="border-t pt-3">
+                        <div className="flex flex-col items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 sm:flex-row sm:items-center">
+                          <p className="flex items-start gap-2 text-sm text-destructive" role="alert">
+                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                            Kunne ikke hente forespørsler for vaktene.
+                          </p>
+                          <Button variant="outline" size="sm" onClick={() => interesserQuery.refetch()}>
+                            Prøv igjen
+                          </Button>
+                        </div>
+                      </div>
+                    ) : interesser.length > 0 ? (
+                      <div className="space-y-2 border-t pt-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Interesserte ansatte
+                        </p>
+                        {interesser.map((interesse) => {
+                          const ansatt = userMap.get(interesse.ansattId);
+                          const initials = ansatt?.name
+                            ?.split(" ")
+                            .map((name) => name[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase() || "?";
+                          const isApproving =
+                            godkjenn.isPending &&
+                            godkjenn.variables?.vaktId === vakt.id &&
+                            godkjenn.variables?.ansattId === interesse.ansattId;
+                          return (
+                            <div
+                              key={interesse.id}
+                              className="flex flex-col gap-2 rounded-md bg-muted/50 p-2 sm:flex-row sm:items-center sm:justify-between"
                             >
-                              <Check className="w-3.5 h-3.5 mr-1" />
-                              Velg
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <Avatar className="h-7 w-7 shrink-0">
+                                  {ansatt?.profileImage && <AvatarImage src={ansatt.profileImage} alt={ansatt.name} />}
+                                  <AvatarFallback className="bg-primary text-[10px] font-bold text-primary-foreground">
+                                    {initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="truncate text-sm font-medium">{ansatt?.name || "Ukjent ansatt"}</span>
+                                {ansatt?.stilling && (
+                                  <span className="text-xs text-muted-foreground">({ansatt.stilling})</span>
+                                )}
+                              </div>
+                              <Button
+                                type="button"
+                                data-testid={`button-godkjenn-${vakt.id}-${interesse.ansattId}`}
+                                size="sm"
+                                onClick={() => godkjenn.mutate({ vaktId: vakt.id, ansattId: interesse.ansattId })}
+                                disabled={godkjenn.isPending}
+                              >
+                                <Check className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                                {isApproving ? "Godkjenner…" : "Velg"}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="border-t pt-3 text-sm text-muted-foreground">Ingen forespørsler på denne vakten.</p>
+                    )}
+
+                    <AvailableShiftCandidates
+                      vakt={vakt}
+                      kindergartenName={barnehage?.name || "Ukjent barnehage"}
+                    />
                   </CardContent>
                 </Card>
               );
@@ -209,27 +284,42 @@ export default function GodkjennVakter() {
           </div>
         )
       ) : (
-        vakterMedTimerInnsendt.length === 0 ? (
+        vakterQuery.isLoading ? (
+          <div className="space-y-3" aria-label="Laster timer">
+            {[1, 2].map((item) => <Skeleton key={item} className="h-40 w-full rounded-md" />)}
+          </div>
+        ) : vakterQuery.isError ? (
+          <Card>
+            <CardContent className="flex flex-col items-center py-10 text-center">
+              <AlertCircle className="mb-3 h-10 w-10 text-destructive" aria-hidden="true" />
+              <p className="font-medium">Kunne ikke hente vaktene</p>
+              <p className="mt-1 text-sm text-muted-foreground">Timer kan ikke vises akkurat nå.</p>
+              <Button className="mt-4" variant="outline" size="sm" onClick={() => refetch()}>
+                Prøv igjen
+              </Button>
+            </CardContent>
+          </Card>
+        ) : vakterMedTimerInnsendt.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+              <AlertCircle className="mx-auto mb-3 h-10 w-10 text-muted-foreground" aria-hidden="true" />
               <p className="font-medium">Ingen timer venter</p>
-              <p className="text-sm text-muted-foreground mt-1">Ingen ansatte har sendt inn timer for godkjenning.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Ingen ansatte har sendt inn timer for godkjenning.</p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
             {vakterMedTimerInnsendt.map((vakt) => {
-              const bh = bhMap.get(vakt.barnehageId);
-              const emp = vakt.ansattId ? userMap.get(vakt.ansattId) : null;
+              const barnehage = bhMap.get(vakt.barnehageId);
+              const ansatt = vakt.ansattId ? userMap.get(vakt.ansattId) : null;
               const isPending = godkjennTimer.isPending && godkjennTimer.variables === vakt.id;
               return (
                 <Card key={vakt.id} data-testid={`card-timer-${vakt.id}`}>
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="mb-3 flex items-start justify-between gap-2">
                       <div>
-                        <h3 className="font-semibold text-sm">{bh?.name || "Ukjent"}</h3>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        <h2 className="text-sm font-semibold">{barnehage?.name || "Ukjent"}</h2>
+                        <span className="mt-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                           Timer innsendt
                         </span>
                       </div>
@@ -240,30 +330,30 @@ export default function GodkjennVakter() {
                       )}
                     </div>
 
-                    {emp && (
-                      <div className="flex items-center gap-2 mb-3">
-                        <Avatar className="w-7 h-7 flex-shrink-0">
-                          {emp.profileImage && <AvatarImage src={emp.profileImage} alt={emp.name} />}
-                          <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
-                            {emp.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                    {ansatt && (
+                      <div className="mb-3 flex items-center gap-2">
+                        <Avatar className="h-7 w-7 shrink-0">
+                          {ansatt.profileImage && <AvatarImage src={ansatt.profileImage} alt={ansatt.name} />}
+                          <AvatarFallback className="bg-primary text-[10px] font-bold text-primary-foreground">
+                            {ansatt.name.split(" ").map((name) => name[0]).join("").slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm font-medium">{emp.name}</span>
-                        <span className="text-xs text-muted-foreground">({emp.stilling})</span>
+                        <span className="text-sm font-medium">{ansatt.name}</span>
+                        <span className="text-xs text-muted-foreground">({ansatt.stilling})</span>
                       </div>
                     )}
 
-                    <div className="space-y-2 mb-4 text-sm">
+                    <div className="mb-4 space-y-2 text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>{formatDate(vakt.dato)}</span>
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="w-3.5 h-3.5" />
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>{vakt.startTid?.slice(0, 5)} - {vakt.sluttTid?.slice(0, 5)}</span>
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Building2 className="w-3.5 h-3.5" />
+                        <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>{vakt.region}</span>
                       </div>
                     </div>
@@ -275,8 +365,8 @@ export default function GodkjennVakter() {
                       disabled={isPending}
                       data-testid={`button-godkjenn-timer-${vakt.id}`}
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                      {isPending ? "Godkjenner..." : "Godkjenn timer"}
+                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      {isPending ? "Godkjenner…" : "Godkjenn timer"}
                     </Button>
                   </CardContent>
                 </Card>
