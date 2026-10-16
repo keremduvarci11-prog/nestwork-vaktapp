@@ -21,6 +21,7 @@ import { wakeSheetSyncWorker } from "./sheetSync";
 import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 import { calculateShiftPay, normalizeShiftPayPatch } from "@shared/shiftPay";
+import { availableShiftCandidates } from "@shared/availableShiftCandidates";
 import { normalizeRegionMembership, visibleShiftRegions } from "@shared/regions";
 import { SCHEDULED_MESSAGING_TIMEZONE } from "./scheduledMessaging";
 import { registerWeek39Routes } from "./week39";
@@ -952,6 +953,22 @@ export async function registerRoutes(
     res.json(mine);
   });
 
+  app.get("/api/vakter/:id/tilgjengelige", requireAdmin, async (req, res) => {
+    const shift = await storage.getVakt(asString(req.params.id));
+    if (!shift) return res.status(404).json({ message: "Vakt ikke funnet" });
+    const [calendar, employees, shifts, requests, blocked] = await Promise.all([
+      storage.getAvailabilityByDate(shift.dato),
+      storage.getAllUsers(),
+      storage.getVakter(),
+      storage.getVaktInteresser(shift.id),
+      storage.isBlockedDate(shift.dato),
+    ]);
+    res.json({
+      blocked,
+      employees: availableShiftCandidates(shift, employees, calendar, shifts, requests, blocked),
+    });
+  });
+
   app.post("/api/vakter/:id/tildel", requireAdmin, async (req, res) => {
     const { ansattId } = req.body;
     if (!ansattId) {
@@ -960,10 +977,18 @@ export async function registerRoutes(
     const before = await storage.getVakt(asString(req.params.id));
     const autoGodkjenn = isPastDateOslo(before?.dato);
     const newStatus = autoGodkjenn ? "godkjent" : "tildelt";
-    const updated = await storage.updateVakt(asString(req.params.id), {
-      status: newStatus,
-      ansattId,
-    });
+    let updated;
+    try {
+      updated = await storage.updateVakt(asString(req.params.id), {
+        status: newStatus,
+        ansattId,
+      }, req.body.fromAvailability === true ? ansattId : undefined);
+    } catch (error) {
+      if (error instanceof ShiftRequestError) {
+        return res.status(error.status).json({ message: error.message });
+      }
+      throw error;
+    }
     if (!updated) return res.status(404).json({ message: "Vakt ikke funnet" });
     wakeSheetSyncWorker();
 

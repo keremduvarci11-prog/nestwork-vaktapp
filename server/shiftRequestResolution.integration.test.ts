@@ -27,7 +27,7 @@ test("real assignment transaction stores rejection notices and serializes reques
   }
   await pool.query(`CREATE SCHEMA "${namespace}"`);
   try {
-    for (const table of ["vakter", "barnehager", "vakt_interesser", "varsler"]) {
+    for (const table of ["vakter", "barnehager", "vakt_interesser", "varsler", "users", "availability", "blocked_dates"]) {
       await pool.query(`CREATE TABLE "${namespace}".${table} (LIKE public.${table} INCLUDING DEFAULTS)`);
     }
     t.mock.method(db, "transaction", async work => {
@@ -104,6 +104,42 @@ test("real assignment transaction stores rejection notices and serializes reques
       } finally {
         await query("ALTER TABLE varsler DROP CONSTRAINT synthetic_notice_failure");
       }
+    });
+
+    await t.test("calendar candidate is revalidated atomically before assignment", async () => {
+      await reset();
+      await query(`INSERT INTO users (id,username,password,name,role,region,stilling,timelonn,user_status)
+        VALUES ('synthetic-calendar','synthetic-calendar','not-a-real-password','Synthetic Calendar','ansatt','Testregion','Assistent',200,'Aktiv')`);
+      await query(`INSERT INTO availability (user_id,date,status)
+        VALUES ('synthetic-calendar','2026-10-13','available')`);
+      await storage.updateVakt("synthetic-shift", { status: "tildelt", ansattId: "synthetic-calendar" }, "synthetic-calendar");
+      assert.deepEqual((await query("SELECT status,ansatt_id FROM vakter")).rows,
+        [{ status: "tildelt", ansatt_id: "synthetic-calendar" }]);
+      await assert.rejects(
+        storage.updateVakt("synthetic-shift", { status: "tildelt", ansattId: "synthetic-calendar" }, "synthetic-calendar"),
+        (error: unknown) => error instanceof ShiftRequestError && error.status === 409,
+      );
+      await reset();
+      await query("UPDATE availability SET status='unavailable'");
+      await assert.rejects(
+        storage.updateVakt("synthetic-shift", { status: "tildelt", ansattId: "synthetic-calendar" }, "synthetic-calendar"),
+        (error: unknown) => error instanceof ShiftRequestError && error.status === 409,
+      );
+      assert.deepEqual((await query("SELECT status,ansatt_id FROM vakter")).rows,
+        [{ status: "ledig", ansatt_id: null }]);
+    });
+
+    await t.test("simultaneous overlapping candidate assignments cannot both succeed", async () => {
+      await reset();
+      await query("UPDATE availability SET status='available'");
+      await query(`INSERT INTO vakter (id,barnehage_id,dato,start_tid,slutt_tid,vikarkode,status,region)
+        VALUES ('synthetic-other-shift','synthetic-bh','2026-10-13','09:00','16:00','LTV','ledig','Testregion')`);
+      const outcomes = await Promise.allSettled(["synthetic-shift", "synthetic-other-shift"].map(id =>
+        storage.updateVakt(id, { status: "tildelt", ansattId: "synthetic-calendar" }, "synthetic-calendar")));
+      assert.equal(outcomes.filter(result => result.status === "fulfilled").length, 1);
+      const rejected = outcomes.find(result => result.status === "rejected") as PromiseRejectedResult;
+      assert.ok(rejected.reason instanceof ShiftRequestError && rejected.reason.status === 409);
+      assert.equal((await query("SELECT * FROM vakter WHERE ansatt_id='synthetic-calendar'")).rowCount, 1);
     });
   } finally {
     // Only this test's temporary schema is removed; public data is untouched.

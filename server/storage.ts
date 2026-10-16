@@ -4,6 +4,7 @@ import { hasPolicyPaidBreak, shiftPaidTerms } from "@shared/shiftHours";
 import { normalizeShiftPayPatch, type HourlyRatePatch } from "@shared/shiftPay";
 import { persistUnsuccessfulRequestNotices, ShiftRequestError } from "./shiftRequestResolution";
 import { persistShiftTimeNotices } from "./shiftTimeChanges";
+import { availableShiftCandidates } from "@shared/availableShiftCandidates";
 import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
   users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning, lonnsslipper, scheduledMeldinger,
@@ -43,7 +44,7 @@ export interface IStorage {
   getVakterByAnsatt(ansattId: string): Promise<Vakt[]>;
   getVakt(id: string): Promise<Vakt | undefined>;
   createVakt(v: InsertVakt): Promise<Vakt>;
-  updateVakt(id: string, data: Partial<InsertVakt> & HourlyRatePatch): Promise<Vakt | undefined>;
+  updateVakt(id: string, data: Partial<InsertVakt> & HourlyRatePatch, availableEmployeeId?: string): Promise<Vakt | undefined>;
   markVaktTimerInnsendt(id: string): Promise<Vakt | undefined>;
   markVaktTimerGodkjent(id: string): Promise<Vakt | undefined>;
   deleteVakt(id: string): Promise<boolean>;
@@ -208,10 +209,24 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateVakt(id: string, input: Partial<InsertVakt> & HourlyRatePatch): Promise<Vakt | undefined> {
+  async updateVakt(id: string, input: Partial<InsertVakt> & HourlyRatePatch, availableEmployeeId?: string): Promise<Vakt | undefined> {
     const result = await db.transaction(async (tx) => {
       const [before] = await tx.select().from(vakter).where(eq(vakter.id, id)).for("update");
       if (!before) return { updated: undefined, notices: [] };
+      if (availableEmployeeId) {
+        // Serialize assignments from this suggestion flow for one employee,
+        // then re-read eligibility while holding the target shift's row lock.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${availableEmployeeId}))`);
+        const [employee] = await tx.select().from(users).where(eq(users.id, availableEmployeeId));
+        const calendar = await tx.select().from(availability).where(and(
+          eq(availability.userId, availableEmployeeId), eq(availability.date, before.dato),
+        ));
+        const blocked = await tx.select().from(blockedDates).where(eq(blockedDates.date, before.dato));
+        const assigned = await tx.select().from(vakter).where(eq(vakter.ansattId, availableEmployeeId));
+        if (!employee || !availableShiftCandidates(before, [employee], calendar, assigned, [], blocked.length > 0).length) {
+          throw new ShiftRequestError(409, "Den ansatte er ikke lenger tilgjengelig, eller vakten er allerede tildelt. Oppdater listen og prøv igjen.");
+        }
+      }
       const data = normalizeShiftPayPatch(before, input);
       const effective = { ...before, ...data };
       const termsEdited = ["dato", "barnehageId", "startTid", "sluttTid", "betaltPause", "avtalteBetalteTimer"]

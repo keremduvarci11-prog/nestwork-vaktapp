@@ -15,6 +15,7 @@ import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, A
 import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
 import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak } from "@shared/shiftHours";
+import { AvailableShiftCandidates } from "@/components/admin/available-shift-candidates";
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   ledig: { label: "Ledig", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
@@ -584,7 +585,9 @@ export default function AlleVakter() {
                   )}
 
                   {vakt.status === "ledig" && (
-                    tildelingId === vakt.id ? (
+                    <>
+                    <AvailableShiftCandidates vakt={vakt} kindergartenName={bh?.name || "Ukjent barnehage"} />
+                    {tildelingId === vakt.id ? (
                       <div className="mt-3 pt-3 border-t space-y-2">
                         <label className="text-xs font-medium">Velg ansatt å tildele</label>
                         <Select onValueChange={(ansattId) => tildelVakt.mutate({ vaktId: vakt.id, ansattId })}>
@@ -613,6 +616,8 @@ export default function AlleVakter() {
                         Tildel til ansatt
                       </Button>
                     )
+                    }
+                    </>
                   )}
                 </CardContent>
               </Card>
