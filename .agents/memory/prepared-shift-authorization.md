@@ -14,3 +14,9 @@ Completed preparation cards should disappear based on server-confirmed completio
 **Why:** The user expects a confirmed plan to stop appearing as unfinished, including after reopening the app. A local flag could hide an incomplete or failed batch and would not carry across devices.
 
 **How to apply:** Treat only complete, conflict-free persisted assignments as finished. Keep unfinished or conflicting plans available; failed reads are not proof of completion.
+
+Employees must be notified when their assigned shift times change. Applicants to a changed open shift need the new times without implying that their request has been approved.
+
+**Why:** The user explicitly requested employee alerts for time corrections, not merely updated app and billing-sheet records.
+
+**How to apply:** Distinguish actual time changes from no-op saves. Preserve assignment and approval status. For live corrections before automatic notification support is published, send an explicit app message through the authorized admin flow and distinguish that from confirmed device-push delivery.

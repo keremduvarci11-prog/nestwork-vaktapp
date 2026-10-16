@@ -3,6 +3,7 @@ import { matchesRegions } from "@shared/regions";
 import { hasPolicyPaidBreak, shiftPaidTerms } from "@shared/shiftHours";
 import { normalizeShiftPayPatch, type HourlyRatePatch } from "@shared/shiftPay";
 import { persistUnsuccessfulRequestNotices, ShiftRequestError } from "./shiftRequestResolution";
+import { persistShiftTimeNotices } from "./shiftTimeChanges";
 import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
 import {
   users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning, lonnsslipper, scheduledMeldinger,
@@ -224,7 +225,10 @@ export class DatabaseStorage implements IStorage {
             ? shiftPaidTerms(effective) : {}),
         })
         .where(eq(vakter.id, id)).returning();
-      const notices = await persistUnsuccessfulRequestNotices(tx, before, updated);
+      const notices = [
+        ...await persistUnsuccessfulRequestNotices(tx, before, updated),
+        ...await persistShiftTimeNotices(tx, before, updated),
+      ];
       return { updated, notices };
     });
     // The app notices are already durable. Push is best-effort and must not
@@ -234,7 +238,7 @@ export class DatabaseStorage implements IStorage {
         await Promise.allSettled(result.notices.map(notice =>
           sendPushNotificationOnly(notice.userId, notice.title, notice.message, notice.link || "/"),
         ));
-      }).catch(() => console.error("[Notify] Kunne ikke sende push for avslåtte vaktforespørsler"));
+      }).catch(() => console.error("[Notify] Kunne ikke sende push for vaktendring"));
     }
     return result.updated;
   }
