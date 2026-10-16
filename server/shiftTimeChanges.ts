@@ -27,8 +27,10 @@ export function buildShiftTimeNotices(
   });
   return recipients.map(userId => ({
     userId,
-    title: "Vakttiden er endret",
-    message: `Vakttiden hos ${kindergarten} ${date} er endret fra kl. ${before.startTid.slice(0, 5)}–${before.sluttTid.slice(0, 5)} til kl. ${after.startTid.slice(0, 5)}–${after.sluttTid.slice(0, 5)}.${after.ansattId ? "" : " Dette gjelder en vakt du har sendt forespørsel om. Forespørselen er ikke en tildeling. Du skal ikke møte uten bekreftet tildeling."}`,
+    title: after.ansattId
+      ? "Vakten din har fått nye tider"
+      : "Vakten du har søkt på har fått nye tider",
+    message: `${kindergarten}, ${date}. Trykk her for å se de nye tidene.${after.ansattId ? "" : " Forespørselen er ikke en tildeling. Du skal ikke møte uten bekreftet tildeling."}`,
     type: "vakt",
     read: false,
     link: after.ansattId ? "/mine-vakter" : "/",

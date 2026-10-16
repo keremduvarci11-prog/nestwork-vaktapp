@@ -19,4 +19,10 @@ Employees must be notified when their assigned shift times change. Applicants to
 
 **Why:** The user explicitly requested employee alerts for time corrections, not merely updated app and billing-sheet records.
 
-**How to apply:** Distinguish actual time changes from no-op saves. Preserve assignment and approval status. For live corrections before automatic notification support is published, send an explicit app message through the authorized admin flow and distinguish that from confirmed device-push delivery.
+**How to apply:** Distinguish actual time changes from no-op saves. Preserve assignment and approval status. Use ordinary app notifications and push, never a chat message or conversation as a fallback. If the automatic flow requires publishing, say so instead of sending a message. Distinguish saved app notifications from confirmed device-push delivery.
+
+Time-change alerts must be short ordinary notifications, not messages in «Meldinger».
+
+**Why:** The user explicitly rejected the manually sent change-time conversations and requested the same notification channel as other app alerts.
+
+**How to apply:** For assigned shifts use «Vakten din har fått nye tider» with a prompt to tap and see the updated times. Link to the employee's shifts. Keep applicant wording distinct so it does not imply assignment. Never use the messaging endpoint for these alerts, even temporarily.

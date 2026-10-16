@@ -8,13 +8,17 @@ const before = {
 };
 const after = { ...before, startTid: "08:30:00", sluttTid: "16:00:00" };
 
-test("notifies assigned employee with old and new time and date", () => {
+test("uses an ordinary shift notification with a short message and a link to the updated shifts", () => {
   const notices = buildShiftTimeNotices(before, after, [{ ansattId: "other" }], "Havhesten FUS");
   assert.equal(notices.length, 1);
   assert.equal(notices[0].userId, "employee");
   assert.equal(notices[0].link, "/mine-vakter");
+  assert.equal(notices[0].type, "vakt");
+  assert.equal(notices[0].read, false);
+  assert.equal(notices[0].title, "Vakten din har fått nye tider");
   assert.match(notices[0].message, /19\. oktober 2026/);
-  assert.match(notices[0].message, /08:00–15:30.*08:30–16:00/);
+  assert.match(notices[0].message, /Trykk her for å se de nye tidene/);
+  assert.doesNotMatch(notices[0].message, /08:00|08:30/);
 });
 
 test("ignores no-op saves, seconds formatting, and unrelated edits", () => {
@@ -34,6 +38,9 @@ test("notifies interested applicants once, without implying an assignment", () =
     [{ ansattId: "applicant" }, { ansattId: "applicant" }], "Client");
   assert.equal(notices.length, 1);
   assert.equal(notices[0].userId, "applicant");
+  assert.equal(notices[0].title, "Vakten du har søkt på har fått nye tider");
+  assert.equal(notices[0].type, "vakt");
+  assert.equal(notices[0].link, "/");
   assert.match(notices[0].message, /ikke en tildeling/);
   assert.match(notices[0].message, /ikke møte/);
   assert.deepEqual(buildShiftTimeNotices(openBefore, openAfter, [], "Client"), []);
