@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Mail, MailOpen, AlertCircle, Send, Lock, ArrowLeft, User, Trash2, RotateCcw, Plus, Search, ChevronDown } from "lucide-react";
 import type { Melding, User as UserType, SamtaleMelding } from "@shared/schema";
 import { ScheduledMessageComposer } from "@/components/admin/scheduled-message-composer";
+import { isAdminInboxUnread } from "@shared/messageInbox";
 
 function isAdminMessage(fromUserId: string, adminIds: Set<string>) {
   return fromUserId === "admin" || adminIds.has(fromUserId);
@@ -35,8 +35,16 @@ function SamtaleView({
   const { toast } = useToast();
   const [replyText, setReplyText] = useState("");
 
-  const { data: samtale, isLoading } = useQuery<SamtaleMelding[]>({
+  const {
+    data: samtale,
+    isLoading,
+    isError: samtaleIsError,
+    refetch: refetchSamtale,
+  } = useQuery<SamtaleMelding[]>({
     queryKey: ["/api/meldinger", melding.id, "samtale"],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: 15_000,
   });
 
   const sendReply = useMutation({
@@ -48,6 +56,9 @@ function SamtaleView({
       queryClient.invalidateQueries({ queryKey: ["/api/meldinger", melding.id, "samtale"] });
       queryClient.invalidateQueries({ queryKey: ["/api/meldinger"] });
       setReplyText("");
+    },
+    onError: () => {
+      toast({ title: "Kunne ikke sende svar", variant: "destructive" });
     },
   });
 
@@ -157,6 +168,16 @@ function SamtaleView({
           </div>
         </div>
 
+        {samtaleIsError && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            <span className="text-destructive">
+              Kunne ikke hente samtalen. {samtale?.length ? "Viser sist hentede meldinger." : ""}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => refetchSamtale()}>
+              Prøv igjen
+            </Button>
+          </div>
+        )}
         {isLoading ? (
           <Skeleton className="h-16 w-3/4" />
         ) : (
@@ -361,12 +382,19 @@ function NyMeldingView({
 }
 
 export default function AdminMeldinger() {
-  const { user: currentAdmin } = useAuth();
   const [openMeldingId, setOpenMeldingId] = useState<string | null>(null);
   const [showNyMelding, setShowNyMelding] = useState(false);
 
-  const { data: meldinger, isLoading } = useQuery<AdminMelding[]>({
+  const {
+    data: meldinger,
+    isLoading,
+    isError: meldingerIsError,
+    refetch: refetchMeldinger,
+  } = useQuery<AdminMelding[]>({
     queryKey: ["/api/meldinger"],
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: 15_000,
   });
   const { data: users } = useQuery<UserType[]>({
     queryKey: ["/api/users"],
@@ -377,18 +405,10 @@ export default function AdminMeldinger() {
     users?.filter((u) => u.role === "admin").map((u) => u.id) || []
   );
 
-  const myMeldinger = meldinger?.filter((m) => {
-    if (m.toUserId === currentAdmin?.id || m.fromUserId === currentAdmin?.id) return true;
-    if (m.fromUserId === "admin") return true;
-    if (!m.toUserId && !adminIds.has(m.fromUserId) && m.fromUserId !== "admin") return true;
-    return false;
-  }) || [];
+  const sharedMeldinger = meldinger || [];
 
-  const unreadCount = myMeldinger.filter((m) => {
-    const fromAdmin = isAdminMessage(m.fromUserId, adminIds);
-    return (!fromAdmin && !m.read) || m.hasNewReply;
-  }).length || 0;
-  const openMelding = myMeldinger.find((m) => m.id === openMeldingId);
+  const unreadCount = sharedMeldinger.filter((m) => isAdminInboxUnread(m, adminIds)).length;
+  const openMelding = sharedMeldinger.find((m) => m.id === openMeldingId);
 
   if (showNyMelding && users) {
     return (
@@ -419,7 +439,9 @@ export default function AdminMeldinger() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold" data-testid="text-admin-meldinger-title">Meldinger</h1>
-          <p className="text-sm text-muted-foreground mt-1">{unreadCount} uleste meldinger</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Felles innboks for administratorer · {unreadCount} uleste meldinger
+          </p>
         </div>
         <Button
           onClick={() => setShowNyMelding(true)}
@@ -433,11 +455,30 @@ export default function AdminMeldinger() {
 
       <ScheduledMessageComposer users={users || []} />
 
+      {meldingerIsError && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+          <span className="text-destructive">
+            Kunne ikke hente meldinger. {sharedMeldinger.length ? "Viser sist hentede meldinger." : ""}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => refetchMeldinger()}>
+            Prøv igjen
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-md" />)}
         </div>
-      ) : !myMeldinger.length ? (
+      ) : meldingerIsError && !sharedMeldinger.length ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertCircle className="w-10 h-10 mx-auto text-destructive mb-3" />
+            <p className="font-medium">Meldingene er ikke tilgjengelige</p>
+            <p className="text-sm text-muted-foreground mt-1">Prøv å hente innboksen på nytt.</p>
+          </CardContent>
+        </Card>
+      ) : !sharedMeldinger.length ? (
         <Card>
           <CardContent className="py-12 text-center">
             <AlertCircle className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
@@ -446,10 +487,10 @@ export default function AdminMeldinger() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {myMeldinger.map((m) => {
+          {sharedMeldinger.map((m) => {
             const fromAdmin = isAdminMessage(m.fromUserId, adminIds);
             const otherUser = fromAdmin ? userMap.get(m.toUserId || "") : userMap.get(m.fromUserId);
-            const hasNewMessage = (!fromAdmin && !m.read) || !!m.hasNewReply;
+            const hasNewMessage = isAdminInboxUnread(m, adminIds);
             return (
               <Card
                 key={m.id}

@@ -152,6 +152,8 @@ async function installNativeListeners() {
         if (!userId || stopping) return;
         void queryClient.invalidateQueries({ queryKey: ["/api/varsler"] });
         void queryClient.invalidateQueries({ queryKey: ["/api/varsler/unread-count"] });
+        void queryClient.invalidateQueries({ queryKey: ["/api/meldinger"] });
+        void queryClient.invalidateQueries({ queryKey: ["/api/meldinger/user"] });
       })).catch(error => {
         foregroundListener = null;
         throw error;

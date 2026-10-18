@@ -5,7 +5,7 @@ import { normalizeShiftPayPatch, type HourlyRatePatch } from "@shared/shiftPay";
 import { persistUnsuccessfulRequestNotices, ShiftRequestError } from "./shiftRequestResolution";
 import { persistShiftTimeNotices } from "./shiftTimeChanges";
 import { availableShiftCandidates } from "@shared/availableShiftCandidates";
-import { eq, and, desc, inArray, or, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, or, gte, lte, sql, getTableColumns } from "drizzle-orm";
 import {
   users, barnehager, vakter, meldinger, samtaleMeldinger, favoritter, onboarding, varsler, pushSubscriptions, vaktInteresser, availability, blockedDates, personalreglerGodkjenning, lonnsslipper, scheduledMeldinger,
   type User, type InsertUser,
@@ -283,6 +283,23 @@ export class DatabaseStorage implements IStorage {
 
   async getMeldinger(): Promise<Melding[]> {
     return db.select().from(meldinger).orderBy(desc(meldinger.lastActivityAt), desc(meldinger.createdAt));
+  }
+
+  async getAdminInbox() {
+    // One query rather than fetching every conversation's replies separately.
+    return db.select({
+      ...getTableColumns(meldinger),
+      hasNewReply: sql<boolean>`exists (
+        select 1 from samtale_meldinger as reply
+        where reply.melding_id = meldinger.id
+          and reply.from_user_id <> 'admin'
+          and not exists (
+            select 1 from users as sender
+            where sender.id = reply.from_user_id and sender.role = 'admin'
+          )
+          and reply.created_at > coalesce(meldinger.last_seen_by_admin, timestamp '1970-01-01')
+      )`,
+    }).from(meldinger).orderBy(desc(meldinger.lastActivityAt), desc(meldinger.createdAt));
   }
 
   async getMeldingerByUser(userId: string): Promise<Melding[]> {

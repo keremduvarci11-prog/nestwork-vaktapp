@@ -22,6 +22,7 @@ import { notifyRegion, notifyUser, notifyAdmins } from "./notifications";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
 import { calculateShiftPay, normalizeShiftPayPatch } from "@shared/shiftPay";
 import { availableShiftCandidates } from "@shared/availableShiftCandidates";
+import { isAdminInboxUnread } from "@shared/messageInbox";
 import { normalizeRegionMembership, visibleShiftRegions } from "@shared/regions";
 import { SCHEDULED_MESSAGING_TIMEZONE } from "./scheduledMessaging";
 import { registerWeek39Routes } from "./week39";
@@ -1158,22 +1159,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/meldinger", requireAdmin, async (_req, res) => {
-    const all = await storage.getMeldinger();
-    const allAdmins = (await storage.getAllUsers()).filter((user) => user.role === "admin");
-    const adminIds = new Set(allAdmins.map((admin) => admin.id));
-    const withReplyStatus = await Promise.all(all.map(async (melding) => {
-      const samtale = await storage.getSamtaleMeldinger(melding.id);
-      const lastAdminSeen = melding.lastSeenByAdmin || new Date(0);
-      const hasNewReply = samtale.some(
-        (svar) =>
-          !adminIds.has(svar.fromUserId) &&
-          svar.fromUserId !== "admin" &&
-          !!svar.createdAt &&
-          new Date(svar.createdAt) > lastAdminSeen
-      );
-      return { ...melding, hasNewReply };
-    }));
-    res.json(withReplyStatus);
+    res.json(await storage.getAdminInbox());
   });
 
   app.get("/api/meldinger/user/:userId", requireAuth, async (req, res) => {
@@ -1200,6 +1186,9 @@ export async function registerRoutes(
     }
 
     const created = await storage.createMelding(data);
+    // The message is already durable. A slow device-push provider must not
+    // keep the composer waiting or make a successful save look like failure.
+    res.json(created);
 
     if (currentUser?.role === "admin" && data.toUserId) {
       try {
@@ -1226,7 +1215,6 @@ export async function registerRoutes(
       }
     }
 
-    res.json(created);
   });
 
   // ===== Planlagte admin-meldinger =====
@@ -1383,6 +1371,7 @@ export async function registerRoutes(
       message,
     });
     await storage.updateMeldingActivity(melding.id, !isAdmin);
+    res.json(created);
 
     try {
       if (isAdmin) {
@@ -1437,26 +1426,13 @@ export async function registerRoutes(
       console.error("[Notify] Feil ved melding-varsling:", err);
     }
 
-    res.json(created);
   });
 
   app.get("/api/meldinger/unread-count/admin", requireAdmin, async (req, res) => {
-    const all = await storage.getMeldinger();
-    const myId = getUserIdFromRequest(req)!;
+    const all = await storage.getAdminInbox();
     const allAdmins = (await storage.getAllUsers()).filter(u => u.role === "admin");
     const adminIds = new Set(allAdmins.map(a => a.id));
-    let count = 0;
-    for (const m of all) {
-      if (m.closed) continue;
-      const isMyConversation = m.toUserId === myId || m.fromUserId === myId || m.fromUserId === "admin";
-      if (!isMyConversation) continue;
-      const samtale = await storage.getSamtaleMeldinger(m.id);
-      const lastAdminSeen = m.lastSeenByAdmin || new Date(0);
-      const hasNewFromUser = !m.read || samtale.some(
-        (s) => !adminIds.has(s.fromUserId) && s.fromUserId !== "admin" && s.createdAt && new Date(s.createdAt) > lastAdminSeen
-      );
-      if (hasNewFromUser) count++;
-    }
+    const count = all.filter(m => isAdminInboxUnread(m, adminIds)).length;
     res.json({ count });
   });
 
