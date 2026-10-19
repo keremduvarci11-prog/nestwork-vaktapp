@@ -8,6 +8,7 @@ import fs from "fs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { storage } from "./storage";
+import { LEGACY_ONBOARDING_ITEMS, NEW_EMPLOYEE_ONBOARDING_ITEMS, isPayrollDemoUser } from "@shared/onboarding";
 import { ShiftRequestError } from "./shiftRequestResolution";
 import {
   insertVaktSchema,
@@ -1549,27 +1550,35 @@ export async function registerRoutes(
     if (getUserIdFromRequest(req) !== asString(req.params.userId) && currentUser?.role !== "admin") {
       return res.status(403).json({ message: "Ikke tilgang" });
     }
-    let items = await storage.getOnboarding(asString(req.params.userId));
-    const defaultItems = ["Bytt passord", "Last opp profilbilde", "Last opp CV", "Last opp politiattest", "Signert kontrakt"];
-    const existingNames = new Set(items.map((i) => i.item));
-    const missing = defaultItems.filter((d) => !existingNames.has(d));
-    if (missing.length > 0) {
-      for (const item of missing) {
-        await storage.createOnboarding({ userId: asString(req.params.userId), item, completed: false });
-      }
-      items = await storage.getOnboarding(asString(req.params.userId));
-    }
+    const target = await storage.getUser(asString(req.params.userId));
+    if (!target) return res.status(404).json({ message: "Bruker ikke funnet" });
+    // Real new employees receive the payroll task atomically on creation.
+    // Never backfill it for existing staff, even if they have not logged in yet.
+    const defaults = isPayrollDemoUser(target)
+      ? NEW_EMPLOYEE_ONBOARDING_ITEMS : LEGACY_ONBOARDING_ITEMS;
+    const items = await storage.ensureOnboarding(target.id, defaults);
     res.json(items);
   });
 
   app.post("/api/onboarding", requireAuth, async (req, res) => {
+    const requester = await storage.getUser(getUserIdFromRequest(req)!);
+    if (requester?.role !== "admin") {
+      return res.status(403).json({ message: "Bare admin kan opprette steg" });
+    }
     const created = await storage.createOnboarding(req.body);
     res.json(created);
   });
 
   app.patch("/api/onboarding/:id", requireAuth, async (req, res) => {
     const { completed } = req.body;
-    const updated = await storage.toggleOnboarding(asString(req.params.id), completed);
+    if (typeof completed !== "boolean") {
+      return res.status(400).json({ message: "Fullført må være ja eller nei" });
+    }
+    const requester = await storage.getUser(getUserIdFromRequest(req)!);
+    const updated = await storage.toggleOnboarding(
+      asString(req.params.id), completed,
+      requester?.role === "admin" ? undefined : getUserIdFromRequest(req)!,
+    );
     if (!updated) return res.status(404).json({ message: "Ikke funnet" });
     res.json(updated);
   });

@@ -20,14 +20,22 @@ import {
   FileSignature,
   Loader2,
   Check,
+  ExternalLink,
 } from "lucide-react";
 import type { Onboarding as OnboardingType } from "@shared/schema";
+import { PAYROLL_FORM_URL, PAYROLL_ONBOARDING_ITEM } from "@shared/onboarding";
 
 const itemConfig: Record<string, { icon: typeof KeyRound; description: string; actionType: "navigate" | "upload" | "checkbox" }> = {
   "Bytt passord": {
     icon: KeyRound,
     description: "Du må bytte til et personlig passord. Gå til Innstillinger for å endre.",
     actionType: "navigate",
+  },
+  [PAYROLL_ONBOARDING_ITEM]: {
+    icon: FileText,
+    description:
+      "Åpne skjemaet, fyll inn bankkonto- og lønnsopplysninger, og trykk Send i skjemaet. Gå deretter tilbake hit og bekreft innsendingen.",
+    actionType: "checkbox",
   },
   "Last opp profilbilde": {
     icon: Camera,
@@ -53,6 +61,7 @@ const itemConfig: Record<string, { icon: typeof KeyRound; description: string; a
 
 const desiredOrder = [
   "Bytt passord",
+  PAYROLL_ONBOARDING_ITEM,
   "Last opp profilbilde",
   "Last opp CV",
   "Last opp politiattest",
@@ -74,6 +83,13 @@ export default function OnboardingPage() {
       apiRequest("PATCH", `/api/onboarding/${id}`, { completed }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/onboarding"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Kunne ikke lagre endringen",
+        description: error.message || "Prøv igjen om litt.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -135,6 +151,14 @@ export default function OnboardingPage() {
                 onComplete={(done) =>
                   toggleItem.mutate({ id: item.id, completed: done })
                 }
+                completionPending={
+                  toggleItem.isPending && toggleItem.variables?.id === item.id
+                }
+                completionError={
+                  toggleItem.isError && toggleItem.variables?.id === item.id
+                    ? toggleItem.error?.message || "Prøv igjen om litt."
+                    : null
+                }
                 onNavigate={navigate}
                 toast={toast}
               />
@@ -152,6 +176,8 @@ function OnboardingItem({
   expanded,
   onToggleExpand,
   onComplete,
+  completionPending,
+  completionError,
   onNavigate,
   toast,
 }: {
@@ -160,6 +186,8 @@ function OnboardingItem({
   expanded: boolean;
   onToggleExpand: () => void;
   onComplete: (done: boolean) => void;
+  completionPending: boolean;
+  completionError: string | null;
   onNavigate: (path: string) => void;
   toast: ReturnType<typeof useToast>["toast"];
 }) {
@@ -258,6 +286,25 @@ function OnboardingItem({
               {config.description}
             </p>
 
+            {item.item === PAYROLL_ONBOARDING_ITEM && (
+              <div className="mb-3 rounded-md border bg-muted/40 p-3">
+                <a
+                  href={PAYROLL_FORM_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-auto"
+                  data-testid={`link-payroll-form-${item.id}`}
+                >
+                  Åpne lønnsskjema
+                  <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+                </a>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Skjemaet åpnes eksternt. Innsending bekreftes av deg her – vi
+                  verifiserer ikke automatisk om Google-skjemaet er sendt inn.
+                </p>
+              </div>
+            )}
+
             {isUploadType && (
               <div className="space-y-2">
                 {existingFile && (
@@ -312,14 +359,34 @@ function OnboardingItem({
             )}
 
             {config.actionType === "checkbox" && (
-              <Button
-                size="sm"
-                variant={item.completed ? "outline" : "default"}
-                onClick={() => onComplete(!item.completed)}
-                data-testid={`button-toggle-${item.id}`}
-              >
-                {item.completed ? "Angre" : "Merk som fullført"}
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  size="sm"
+                  variant={item.completed ? "outline" : "default"}
+                  onClick={() => onComplete(!item.completed)}
+                  disabled={completionPending}
+                  aria-busy={completionPending}
+                  data-testid={`button-toggle-${item.id}`}
+                >
+                  {completionPending && (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
+                  )}
+                  {completionPending
+                    ? "Lagrer..."
+                    : item.item === PAYROLL_ONBOARDING_ITEM
+                      ? item.completed
+                        ? "Angre"
+                        : "Jeg har sendt inn lønnsskjemaet"
+                      : item.completed
+                        ? "Angre"
+                        : "Merk som fullført"}
+                </Button>
+                {completionError && item.item === PAYROLL_ONBOARDING_ITEM && (
+                  <p role="alert" className="text-sm text-destructive">
+                    Bekreftelsen ble ikke lagret. Du kan prøve igjen. {completionError}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         )}

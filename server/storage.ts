@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { NEW_EMPLOYEE_ONBOARDING_ITEMS } from "@shared/onboarding";
 import { matchesRegions } from "@shared/regions";
 import { hasPolicyPaidBreak, shiftPaidTerms } from "@shared/shiftHours";
 import { normalizeShiftPayPatch, type HourlyRatePatch } from "@shared/shiftPay";
@@ -75,8 +76,9 @@ export interface IStorage {
   removeFavoritt(id: string): Promise<void>;
 
   getOnboarding(userId: string): Promise<Onboarding[]>;
+  ensureOnboarding(userId: string, defaults: readonly string[]): Promise<Onboarding[]>;
   createOnboarding(o: InsertOnboarding): Promise<Onboarding>;
-  toggleOnboarding(id: string, completed: boolean): Promise<Onboarding | undefined>;
+  toggleOnboarding(id: string, completed: boolean, ownerId?: string): Promise<Onboarding | undefined>;
 
   getVarsler(userId: string): Promise<Varsel[]>;
   createVarsel(v: InsertVarsel): Promise<Varsel>;
@@ -141,8 +143,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const [created] = await db.insert(users).values(user).returning();
-    return created;
+    return db.transaction(async (tx) => {
+      const [created] = await tx.insert(users).values(user).returning();
+      if (created.role === "ansatt") {
+        await tx.insert(onboarding).values(NEW_EMPLOYEE_ONBOARDING_ITEMS.map(item => ({
+          userId: created.id, item, completed: false,
+        })));
+      }
+      return created;
+    });
   }
 
   async getAllUsers(): Promise<User[]> {
@@ -436,15 +445,33 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(onboarding).where(eq(onboarding.userId, userId));
   }
 
+  async ensureOnboarding(userId: string, defaults: readonly string[]): Promise<Onboarding[]> {
+    return db.transaction(async (tx) => {
+      // Home and the checklist can load together. Serialize initialization so
+      // reopening either page never creates duplicate tasks or resets completion.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"onboarding:" + userId}))`);
+      const rows = await tx.select().from(onboarding).where(eq(onboarding.userId, userId));
+      const names = new Set(rows.map(row => row.item));
+      const missing = defaults.filter(item => !names.has(item));
+      if (missing.length) {
+        const created = await tx.insert(onboarding).values(missing.map(item => ({
+          userId, item, completed: false,
+        }))).returning();
+        return [...rows, ...created];
+      }
+      return rows;
+    });
+  }
+
   async createOnboarding(o: InsertOnboarding): Promise<Onboarding> {
     const [created] = await db.insert(onboarding).values(o).returning();
     return created;
   }
 
-  async toggleOnboarding(id: string, completed: boolean): Promise<Onboarding | undefined> {
+  async toggleOnboarding(id: string, completed: boolean, ownerId?: string): Promise<Onboarding | undefined> {
     const [updated] = await db.update(onboarding)
       .set({ completed, completedAt: completed ? new Date() : null })
-      .where(eq(onboarding.id, id))
+      .where(ownerId ? and(eq(onboarding.id, id), eq(onboarding.userId, ownerId)) : eq(onboarding.id, id))
       .returning();
     return updated;
   }

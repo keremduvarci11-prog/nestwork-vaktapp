@@ -10,6 +10,7 @@ import { MapPin, Clock, Calendar, Building2, AlertCircle, ArrowRight, ClipboardL
 import { PushPermissionBanner } from "@/components/push-banner";
 import type { Vakt, Barnehage, Onboarding, VaktInteresse } from "@shared/schema";
 import { shouldDeductPause } from "@shared/shiftHours";
+import { PAYROLL_ONBOARDING_ITEM } from "@shared/onboarding";
 
 
 export default function EmployeeHome() {
@@ -80,6 +81,9 @@ export default function EmployeeHome() {
   const onboardingDone = onboardingItems?.filter((i) => i.completed).length || 0;
   const onboardingTotal = onboardingItems?.length || 0;
   const hasUnfinishedOnboarding = onboardingTotal > 0 && onboardingDone < onboardingTotal;
+  const payrollPending = onboardingItems?.some(
+    (item) => item.item === PAYROLL_ONBOARDING_ITEM && !item.completed,
+  ) ?? false;
 
   const formatDate = (d: string) => {
     const date = new Date(d + "T00:00:00");
@@ -109,6 +113,7 @@ export default function EmployeeHome() {
                 <p className="text-sm font-semibold">Fullfør oppsettet ditt</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Du har {onboardingTotal - onboardingDone} steg igjen. Bytt passord, last opp CV og politiattest, og legg inn profilbilde.
+                  {payrollPending && " Fyll også ut lønnsskjemaet."}
                 </p>
                 <Button
                   size="sm"

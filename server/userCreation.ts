@@ -1,18 +1,11 @@
 import bcrypt from "bcryptjs";
 import type { Pool, PoolClient } from "pg";
 import { pool } from "./db";
+import { NEW_EMPLOYEE_ONBOARDING_ITEMS as ONBOARDING_ITEMS } from "@shared/onboarding";
 import {
   createUserRequestSchema,
   type CreateUserRequest,
 } from "@shared/createUser";
-
-const ONBOARDING_ITEMS = [
-  "Bytt passord",
-  "Last opp profilbilde",
-  "Last opp CV",
-  "Last opp politiattest",
-  "Signert kontrakt",
-];
 
 export type SafeCreatedUser = {
   id: string;

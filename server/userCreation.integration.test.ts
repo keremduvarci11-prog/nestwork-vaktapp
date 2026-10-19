@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
+import { PAYROLL_ONBOARDING_ITEM, NEW_EMPLOYEE_ONBOARDING_ITEMS } from "@shared/onboarding";
 import {
   createEmployeeUser,
   parseCreateUserRequest,
@@ -84,7 +85,10 @@ test("creates ordinary employee with normalized pay, hashed password and onboard
     assert.equal(created.role, "ansatt");
     assert.equal(created.status, "Aktiv");
     assert.equal("password" in created, false);
-    assert.deepEqual(await counts(), [1, 5]);
+    assert.deepEqual(await counts(), [1, NEW_EMPLOYEE_ONBOARDING_ITEMS.length]);
+    const tasks = await pool.query(`SELECT item, completed FROM "${schema}".onboarding WHERE user_id = $1`, [created.id]);
+    assert.equal(tasks.rows.filter(row => row.item === PAYROLL_ONBOARDING_ITEM).length, 1);
+    assert.equal(tasks.rows.find(row => row.item === PAYROLL_ONBOARDING_ITEM).completed, false);
     const stored = await pool.query(`SELECT password FROM "${schema}".users`);
     assert.notEqual(stored.rows[0].password, "Synthetic!Passphrase42");
     assert.equal(await bcrypt.compare("Synthetic!Passphrase42", stored.rows[0].password), true);
@@ -142,7 +146,7 @@ test("concurrent duplicate email and employee ID create only one user", { skip }
       idFailure.reason.existingUsers?.length === 1,
       true,
     );
-    assert.deepEqual(await counts(), [2, 10]);
+    assert.deepEqual(await counts(), [2, NEW_EMPLOYEE_ONBOARDING_ITEMS.length * 2]);
   } finally {
     if (schema) await pool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
   }

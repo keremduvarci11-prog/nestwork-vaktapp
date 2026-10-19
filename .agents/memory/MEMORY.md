@@ -14,3 +14,4 @@
 - [Vaktforespørsler](shift-request-confirmations.md) — en forespørsel gir ikke rett til å møte; søkere som ikke får vakten trenger et tydelig avslag.
 - [Vaktsærskilt timelønn](shift-specific-pay.md) — særskilt sats for bestemte vakter skal ikke endre vanlig timelønn eller andre vakters lønn.
 - [Admin message visibility](admin-message-visibility.md) — keep the shared admin inbox, unread counts and push notifications consistent across admin accounts.
+- [Payroll onboarding](payroll-onboarding.md) — payroll form for new employees and the demo account only; opening the form is not proof of submission.
