@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, X, UserCheck, Coffee, Clock } from "lucide-react";
 import type { Barnehage, User } from "@shared/schema";
-import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak } from "@shared/shiftHours";
+import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak, isEspiraKindergarten } from "@shared/shiftHours";
 import { Week39Plan } from "@/components/admin/week39-plan";
 
 export default function NyVakt() {
@@ -27,12 +27,13 @@ export default function NyVakt() {
   const [showSearch, setShowSearch] = useState(false);
   const [betaltPause, setBetaltPause] = useState(false);
   const [avtalteBetalteTimer, setAvtalteBetalteTimer] = useState("");
-  const policyPaidBreak = hasPolicyPaidBreak(dato, barnehageId);
-  const effectiveBetaltPause = policyPaidBreak || betaltPause;
-
   const { data: barnehager } = useQuery<Barnehage[]>({
     queryKey: ["/api/barnehager"],
   });
+  const selectedBh = barnehager?.find((b) => b.id === barnehageId);
+  const espira = isEspiraKindergarten(barnehageId, selectedBh?.name);
+  const policyPaidBreak = hasPolicyPaidBreak(dato, barnehageId, selectedBh?.name);
+  const effectiveBetaltPause = !espira && (policyPaidBreak || betaltPause);
 
   const { data: users } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -55,7 +56,6 @@ export default function NyVakt() {
   }, [ansatte, ansattSearch]);
 
   const selectedAnsatt = ansatte.find((a) => a.id === ansattId);
-  const selectedBh = barnehager?.find((b) => b.id === barnehageId);
 
   const calcHours = () => {
     return calculatePaidHours(startTid, sluttTid, {
@@ -191,13 +191,16 @@ export default function NyVakt() {
               </div>
               <Switch
                 checked={effectiveBetaltPause}
-                disabled={policyPaidBreak}
+                disabled={policyPaidBreak || espira}
                 onCheckedChange={setBetaltPause}
                 data-testid="switch-betalt-pause"
               />
             </div>
             {policyPaidBreak && (
               <p className="text-xs text-muted-foreground">Betalt pause gjelder ved denne barnehagen fra 01.09.2026.</p>
+            )}
+            {espira && (
+              <p className="text-xs text-muted-foreground">Espira har ikke betalt pause. Ved minst 5,5 timer trekkes 30 minutter, med mindre betalte timer er avtalt særskilt.</p>
             )}
 
             <div className="space-y-2">

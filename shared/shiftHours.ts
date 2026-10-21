@@ -5,14 +5,22 @@ export const PAID_BREAK_EFFECTIVE_DATE = "2026-09-01";
 export const PAID_BREAK_EXEMPT_KINDERGARTEN_IDS = [
   "99caabb6-6068-42e4-8aad-defadbb578f2",
   "58d81ed1-e4fb-49ee-8fa3-e5bccdcddea6",
+  "f5d95f21-635b-4209-8dac-7e366979b99d",
+  "318a9cc1-1673-4905-a011-38f471c20f83",
 ] as const;
 
+/** Match future Espira clients by their authoritative client name as well. */
+export function isEspiraKindergarten(barnehageId: string, name?: string | null): boolean {
+  return PAID_BREAK_EXEMPT_KINDERGARTEN_IDS.some((id) => id === barnehageId) ||
+    /\bespira\b/i.test(name ?? "");
+}
+
 /** Date-only comparisons: the shift's date, not today's date, controls policy. */
-export function hasPolicyPaidBreak(dato: string, barnehageId: string): boolean {
+export function hasPolicyPaidBreak(dato: string, barnehageId: string, name?: string | null): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(dato) &&
     dato >= PAID_BREAK_EFFECTIVE_DATE &&
     !!barnehageId &&
-    !PAID_BREAK_EXEMPT_KINDERGARTEN_IDS.some((id) => id === barnehageId);
+    !isEspiraKindergarten(barnehageId, name);
 }
 
 interface ShiftPaidTerms extends ShiftHoursOptions {
@@ -20,14 +28,16 @@ interface ShiftPaidTerms extends ShiftHoursOptions {
   barnehageId: string;
   startTid: string;
   sluttTid: string;
+  barnehageName?: string | null;
 }
 
 /** Persist these terms on writes; accounting readers keep using stored values.
- * Never clear an existing explicit paid-break agreement outside policy scope.
+ * Espira never pays breaks; agreed paid-hour totals remain explicit overrides.
  */
 export function shiftPaidTerms(shift: ShiftPaidTerms) {
-  const betaltPause = hasPolicyPaidBreak(shift.dato, shift.barnehageId) ||
-    shift.betaltPause === true;
+  const betaltPause = !isEspiraKindergarten(shift.barnehageId, shift.barnehageName) &&
+    (hasPolicyPaidBreak(shift.dato, shift.barnehageId, shift.barnehageName) ||
+      shift.betaltPause === true);
   return {
     betaltPause,
     trekkPause: shouldDeductPause(shift.startTid, shift.sluttTid, { ...shift, betaltPause }),

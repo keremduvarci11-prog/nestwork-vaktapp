@@ -1,4 +1,5 @@
 import { pool } from "./db";
+import { correctEspiraBreaks } from "./espiraBreakCorrection";
 
 export async function runMigrations() {
   const client = await pool.connect();
@@ -167,6 +168,8 @@ export async function runMigrations() {
       FOR EACH ROW EXECUTE FUNCTION enqueue_vakt_sheet_sync_job();
     `);
     console.log("[Migration] sheet_sync_jobs OK");
+    const espiraCorrections = await correctEspiraBreaks(client);
+    console.log(`[Migration] Espira unpaid-break correction: ${espiraCorrections} shifts; sheet updates queued`);
 
     await client.query(`
       ALTER TABLE meldinger

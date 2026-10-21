@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { vaktPaidHoursPatchSchema } from "./schema";
-import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak, shiftPaidTerms, PAID_BREAK_EXEMPT_KINDERGARTEN_IDS } from "./shiftHours";
+import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak, shiftPaidTerms, PAID_BREAK_EXEMPT_KINDERGARTEN_IDS, isEspiraKindergarten } from "./shiftHours";
 
 test("paid-break policy is inclusive, date-scoped and keyed by stable client IDs", () => {
   assert.equal(hasPolicyPaidBreak("2026-08-31", "ordinary-client"), false);
@@ -16,12 +16,36 @@ test("paid-break policy is inclusive, date-scoped and keyed by stable client IDs
     assert.equal(hasPolicyPaidBreak("2026-09-07", barnehageId), false);
     const shift = { dato: "2026-09-07", barnehageId, startTid: "08:00", sluttTid: "13:30" };
     assert.deepEqual(shiftPaidTerms(shift), { betaltPause: false, trekkPause: true });
-    assert.deepEqual(shiftPaidTerms({ ...shift, betaltPause: true }), { betaltPause: true, trekkPause: false });
+    assert.deepEqual(shiftPaidTerms({ ...shift, betaltPause: true }), { betaltPause: false, trekkPause: true });
     assert.equal(calculatePaidHours(shift.startTid, shift.sluttTid, {
       ...shiftPaidTerms({ ...shift, avtalteBetalteTimer: "6.25" }),
       avtalteBetalteTimer: "6.25",
     }), 6.25);
   }
+});
+
+test("new Espira clients are unpaid regardless of legacy flags or shift date", () => {
+  for (const name of ["Espira Ny barnehage", "Ny barnehage Espira", "ESPIRA Test"]) {
+    assert.equal(isEspiraKindergarten("new-client", name), true);
+    assert.equal(hasPolicyPaidBreak("2026-10-22", "new-client", name), false);
+    for (const dato of ["2026-08-31", "2026-10-22"]) {
+      const shift = {
+        dato, barnehageId: "new-client", barnehageName: name,
+        startTid: "08:00", sluttTid: "15:30", betaltPause: true,
+      };
+      assert.deepEqual(shiftPaidTerms(shift), { betaltPause: false, trekkPause: true });
+      assert.equal(calculatePaidHours(shift.startTid, shift.sluttTid, shiftPaidTerms(shift)), 7);
+      const agreed = { ...shift, avtalteBetalteTimer: "7.00" };
+      assert.equal(calculatePaidHours(agreed.startTid, agreed.sluttTid, {
+        ...agreed, ...shiftPaidTerms(agreed),
+      }), 7);
+    }
+  }
+  assert.equal(isEspiraKindergarten("ordinary", "Spiren Barnehage"), false);
+  assert.deepEqual(shiftPaidTerms({
+    dato: "2026-10-30", barnehageId: PAID_BREAK_EXEMPT_KINDERGARTEN_IDS[2],
+    startTid: "07:30", sluttTid: "11:15", betaltPause: true,
+  }), { betaltPause: false, trekkPause: false });
 });
 
 test("write terms override legacy false but never rewrite clock times or agreed totals", () => {

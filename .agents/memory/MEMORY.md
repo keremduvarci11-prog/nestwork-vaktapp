@@ -1,6 +1,6 @@
 - [Codemagic/GitHub sync](codemagic-github-sync.md) — mobile builds clone GitHub main; push from Replit first, and lockfile firewall URLs break npm ci outside Replit.
 - [Vaktlogg og bestillinger](vaktlogg-sheet.md) — arkregler og testvaktmerking; separate bestillinger kan ha identiske tider og skal ikke slås sammen.
-- [Pausebetaling](automatisk-pausefratrekk.md) — betalt pause fra 2026-09-01, unntatt Espira Kuventræ og Ulvenvatnet; bevar klokkeslett og særavtaler.
+- [Pausebetaling](automatisk-pausefratrekk.md) — ingen Espira har betalt pause; ellers betalt fra 2026-09-01. Bevar særavtaler og unngå dobbelt fratrekk.
 - [Scheduled delivery](scheduled-delivery.md) — exact-time messaging needs an always-on runtime; distinguish drafts, activation, delivery and device push.
 - [Prepared shift authorization](prepared-shift-authorization.md) — honor latest scoped admin authorization; distinguish assignments, app notifications, device push and verified sheet rows.
 - [Isolated browser tests](isolated-browser-tests.md) — block service workers before navigation so fixture-based API interception stays isolated.

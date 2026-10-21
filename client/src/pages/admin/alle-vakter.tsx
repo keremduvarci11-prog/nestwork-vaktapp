@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Trash2, Pencil, Calendar, Clock, Building2, User, Save, X, AlertCircle, UserPlus, Coffee, CheckCircle2 } from "lucide-react";
 import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
-import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak } from "@shared/shiftHours";
+import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak, isEspiraKindergarten } from "@shared/shiftHours";
 import { AvailableShiftCandidates } from "@/components/admin/available-shift-candidates";
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -48,8 +48,10 @@ function EditVaktForm({
   const [status, setStatus] = useState(vakt.status);
   const [ansattId, setAnsattId] = useState(vakt.ansattId || "");
   const [betaltPause, setBetaltPause] = useState(vakt.betaltPause ?? false);
-  const policyPaidBreak = hasPolicyPaidBreak(dato, barnehageId);
-  const effectiveBetaltPause = policyPaidBreak || betaltPause;
+  const selectedBh = barnehager.find((b) => b.id === barnehageId);
+  const espira = isEspiraKindergarten(barnehageId, selectedBh?.name);
+  const policyPaidBreak = hasPolicyPaidBreak(dato, barnehageId, selectedBh?.name);
+  const effectiveBetaltPause = !espira && (policyPaidBreak || betaltPause);
   const [avtalteBetalteTimer, setAvtalteBetalteTimer] = useState(
     vakt.avtalteBetalteTimer?.toString() ?? "",
   );
@@ -65,7 +67,6 @@ function EditVaktForm({
   const [fakturert, setFakturert] = useState(vakt.fakturert || false);
   const [lonnUtbetalt, setLonnUtbetalt] = useState(vakt.lonnUtbetalt || false);
 
-  const selectedBh = barnehager.find((b) => b.id === barnehageId);
 
   const updateVakt = useMutation({
     mutationFn: () =>
@@ -212,14 +213,16 @@ function EditVaktForm({
             <div>
               <p className="text-xs font-medium">Pausen er betalt</p>
               <p className="text-[10px] text-muted-foreground">
-                {policyPaidBreak
+                {espira
+                  ? "Espira har ikke betalt pause. Automatisk trekk ved minst 5,5 timer; avtalte betalte timer beholdes."
+                  : policyPaidBreak
                   ? "Betalt pause gjelder ved denne barnehagen fra 01.09.2026"
                   : "Slår av automatisk trekk for denne vakten"}
               </p>
             </div>
             <Switch
               checked={effectiveBetaltPause}
-              disabled={policyPaidBreak}
+              disabled={policyPaidBreak || espira}
               onCheckedChange={setBetaltPause}
               data-testid="edit-switch-betalt-pause"
             />

@@ -10,11 +10,16 @@ test("storage create and edit enforce policy without touching unrelated shift st
   const { DatabaseStorage } = await import("./storage");
   const storage = new DatabaseStorage();
   let row: any;
+  let clientName = "Ordinary client";
+  t.mock.method(storage, "getBarnehage", async () => ({ id: "test-client", name: clientName }) as any);
   t.mock.method(db, "insert", () => ({
     values: (value: any) => ({ returning: async () => { row = { id: "test-shift", ...value }; return [row]; } }),
   }));
   t.mock.method(db, "transaction", async (callback: any) => callback({
-    select: () => ({ from: () => ({ where: () => ({ for: async () => [row] }) }) }),
+    select: () => ({ from: () => ({ where: () => ({
+      for: async () => [row],
+      then: (resolve: any, reject: any) => Promise.resolve([{ name: clientName }]).then(resolve, reject),
+    }) }) }),
     update: () => ({
       set: (patch: any) => ({ where: () => ({ returning: async () => { row = { ...row, ...patch }; return [row]; } }) }),
     }),
@@ -49,8 +54,18 @@ test("storage create and edit enforce policy without touching unrelated shift st
     assert.equal(row.trekkPause, true);
     await storage.updateVakt(row.id, { betaltPause: true, avtalteBetalteTimer: "7.50" });
     await storage.updateVakt(row.id, { dato: "2026-08-31" });
-    assert.equal(row.betaltPause, true);
+    assert.equal(row.betaltPause, false);
     assert.equal(row.avtalteBetalteTimer, "7.50");
     assert.equal(row.trekkPause, false);
   }
+  clientName = "Espira Newly added";
+  await storage.createVakt({ ...base, barnehageId: "new-espira", betaltPause: true });
+  assert.equal(row.betaltPause, false);
+  assert.equal(row.trekkPause, true);
+  await storage.updateVakt(row.id, { betaltPause: true });
+  assert.equal(row.betaltPause, false);
+  assert.equal(row.trekkPause, true);
+  await storage.updateVakt(row.id, { avtalteBetalteTimer: "7.00" });
+  assert.equal(row.avtalteBetalteTimer, "7.00");
+  assert.equal(row.trekkPause, false);
 });

@@ -1,16 +1,16 @@
 ---
 name: Automatisk pausefratrekk
-description: Betalt pause fra 1. september 2026, med to barnehageunntak og eldre standardregel.
+description: Betalt pause fra 1. september 2026, men ingen Espira-barnehager har betalt pause.
 ---
 
-Fra 2026-09-01 (tirsdag i uke 36) skal ansatte ha betalt pause ved alle barnehager unntatt Espira Kuventræ Barnehage og Espira Ulvenvatnet. Unntakene beholder tidligere regler til brukeren uttrykkelig bekrefter endring. Regelen gjelder allerede registrerte vakter og fremtidige vakter; mandag 31. august er ikke omfattet.
+Fra 2026-09-01 skal ansatte ha betalt pause ved barnehager utenfor Espira. Ingen Espira-barnehager har betalt pause, heller ikke Hollund, Scala Tasta eller nye Espira-kunder. Espira-regelen gjelder både registrerte og fremtidige vakter.
 
-**Why:** Brukeren korrigerte den tidligere generelle regelen om ubetalt pause og utvidet senere startdatoen uttrykkelig fra uke 37 til 1. september. De to navngitte unntakene er fortsatt ikke bekreftet.
+**Why:** Brukeren presiserte 2026-10-22: «Ingen Espira barnehager har betalt pause» og ba om å korrigere tidligere Espira-vakter både i appen og arket. Dette erstatter den eldre avgrensningen til Kuventræ og Ulvenvatnet.
 
-**How to apply:** Bevar faktiske klokkeslett, særskilt avtalte betalte timer og godkjennings-/utbetalingsstatus. Skill en autorisert forretningsregel fra bekreftet implementering og datakorrigering; les faktisk kode og lagrede verdier før du sier at regelen er aktiv. Brukeren godkjente også vanlig automatisk arksynk for denne korreksjonen, selv om uke 37–38 allerede var rettet manuelt. Bevar manuelle arkfelt og samme radidentitet.
+**How to apply:** Bevar faktiske klokkeslett, særskilt avtalte betalte timer og godkjennings-/utbetalingsstatus. Ikke trekk pause dobbelt når et avtalt timeantall allerede har fratrekket. Skill en autorisert regel fra bekreftet implementering og datakorrigering; les faktisk kode og lagrede verdier før du sier at regelen er aktiv. Bevar manuelle arkfelt og samme radidentitet ved arksynk.
 
-Før denne datoen og ved de to unntatte barnehagene gjelder eldre standard: minst 5,5 timers varighet gir 30 minutter ubetalt pause, med mindre en eksplisitt avtale om betalt pause eller betalte timer går foran.
+For Espira gjelder 30 minutter ubetalt pause ved minst 5,5 timers varighet. Kortere vakter skal ikke automatisk miste 30 minutter. Særskilt avtalte betalte timer må kontrolleres separat, særlig ved oppdelte arbeidsperioder.
 
-**Why:** Den nye regelen er datobegrenset og gjør ikke eldre eller særskilte avtaler ugyldige.
+**Why:** Brukerens korrigering gjelder betalt pause; den gir ikke grunnlag for å trekke en ekstra pause fra et timeantall som allerede er korrigert.
 
-**How to apply:** Ikke endre eldre vakter eller unntatte barnehager som del av denne korreksjonen. Bruk samme effektive beregning i ansattvisning, timerapportering og lønn.
+**How to apply:** Bruk samme effektive beregning i ansattvisning, timerapportering, lønn og Sheet. Tidligere ordinær regel før 2026-09-01 består utenfor Espira.

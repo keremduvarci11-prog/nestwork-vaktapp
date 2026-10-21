@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { NEW_EMPLOYEE_ONBOARDING_ITEMS } from "@shared/onboarding";
 import { matchesRegions } from "@shared/regions";
-import { hasPolicyPaidBreak, shiftPaidTerms } from "@shared/shiftHours";
+import { shiftPaidTerms } from "@shared/shiftHours";
 import { normalizeShiftPayPatch, type HourlyRatePatch } from "@shared/shiftPay";
 import { persistUnsuccessfulRequestNotices, ShiftRequestError } from "./shiftRequestResolution";
 import { persistShiftTimeNotices } from "./shiftTimeChanges";
@@ -214,7 +214,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createVakt(v: InsertVakt): Promise<Vakt> {
-    const [created] = await db.insert(vakter).values({ ...v, ...shiftPaidTerms(v) }).returning();
+    const client = await this.getBarnehage(v.barnehageId);
+    const [created] = await db.insert(vakter).values({
+      ...v,
+      ...shiftPaidTerms({ ...v, barnehageName: client?.name }),
+    }).returning();
     return created;
   }
 
@@ -238,15 +242,13 @@ export class DatabaseStorage implements IStorage {
       }
       const data = normalizeShiftPayPatch(before, input);
       const effective = { ...before, ...data };
-      const termsEdited = ["dato", "barnehageId", "startTid", "sluttTid", "betaltPause", "avtalteBetalteTimer"]
-        .some((key) => Object.prototype.hasOwnProperty.call(data, key));
+      const [client] = await tx.select().from(barnehager).where(eq(barnehager.id, effective.barnehageId));
       // Merge under a row lock so date/client edits and legacy false payloads
       // cannot bypass policy or overwrite concurrent paid-hours agreements.
       const [updated] = await tx.update(vakter)
         .set({
           ...data,
-          ...(termsEdited || hasPolicyPaidBreak(effective.dato, effective.barnehageId)
-            ? shiftPaidTerms(effective) : {}),
+          ...shiftPaidTerms({ ...effective, barnehageName: client?.name }),
         })
         .where(eq(vakter.id, id)).returning();
       const notices = [
