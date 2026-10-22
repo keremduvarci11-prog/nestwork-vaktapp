@@ -179,7 +179,7 @@ export default function AdminDashboard() {
                             <Card key={v.id} data-testid={`card-vakt-${v.id}`}>
                               <CardContent className="p-2.5">
                                 <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2 min-w-0">
+                                  <div className="flex flex-1 items-center gap-2 min-w-0">
                                     {emp ? (
                                       <Avatar className="w-7 h-7 flex-shrink-0">
                                         {emp.profileImage && <AvatarImage src={emp.profileImage} alt={emp.name} />}
@@ -197,6 +197,14 @@ export default function AdminDashboard() {
                                       <p className="text-xs text-muted-foreground truncate leading-tight">{bh?.name}</p>
                                     </div>
                                   </div>
+                                  {v.status === "tildelt" && (
+                                    <span
+                                      className="flex-shrink-0 text-xs font-semibold text-orange-600 dark:text-orange-400"
+                                      data-testid={`status-tildelt-${v.id}`}
+                                    >
+                                      Tildelt
+                                    </span>
+                                  )}
                                   <div className="text-right flex-shrink-0">
                                     <p className="text-xs font-medium tabular-nums">{v.startTid?.slice(0, 5)}–{v.sluttTid?.slice(0, 5)}</p>
                                   </div>
