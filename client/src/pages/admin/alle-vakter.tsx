@@ -16,6 +16,7 @@ import type { Vakt, Barnehage, User as UserType } from "@shared/schema";
 import { useLocation } from "wouter";
 import { calculatePaidHours, shouldDeductPause, hasPolicyPaidBreak, isEspiraKindergarten } from "@shared/shiftHours";
 import { AvailableShiftCandidates } from "@/components/admin/available-shift-candidates";
+import { EmployeePicker } from "@/components/admin/employee-picker";
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   ledig: { label: "Ledig", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
@@ -174,20 +175,16 @@ function EditVaktForm({
 
         <div className="space-y-2">
           <label className="text-xs font-medium">Tildelt ansatt</label>
-          <Select value={ansattId || "none"} onValueChange={(v) => {
-            setAnsattId(v === "none" ? "" : v);
-            setAvtalteTimelonn("");
-          }}>
-            <SelectTrigger data-testid="edit-select-ansatt">
-              <SelectValue placeholder="Ingen" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Ingen</SelectItem>
-              {ansatte.map((a) => (
-                <SelectItem key={a.id} value={a.id}>{a.name} ({a.region})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <EmployeePicker
+            employees={ansatte}
+            value={ansattId}
+            allowNone
+            testId="edit-select-ansatt"
+            onValueChange={(id) => {
+              setAnsattId(id);
+              setAvtalteTimelonn("");
+            }}
+          />
         </div>
 
         <div className="flex items-center gap-2 p-2.5 rounded-md bg-muted/50 border">
@@ -593,16 +590,12 @@ export default function AlleVakter() {
                     {tildelingId === vakt.id ? (
                       <div className="mt-3 pt-3 border-t space-y-2">
                         <label className="text-xs font-medium">Velg ansatt å tildele</label>
-                        <Select onValueChange={(ansattId) => tildelVakt.mutate({ vaktId: vakt.id, ansattId })}>
-                          <SelectTrigger data-testid={`select-tildel-${vakt.id}`}>
-                            <SelectValue placeholder="Velg ansatt..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(users || []).filter((u) => u.role === "ansatt").map((a) => (
-                              <SelectItem key={a.id} value={a.id}>{a.name} ({a.region})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <EmployeePicker
+                          employees={(users || []).filter((u) => u.role === "ansatt")}
+                          onValueChange={(ansattId) => tildelVakt.mutate({ vaktId: vakt.id, ansattId })}
+                          disabled={tildelVakt.isPending}
+                          testId={`select-tildel-${vakt.id}`}
+                        />
                         <Button variant="ghost" size="sm" onClick={() => setTildelingId(null)} data-testid={`button-cancel-tildel-${vakt.id}`}>
                           Avbryt
                         </Button>
