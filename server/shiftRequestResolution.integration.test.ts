@@ -70,6 +70,53 @@ test("real assignment transaction stores rejection notices and serializes reques
       assert.equal((await query("SELECT * FROM vakt_interesser")).rowCount, 3);
     });
 
+    await t.test("withdrawal removes only your requests, allows retry and reapplication", async () => {
+      await reset();
+      await request("synthetic-withdrawing");
+      await request("synthetic-other");
+      await storage.withdrawVaktInteresse("synthetic-shift", "synthetic-stranger");
+      assert.equal((await query("SELECT * FROM vakt_interesser")).rowCount, 2);
+      await storage.withdrawVaktInteresse("synthetic-shift", "synthetic-withdrawing");
+      await storage.withdrawVaktInteresse("synthetic-shift", "synthetic-withdrawing");
+      assert.deepEqual((await query("SELECT ansatt_id FROM vakt_interesser")).rows,
+        [{ ansatt_id: "synthetic-other" }]);
+      assert.deepEqual((await query("SELECT status,ansatt_id FROM vakter")).rows,
+        [{ status: "ledig", ansatt_id: null }]);
+      await request("synthetic-withdrawing");
+      assert.equal((await query("SELECT * FROM vakt_interesser")).rowCount, 2);
+    });
+
+    await t.test("withdrawal after assignment cannot remove requests or cancel assignment", async () => {
+      await reset();
+      await request("synthetic-winner");
+      await storage.updateVakt("synthetic-shift", { status: "tildelt", ansattId: "synthetic-winner" });
+      await assert.rejects(storage.withdrawVaktInteresse("synthetic-shift", "synthetic-winner"),
+        (error: unknown) => error instanceof ShiftRequestError && error.status === 409);
+      assert.equal((await query("SELECT * FROM vakt_interesser")).rowCount, 1);
+      assert.deepEqual((await query("SELECT status,ansatt_id FROM vakter")).rows,
+        [{ status: "tildelt", ansatt_id: "synthetic-winner" }]);
+      await assert.rejects(storage.withdrawVaktInteresse("missing-shift", "synthetic-winner"),
+        (error: unknown) => error instanceof ShiftRequestError && error.status === 404);
+    });
+
+    await t.test("withdrawal racing assignment preserves the assigned employee", async () => {
+      await reset();
+      await request("synthetic-withdrawing");
+      const [withdrawal, assignment] = await Promise.allSettled([
+        storage.withdrawVaktInteresse("synthetic-shift", "synthetic-withdrawing"),
+        storage.updateVakt("synthetic-shift", { status: "tildelt", ansattId: "synthetic-winner" }),
+      ]);
+      assert.equal(assignment.status, "fulfilled");
+      assert.deepEqual((await query("SELECT status,ansatt_id FROM vakter")).rows,
+        [{ status: "tildelt", ansatt_id: "synthetic-winner" }]);
+      const remaining = (await query("SELECT * FROM vakt_interesser")).rowCount;
+      if (withdrawal.status === "fulfilled") assert.equal(remaining, 0);
+      else {
+        assert.ok(withdrawal.reason instanceof ShiftRequestError && withdrawal.reason.status === 409);
+        assert.equal(remaining, 1);
+      }
+    });
+
     await t.test("direct PATCH-style approval of a pending request notifies other applicants", async () => {
       await reset();
       await request("synthetic-other");

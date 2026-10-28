@@ -55,6 +55,26 @@ export default function EmployeeHome() {
     },
   });
 
+  const trekkForesporselMutation = useMutation({
+    mutationFn: (vaktId: string) =>
+      apiRequest("DELETE", `/api/vakter/${vaktId}/foresporsel`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vakt-interesser"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
+      toast({ title: "Forespørselen er trukket tilbake", description: "Du kan sende en ny forespørsel hvis du ombestemmer deg." });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vakter"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vakter/mine"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vakt-interesser"] });
+      toast({
+        title: "Kunne ikke trekke tilbake forespørselen",
+        description: "Vakten kan allerede være tildelt. Kontakt Nestwork dersom du ikke kan jobbe.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const godtaVaktMutation = useMutation({
     mutationFn: (vaktId: string) => apiRequest("POST", `/api/vakter/${vaktId}/godta`),
     onSuccess: () => {
@@ -270,6 +290,7 @@ export default function EmployeeHome() {
                     Dette er en forespørsel, ikke en bekreftet vakt. Ikke møt opp før du har fått vakten tildelt og bekreftet.
                   </p>
                   {harMeldtInteresse ? (
+                    <div className="space-y-2">
                     <Button
                       data-testid={`button-interesse-sendt-${vakt.id}`}
                       className="w-full"
@@ -279,6 +300,18 @@ export default function EmployeeHome() {
                       <HandMetal className="w-4 h-4 mr-1.5" />
                       Forespørsel sendt — avventer svar
                     </Button>
+                    <Button
+                      data-testid={`button-trekk-foresporsel-${vakt.id}`}
+                      className="w-full"
+                      variant="outline"
+                      disabled={trekkForesporselMutation.isPending}
+                      onClick={() => trekkForesporselMutation.mutate(vakt.id)}
+                    >
+                      {trekkForesporselMutation.isPending && trekkForesporselMutation.variables === vakt.id
+                        ? "Trekker tilbake…"
+                        : "Trekk tilbake forespørsel"}
+                    </Button>
+                    </div>
                   ) : (
                     <Button
                       data-testid={`button-ta-vakt-${vakt.id}`}

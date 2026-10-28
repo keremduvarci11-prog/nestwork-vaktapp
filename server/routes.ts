@@ -940,6 +940,16 @@ export async function registerRoutes(
     })();
   });
 
+  app.delete("/api/vakter/:id/foresporsel", requireAuth, async (req, res) => {
+    try {
+      await storage.withdrawVaktInteresse(asString(req.params.id), getUserIdFromRequest(req)!);
+      res.json({ success: true });
+    } catch (err) {
+      if (err instanceof ShiftRequestError) return res.status(err.status).json({ message: err.message });
+      throw err;
+    }
+  });
+
   app.get("/api/vakter/:id/interesser", requireAuth, async (req, res) => {
     const interesser = await storage.getVaktInteresser(asString(req.params.id));
     res.json(interesser);

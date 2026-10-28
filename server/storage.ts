@@ -95,6 +95,7 @@ export interface IStorage {
   getVaktInteresser(vaktId: string): Promise<VaktInteresse[]>;
   getAllVaktInteresser(): Promise<VaktInteresse[]>;
   createVaktInteresse(data: InsertVaktInteresse): Promise<VaktInteresse>;
+  withdrawVaktInteresse(vaktId: string, ansattId: string): Promise<void>;
   deleteVaktInteresser(vaktId: string): Promise<void>;
   getVaktInteresserByAnsatt(ansattId: string): Promise<VaktInteresse[]>;
 
@@ -560,6 +561,22 @@ export class DatabaseStorage implements IStorage {
 
   async deleteVaktInteresser(vaktId: string): Promise<void> {
     await db.delete(vaktInteresser).where(eq(vaktInteresser.vaktId, vaktId));
+  }
+
+  async withdrawVaktInteresse(vaktId: string, ansattId: string): Promise<void> {
+    await db.transaction(async tx => {
+      // Serialize with assignment: withdrawing must never cancel an assigned shift.
+      const [shift] = await tx.select().from(vakter).where(eq(vakter.id, vaktId)).for("update");
+      if (!shift) throw new ShiftRequestError(404, "Vakt ikke funnet");
+      if (shift.status !== "ledig" || shift.ansattId) {
+        throw new ShiftRequestError(409, "Vakten er allerede behandlet. Kontakt Nestwork dersom du ikke kan jobbe.");
+      }
+      // Idempotent, and scoped to the authenticated employee only.
+      await tx.delete(vaktInteresser).where(and(
+        eq(vaktInteresser.vaktId, vaktId),
+        eq(vaktInteresser.ansattId, ansattId),
+      ));
+    });
   }
 
   async getVaktInteresserByAnsatt(ansattId: string): Promise<VaktInteresse[]> {
