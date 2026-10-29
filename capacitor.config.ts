@@ -10,6 +10,9 @@ const config: CapacitorConfig = {
     allowNavigation: ["nestwork-shift-manager.replit.app"],
   },
   plugins: {
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
     SplashScreen: {
       launchShowDuration: 2000,
       backgroundColor: "#ffffff",
@@ -36,8 +39,10 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     includePlugins: [
+      "@capacitor/filesystem",
       "@capacitor/keyboard",
       "@capacitor/push-notifications",
+      "@capacitor/share",
       "@capacitor/splash-screen",
       "@capacitor/status-bar",
     ],

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BellRing, BellOff } from "lucide-react";
-import { subscribeToPush } from "@/lib/push";
+import { getPushPermissionState, subscribeToPush } from "@/lib/push";
 
 interface PushBannerProps {
   compact?: boolean;
@@ -11,27 +11,43 @@ interface PushBannerProps {
 export function PushPermissionBanner({ compact }: PushBannerProps) {
   const [status, setStatus] = useState<"prompt" | "granted" | "denied" | "unsupported">("prompt");
   const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState("");
+  const native = ["android", "ios"].includes((window as any).Capacitor?.getPlatform?.());
 
   useEffect(() => {
-    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-      setStatus("unsupported");
-      return;
-    }
-    setStatus(Notification.permission as "prompt" | "granted" | "denied");
+    const refresh = () => {
+      void getPushPermissionState().then(setStatus).catch(() => {
+        setError("Kunne ikke sjekke varslingstillatelsen. Prøv igjen.");
+      });
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    window.addEventListener("nestwork-push-change", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("nestwork-push-change", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   const handleEnable = async () => {
     setRequesting(true);
+    setError("");
     try {
       await subscribeToPush();
-      setStatus(Notification.permission as "prompt" | "granted" | "denied");
+      setStatus(await getPushPermissionState());
     } catch (e) {
-      console.error("[Push] Error:", e);
+      setError("Kunne ikke aktivere varsler. Sjekk internettforbindelsen og prøv igjen.");
     }
     setRequesting(false);
   };
 
-  if (status === "granted" || status === "unsupported") return null;
+  if (status === "granted" && !error) return null;
+  if (status === "unsupported") {
+    if (!native) return null;
+    return <p className="text-sm text-amber-600 p-3" role="status">Oppdater Nestwork-appen for å kunne motta varsler på telefonen.</p>;
+  }
 
   if (status === "denied") {
     return (
@@ -44,7 +60,9 @@ export function PushPermissionBanner({ compact }: PushBannerProps) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-red-700 dark:text-red-300">Varsler er blokkert</p>
               <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
-                For å få varsler på telefonen, åpne nettleserinnstillingene og tillat varsler for denne siden.
+                {native
+                  ? "Åpne telefonens innstillinger → Apper → Nestwork → Varsler, og tillat varsler."
+                  : "For å få varsler på telefonen, åpne nettleserinnstillingene og tillat varsler for denne siden."}
               </p>
             </div>
           </div>
@@ -65,6 +83,7 @@ export function PushPermissionBanner({ compact }: PushBannerProps) {
             <p className="text-xs text-muted-foreground mt-0.5">
               Skru på varsler for å bli varslet om nye vakter og meldinger — også når du ikke er inne i appen.
             </p>
+            {error && <p role="alert" className="text-xs text-destructive mt-1">{error}</p>}
             <Button
               size="sm"
               className="mt-2"

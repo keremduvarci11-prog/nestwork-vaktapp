@@ -1,4 +1,5 @@
 - [Codemagic/GitHub sync](codemagic-github-sync.md) — mobile builds clone GitHub main; push from Replit first, and lockfile firewall URLs break npm ci outside Replit.
+- [Native PDF compatibility](native-document-compatibility.md) — use a matching legacy PDF engine and worker; verify rendering, not just builds.
 - [Vaktlogg og bestillinger](vaktlogg-sheet.md) — arkregler og testvaktmerking; separate bestillinger kan ha identiske tider og skal ikke slås sammen.
 - [Pausebetaling](automatisk-pausefratrekk.md) — ingen Espira har betalt pause; ellers betalt fra 2026-09-01. Bevar særavtaler og unngå dobbelt fratrekk.
 - [Scheduled delivery](scheduled-delivery.md) — exact-time messaging needs an always-on runtime; distinguish drafts, activation, delivery and device push.

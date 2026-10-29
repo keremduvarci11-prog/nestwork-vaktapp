@@ -33,6 +33,8 @@ import {
 } from "lucide-react";
 import type { Vakt, Barnehage } from "@shared/schema";
 import { calculatePaidHours, shouldDeductPause } from "@shared/shiftHours";
+import { PdfPreview } from "@/components/pdf-preview";
+import { shareNativePdf } from "@/lib/share-pdf";
 
 interface LonnsslippMeta {
   id: string;
@@ -213,6 +215,7 @@ export default function LonnTimer() {
       const filename = ensurePdfExt(result.filename);
       const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
 
+      if (await shareNativePdf(pdfBlob, filename)) return;
       const file = new File([pdfBlob], filename, { type: "application/pdf" });
       const nav: any = navigator;
       if (nav.canShare && nav.canShare({ files: [file] })) {
@@ -685,12 +688,7 @@ export default function LonnTimer() {
             )}
           </DialogHeader>
           {pdfViewer && (
-            <iframe
-              src={pdfViewer.url}
-              title={pdfViewer.name}
-              className="flex-1 w-full border-0 bg-muted"
-              data-testid="iframe-pdf-viewer"
-            />
+            <PdfPreview url={pdfViewer.url} />
           )}
         </DialogContent>
       </Dialog>

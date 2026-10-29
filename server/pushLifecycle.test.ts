@@ -182,6 +182,20 @@ test("Android permission denial is retryable and registration uses only the FCM 
   assert.equal(h.calls.at(-1)?.body.endpoint, `fcm://${"b".repeat(64)}`);
 });
 
+test("Android permission status requires a saved registration, not browser permissions", async () => {
+  const h = await pushHarness("android");
+  h.push.setPushUser("android-account");
+  assert.equal(await h.push.getPushPermissionState(), "prompt");
+  await h.push.initPush();
+  assert.equal(await h.push.getPushPermissionState(), "granted");
+  h.push.setPushUser("another-account");
+  assert.equal(await h.push.getPushPermissionState(), "prompt");
+  h.permission("denied");
+  assert.equal(await h.push.getPushPermissionState(), "denied");
+  h.pluginAvailable(false);
+  assert.equal(await h.push.getPushPermissionState(), "unsupported");
+});
+
 test("old Android binaries without the native push plugin skip registration safely", async () => {
   const h = await pushHarness("android");
   h.pluginAvailable(false);

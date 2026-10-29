@@ -25,6 +25,19 @@ function getPlatform(): string {
   return (window as any).Capacitor?.getPlatform?.() || "web";
 }
 
+export async function getPushPermissionState(): Promise<"prompt" | "granted" | "denied" | "unsupported"> {
+  const platform = getPlatform();
+  if (platform === "android" || platform === "ios") {
+    if ((window as any).Capacitor?.isPluginAvailable?.("PushNotifications") === false) return "unsupported";
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+    const { receive } = await PushNotifications.checkPermissions();
+    if (receive === "denied") return "denied";
+    return receive === "granted" && registeredUser === userId && !!userId ? "granted" : "prompt";
+  }
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return "unsupported";
+  return Notification.permission === "default" ? "prompt" : Notification.permission;
+}
+
 export function initPush() {
   return registerPush(false);
 }
@@ -49,7 +62,10 @@ async function registerPush(requestPermission: boolean): Promise<void> {
     // Remember even an ambiguous network failure so logout can detach it.
     localStorage.setItem(ENDPOINT_KEY, endpoint);
     await apiRequest("POST", "/api/push/subscribe", { endpoint, keys });
-    if (current()) registeredUser = owner;
+    if (current()) {
+      registeredUser = owner;
+      window.dispatchEvent?.(new Event("nestwork-push-change"));
+    }
   };
   const operation = async () => {
     const platform = getPlatform();

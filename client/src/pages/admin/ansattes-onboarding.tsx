@@ -1,3 +1,5 @@
+import { PdfPreview } from "@/components/pdf-preview";
+import { shareNativePdf } from "@/lib/share-pdf";
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -330,6 +332,7 @@ function LonnsslippSection({ userId, userName }: { userId: string; userName: str
       const filename = ensurePdfExt(result.filename);
       const pdfBlob = new Blob([result.blob], { type: "application/pdf" });
 
+      if (await shareNativePdf(pdfBlob, filename)) return;
       const fileObj = new File([pdfBlob], filename, { type: "application/pdf" });
       const nav: any = navigator;
       if (nav.canShare && nav.canShare({ files: [fileObj] })) {
@@ -553,12 +556,7 @@ function LonnsslippSection({ userId, userName }: { userId: string; userName: str
             </DialogTitle>
           </DialogHeader>
           {pdfViewer && (
-            <iframe
-              src={pdfViewer.url}
-              title={pdfViewer.name}
-              className="flex-1 w-full border-0 bg-muted"
-              data-testid="iframe-admin-pdf-viewer"
-            />
+            <PdfPreview url={pdfViewer.url} />
           )}
         </DialogContent>
       </Dialog>
