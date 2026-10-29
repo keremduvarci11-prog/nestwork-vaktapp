@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import type { Vakt, Barnehage, User } from "@shared/schema";
 import { PushPermissionBanner } from "@/components/push-banner";
 import { compareWeeklyHours } from "@shared/weeklyHours";
+import { sortDashboardShifts } from "@shared/dashboardShiftOrder";
 
 function osloNow(): { todayIso: string; nowMinutes: number } {
   const fmt = new Intl.DateTimeFormat("en-GB", {
@@ -59,13 +60,8 @@ export default function AdminDashboard() {
 
   const activeVakter = useMemo(() => {
     const list = vakter?.filter((v) => isVaktActive(v) && (v.status === "godkjent" || v.status === "venter" || v.status === "tildelt")) || [];
-    return list.slice().sort((a, b) => {
-      if (a.dato !== b.dato) return a.dato < b.dato ? -1 : 1;
-      const at = a.startTid || "00:00";
-      const bt = b.startTid || "00:00";
-      return at < bt ? -1 : at > bt ? 1 : 0;
-    });
-  }, [vakter, tick]);
+    return sortDashboardShifts(list, barnehager ?? [], users ?? []);
+  }, [vakter, barnehager, users, tick]);
   const ledigeVakter = useMemo(() => vakter?.filter((v) => isVaktActive(v) && v.status === "ledig") || [], [vakter, tick]);
   const venterVakter = vakter?.filter((v) => v.status === "venter") || [];
   const tildelteVakter = useMemo(() => vakter?.filter((v) => isVaktActive(v) && v.status === "tildelt") || [], [vakter, tick]);
