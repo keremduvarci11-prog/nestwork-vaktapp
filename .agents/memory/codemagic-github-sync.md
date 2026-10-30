@@ -21,4 +21,10 @@ The Firebase Android client configuration may travel with the repository; privat
 
 **How to apply:** Keep CI validation strict for missing configuration, wrong package names, and accidentally supplied service-account files. Never copy the server credential into an Android build, Git, logs, or downloadable assets.
 
+Keep Android's minimum supported version at Android 7 / API 24 or higher while Google Play automatic protection is enabled.
+
+**Why:** Google Play rejected the API 23 bundle because automatic protection requires API 24. The user explicitly approved dropping Android 6 update eligibility after the compatibility consequence was explained.
+
+**How to apply:** Do not lower the minimum SDK to restore Android 6 support without revisiting the protection setting and getting approval. Raising the minimum does not remove existing installations, but those devices cannot install the new release.
+
 **Why:** Google Play rejected the app for startup crashes (Firebase auto-init without config); Codemagic builds repeatedly failed at "Build web assets" because GitHub main was a stale diverged copy missing files, then because of the firewall URLs in the lockfile.
