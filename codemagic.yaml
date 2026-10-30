@@ -65,6 +65,18 @@ workflows:
           NODE
       - name: Sync Capacitor
         script: npx cap sync android
+      - name: Install Android 36 SDK
+        script: |
+          set -e
+          SDK_MANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDK_MANAGER" ]; then
+            SDK_MANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          if [ ! -x "$SDK_MANAGER" ]; then
+            echo "Android SDK manager is missing on the build machine" >&2
+            exit 1
+          fi
+          "$SDK_MANAGER" "platforms;android-36" "build-tools;35.0.0" "platform-tools"
       - name: Set Android SDK location
         script: echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
       - name: Build Android App Bundle

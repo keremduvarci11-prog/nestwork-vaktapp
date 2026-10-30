@@ -27,4 +27,10 @@ Keep Android's minimum supported version at Android 7 / API 24 or higher while G
 
 **How to apply:** Do not lower the minimum SDK to restore Android 6 support without revisiting the protection setting and getting approval. Raising the minimum does not remove existing installations, but those devices cannot install the new release.
 
+Google Play's target-API requirement is separate from its automatic-protection minimum SDK requirement; resolve both before preparing another release.
+
+**Why:** After the minimum-SDK correction, the next upload was still blocked by a required target API 36. Fixing one requirement does not establish release readiness.
+
+**How to apply:** Check the actual Play error and current Android build-tool compatibility together. Keep compile/target API, Android Gradle plugin, Gradle wrapper and CI-installed platform consistent; do not raise the minimum supported Android version just to satisfy a target-API requirement.
+
 **Why:** Google Play rejected the app for startup crashes (Firebase auto-init without config); Codemagic builds repeatedly failed at "Build web assets" because GitHub main was a stale diverged copy missing files, then because of the firewall URLs in the lockfile.
